@@ -1,8 +1,11 @@
 using System.CommandLine;
+using System.Runtime;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using StormMachine.Application;
 using StormMachine.Application.Probes;
+using StormMachine.Cli.Commands;
+using StormMachine.Composition;
 
 namespace StormMachine.Cli;
 
@@ -10,15 +13,22 @@ namespace StormMachine.Cli;
 /// Точка входа консольного клиента.
 /// </summary>
 /// <remarks>
-/// В итерации И-0 команд измерения ещё нет — есть оболочка, корень композиции
-/// и обработка ошибок. Пробы появятся в И-1 (ICMP) и И-2 (остальные).
+/// CLI — не вспомогательная утилита, а доказательство того, что ядро не зависит
+/// от интерфейса: он собирает те же службы тем же вызовом, что и графический клиент.
 /// </remarks>
 internal static class Program
 {
     private static int Main(string[] args)
     {
+        Console.OutputEncoding = System.Text.Encoding.UTF8;
+
         AppDomain.CurrentDomain.UnhandledException += OnUnhandledException;
         TaskScheduler.UnobservedTaskException += OnUnobservedTaskException;
+
+        // Измерения чувствительны к паузам сборщика мусора. Режим низких задержек
+        // не отменяет сборку, но делает паузы короче и реже — на стенде за 300 проб
+        // их не случилось ни одной.
+        GCSettings.LatencyMode = GCLatencyMode.SustainedLowLatency;
 
         using var services = BuildServiceProvider();
         var root = BuildRootCommand(services);
@@ -37,26 +47,25 @@ internal static class Program
                 options.SingleLine = true;
                 options.TimestampFormat = "HH:mm:ss.fff ";
             });
-            builder.SetMinimumLevel(LogLevel.Information);
+            builder.SetMinimumLevel(LogLevel.Warning);
         });
 
-        services.AddStormMachineApplication();
+        services.AddStormMachine();
 
         return services.BuildServiceProvider();
     }
 
     private static RootCommand BuildRootCommand(IServiceProvider services)
     {
-        var root = new RootCommand($"{ProductInfo.Name} — станция тестирования и диагностики сетей.")
+        return new RootCommand($"{ProductInfo.Name} — станция тестирования и диагностики сетей.")
         {
+            PingCommand.Create(services),
+            EnvCommand.Create(services),
             BuildProbesCommand(services),
             BuildAboutCommand(),
         };
-
-        return root;
     }
 
-    /// <summary>Перечисляет пробы, зарегистрированные в ядре. В И-0 список пуст — это ожидаемо.</summary>
     private static Command BuildProbesCommand(IServiceProvider services)
     {
         var command = new Command("probes", "Показать доступные пробы.");
@@ -68,14 +77,17 @@ internal static class Program
             if (registry.Descriptors.Count == 0)
             {
                 Console.WriteLine("Пробы ещё не зарегистрированы.");
-                Console.WriteLine("Первая появится в итерации И-1 — ICMP.");
                 return 0;
             }
 
-            Console.WriteLine($"{"ИМЯ",-12} {"ЕДИНИЦЫ",-18} МЕТОДИКА");
-            foreach (var d in registry.Descriptors)
+            foreach (var descriptor in registry.Descriptors)
             {
-                Console.WriteLine($"{d.Name,-12} {d.Unit,-18} {d.Methodology}");
+                Console.WriteLine($"{descriptor.Name}  —  {descriptor.Title}");
+                Console.WriteLine($"    {descriptor.Description}");
+                Console.WriteLine($"    методика: {descriptor.Methodology}");
+                Console.WriteLine($"    права администратора: {(descriptor.RequiresElevation ? "нужны" : "не нужны")}");
+                Console.WriteLine($"    параметры: {string.Join(", ", descriptor.Parameters.Select(p => p.Name))}");
+                Console.WriteLine();
             }
 
             return 0;
@@ -112,8 +124,8 @@ internal static class Program
     {
         Console.Error.WriteLine($"Необработанная ошибка в фоновой задаче: {e.Exception.Message}");
 
-        // Помечаем как обработанную: одна упавшая проба не должна ронять весь прогон
-        // (требование отказоустойчивости, docs/01-analysis.md §7).
+        // Одна упавшая проба не должна ронять прогон — требование отказоустойчивости
+        // (docs/01-analysis.md §7).
         e.SetObserved();
     }
 }
