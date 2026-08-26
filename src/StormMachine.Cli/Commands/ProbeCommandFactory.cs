@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using StormMachine.Application;
 using StormMachine.Application.Abstractions;
 using StormMachine.Application.Probes;
+using StormMachine.Application.Runs;
 using StormMachine.Cli.Rendering;
 using StormMachine.Domain.Measurements;
 using StormMachine.Domain.Results;
@@ -54,7 +55,13 @@ internal static class ProbeCommandFactory
             Description = "Только итоговая сводка, без построчного вывода.",
         };
 
+        var saveOption = new Option<bool>("--save")
+        {
+            Description = "Сохранить прогон в журнал (storm runs list).",
+        };
+
         command.Options.Add(quietOption);
+        command.Options.Add(saveOption);
 
         command.SetAction(async (parseResult, cancellationToken) =>
         {
@@ -71,8 +78,13 @@ internal static class ProbeCommandFactory
                 Parameters = parameters,
             };
 
-            return await RunAsync(services, probe, request, parseResult.GetValue(quietOption), cancellationToken)
-                .ConfigureAwait(false);
+            return await RunAsync(
+                services,
+                probe,
+                request,
+                parseResult.GetValue(quietOption),
+                parseResult.GetValue(saveOption),
+                cancellationToken).ConfigureAwait(false);
         });
 
         return command;
@@ -83,10 +95,12 @@ internal static class ProbeCommandFactory
         IProbe probe,
         ProbeRequest request,
         bool quiet,
+        bool save,
         CancellationToken cancellationToken)
     {
         var environment = services.GetRequiredService<INetworkEnvironment>();
         var clock = services.GetRequiredService<IHighResolutionClock>();
+        var orchestrator = services.GetRequiredService<RunOrchestrator>();
         var descriptor = probe.Descriptor;
 
         var errors = probe.Validate(request);
@@ -100,43 +114,40 @@ internal static class ProbeCommandFactory
             return 2;
         }
 
+        if (save)
+        {
+            var store = services.GetRequiredService<IRunStore>();
+            await store.InitializeAsync(cancellationToken).ConfigureAwait(false);
+        }
+
         await clock.CalibrateAsync(cancellationToken).ConfigureAwait(false);
+        ProbeRenderer.WriteHeader(descriptor, request.Target, BuildContext(environment.GetPrimaryAdapter(), clock, descriptor.Methodology), environment.GetPrimaryAdapter());
 
-        var adapter = environment.GetPrimaryAdapter();
-        var context = BuildContext(adapter, clock, descriptor.Methodology);
-        var collector = new ProbeCollector();
-
-        ProbeRenderer.WriteHeader(descriptor, request.Target, context, adapter);
-
+        // Ctrl+C отменяет измерение, но не прерывает подведение итога: уже измеренное
+        // должно и показаться, и — при --save — доехать до журнала.
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        var interrupted = false;
 
         void OnCancelKey(object? sender, ConsoleCancelEventArgs args)
         {
             args.Cancel = true;
-            interrupted = true;
             linked.Cancel();
         }
 
         Console.CancelKeyPress += OnCancelKey;
 
-        var samples = new List<Sample>();
+        RunOutcome outcome;
 
         try
         {
-            await foreach (var sample in probe.ExecuteAsync(request, collector, linked.Token).ConfigureAwait(false))
-            {
-                samples.Add(sample);
-
-                if (!quiet)
+            outcome = await orchestrator.RunAsync(
+                probe,
+                request,
+                new RunOptions
                 {
-                    ProbeRenderer.WriteLiveSample(descriptor, sample);
-                }
-            }
-        }
-        catch (OperationCanceledException)
-        {
-            interrupted = true;
+                    Save = save,
+                    OnSample = quiet ? null : sample => ProbeRenderer.WriteLiveSample(descriptor, sample),
+                },
+                linked.Token).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
@@ -148,23 +159,16 @@ internal static class ProbeCommandFactory
             Console.CancelKeyPress -= OnCancelKey;
         }
 
-        var result = new ProbeResult
+        ProbeRenderer.WriteSummary(descriptor, outcome.Result, clock);
+
+        if (outcome.RunId is { } runId)
         {
-            Id = Guid.NewGuid(),
-            Kind = descriptor.Kind,
-            Target = request.Target,
-            ResolvedAddress = collector.ResolvedAddress,
-            Context = context,
-            Unit = descriptor.Unit,
-            Samples = samples,
-            Facts = collector.Facts,
-            CompletedUtc = DateTimeOffset.UtcNow,
-            WasCancelled = interrupted,
-        };
+            Console.WriteLine();
+            Console.WriteLine($"Сохранено в журнал: {runId}");
+            Console.WriteLine($"  storm runs show {runId}");
+        }
 
-        ProbeRenderer.WriteSummary(descriptor, result, clock);
-
-        return result.SuccessCount > 0 ? 0 : 1;
+        return outcome.Result.SuccessCount > 0 ? 0 : 1;
     }
 
     private static (Option Option, Func<ParseResult, object?> Read) CreateOption(ProbeParameter parameter)

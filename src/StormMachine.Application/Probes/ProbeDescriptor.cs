@@ -44,30 +44,6 @@ public sealed record ProbeParameter
     public bool IsRequired { get; init; }
 }
 
-/// <summary>
-/// Форма результата пробы.
-/// </summary>
-/// <remarks>
-/// Появилась в И-2. Выяснилось, что шесть проб дают четыре разные формы данных, и угадывать
-/// форму по содержимому сэмплов — значит строить показ на догадках. Проба объявляет форму
-/// сама, как объявляет параметры: и интерфейс, и хранилище опираются на объявление, а не
-/// на эвристику.
-/// </remarks>
-public enum ProbeResultShape
-{
-    /// <summary>Один ряд чисел во времени: ICMP, TCP-connect, UDP.</summary>
-    ScalarSeries,
-
-    /// <summary>Одно событие, разложенное на фазы: HTTP-водопад, рукопожатие TLS.</summary>
-    PhasedTiming,
-
-    /// <summary>Несколько независимых рядов для сравнения между собой: резолверы DNS.</summary>
-    ComparedSeries,
-
-    /// <summary>Матрица «хоп × попытка»: traceroute.</summary>
-    PathTrace,
-}
-
 /// <summary>Паспорт пробы: чем она меряет, в чём и по какой методике.</summary>
 public sealed record ProbeDescriptor
 {

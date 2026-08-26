@@ -34,7 +34,7 @@ internal static class ProbeRenderer
     {
         Console.WriteLine($"Проба     : {descriptor.Title}");
         Console.WriteLine($"Цель      : {target.DisplayName}");
-        Console.WriteLine($"Интерфейс : {context.InterfaceName} ({EnvCommand.Describe(context.AdapterKind)})"
+        Console.WriteLine($"Интерфейс : {context.InterfaceName} ({Describe.AdapterKind(context.AdapterKind)})"
                           + (adapter?.IPv4Address is { } ip ? $", {ip}" : string.Empty));
         Console.WriteLine($"Методика  : {context.Methodology}");
         Console.WriteLine($"Порог     : {F(context.CalibrationBaselineMs)} мс — ниже него измерения недостоверны");
@@ -104,7 +104,7 @@ internal static class ProbeRenderer
                 break;
         }
 
-        WriteFacts(result);
+        Describe.WriteFacts(result.Facts);
     }
 
     // ------------------------------------------------------------ скалярный ряд
@@ -118,7 +118,7 @@ internal static class ProbeRenderer
             return;
         }
 
-        Console.WriteLine($"  {sample.Sequence,5}  {Describe(sample.Status),22}");
+        Console.WriteLine($"  {sample.Sequence,5}  {Describe.SampleStatus(sample.Status),22}");
     }
 
     private static void WriteScalarSummary(ProbeResult result, IHighResolutionClock clock)
@@ -165,7 +165,7 @@ internal static class ProbeRenderer
             if (phases.Count == 0)
             {
                 var failed = attempt.First();
-                Console.WriteLine($"Попытка {attempt.Key + 1}: {Describe(failed.Status)} на фазе «{failed.Label}»");
+                Console.WriteLine($"Попытка {attempt.Key + 1}: {Describe.SampleStatus(failed.Status)} на фазе «{failed.Label}»");
                 continue;
             }
 
@@ -189,7 +189,7 @@ internal static class ProbeRenderer
                 var bar = new string(' ', Math.Min(startCell, WaterfallWidth))
                           + new string('█', Math.Min(width, Math.Max(0, WaterfallWidth - startCell)));
 
-                Console.WriteLine($"  {PhaseName(phase.Label),-14} {F(phase.Value),9} мс  {share,5:P0}  {bar}");
+                Console.WriteLine($"  {Describe.PhaseName(phase.Label),-14} {F(phase.Value),9} мс  {share,5:P0}  {bar}");
                 offset += phase.Value;
             }
 
@@ -207,20 +207,9 @@ internal static class ProbeRenderer
         if (slowest.Phase is not null)
         {
             Console.WriteLine();
-            Console.WriteLine($"  Больше всего времени занимает фаза «{PhaseName(slowest.Phase)}».");
+            Console.WriteLine($"  Больше всего времени занимает фаза «{Describe.PhaseName(slowest.Phase)}».");
         }
     }
-
-    private static string PhaseName(string? label) => label switch
-    {
-        "dns" => "DNS",
-        "connect" => "TCP",
-        "tls" => "TLS",
-        "ttfb" => "первый байт",
-        "download" => "скачивание",
-        null => "—",
-        _ => label,
-    };
 
     // ------------------------------------------------- сравнение нескольких рядов
 
@@ -234,7 +223,7 @@ internal static class ProbeRenderer
             return;
         }
 
-        var detail = sample.RespondedBy is { } code ? code : Describe(sample.Status);
+        var detail = sample.RespondedBy is { } code ? code : Describe.SampleStatus(sample.Status);
         Console.WriteLine($"  {label,-16} {detail,12}");
     }
 
@@ -328,52 +317,4 @@ internal static class ProbeRenderer
                               + $"{lossPercent.ToString("0", CultureInfo.InvariantCulture) + "%",7}");
         }
     }
-
-    // ----------------------------------------------------------------- факты
-
-    private static void WriteFacts(ProbeResult result)
-    {
-        if (result.Facts.Count == 0)
-        {
-            return;
-        }
-
-        foreach (var category in result.Facts.Select(f => f.Category).Distinct(StringComparer.OrdinalIgnoreCase))
-        {
-            Console.WriteLine();
-            Console.WriteLine($"  [{category}]");
-
-            foreach (var fact in result.Facts.Where(f => string.Equals(f.Category, category, StringComparison.OrdinalIgnoreCase)))
-            {
-                var marker = fact.IsWarning ? "!" : " ";
-                Console.WriteLine($"  {marker} {fact.Name,-24} {fact.Value}{UnitSuffix(fact)}");
-            }
-        }
-    }
-
-    /// <summary>
-    /// Единица измерения рядом со значением факта.
-    /// </summary>
-    /// <remarks>
-    /// Число без единицы в отчёте бесполезно: «4.492» не даёт понять, много это или мало.
-    /// Единица берётся из самого факта — проба знает, что именно она измерила.
-    /// </remarks>
-    private static string UnitSuffix(ProbeFact fact) => fact.Unit switch
-    {
-        MeasurementUnit.Milliseconds => " мс",
-        MeasurementUnit.MegabitsPerSecond => " Мбит/с",
-        MeasurementUnit.Percent => " %",
-        MeasurementUnit.Bytes => " байт",
-        _ => string.Empty,
-    };
-
-    private static string Describe(SampleStatus status) => status switch
-    {
-        SampleStatus.Timeout => "таймаут",
-        SampleStatus.Unreachable => "недоступен",
-        SampleStatus.TtlExpired => "истёк TTL",
-        SampleStatus.Rejected => "отказ",
-        SampleStatus.Error => "ошибка",
-        _ => "успех",
-    };
 }

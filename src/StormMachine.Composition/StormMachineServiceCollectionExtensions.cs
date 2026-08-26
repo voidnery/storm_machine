@@ -1,9 +1,12 @@
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using StormMachine.Application;
 using StormMachine.Application.Abstractions;
 using StormMachine.Application.Probes;
+using StormMachine.Application.Runs;
 using StormMachine.Platform;
 using StormMachine.Probes;
+using StormMachine.Storage;
 
 namespace StormMachine.Composition;
 
@@ -17,11 +20,22 @@ namespace StormMachine.Composition;
 /// </remarks>
 public static class StormMachineServiceCollectionExtensions
 {
-    public static IServiceCollection AddStormMachine(this IServiceCollection services)
+    public static IServiceCollection AddStormMachine(this IServiceCollection services) =>
+        services.AddStormMachine(new StorageOptions());
+
+    public static IServiceCollection AddStormMachine(this IServiceCollection services, StorageOptions storage)
     {
         ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(storage);
 
         services.AddStormMachineApplication();
+
+        // Хранилище
+        services.AddSingleton(storage);
+        services.AddSingleton<IRunStore>(provider => new SqliteRunStore(
+            provider.GetRequiredService<StorageOptions>(),
+            provider.GetService<ILogger<SqliteRunStore>>()));
+        services.AddSingleton<RunOrchestrator>();
 
         // Платформа
         services.AddSingleton<IHighResolutionClock, HighResolutionClock>();
@@ -50,6 +64,9 @@ public static class StormMachineServiceCollectionExtensions
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(services);
+
+        var store = services.GetRequiredService<IRunStore>();
+        await store.InitializeAsync(cancellationToken).ConfigureAwait(false);
 
         var clock = services.GetRequiredService<IHighResolutionClock>();
         await clock.CalibrateAsync(cancellationToken).ConfigureAwait(false);
