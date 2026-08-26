@@ -1,3 +1,4 @@
+using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using StormMachine.Domain.Measurements;
@@ -20,29 +21,54 @@ namespace StormMachine.Storage;
 /// </remarks>
 internal static class StorageJson
 {
+    /// <summary>
+    /// Кодировщик, не экранирующий кириллицу.
+    /// </summary>
+    /// <remarks>
+    /// Без него имя «сеть» уезжает в базу как <c>сеть</c>. Это не только
+    /// делает содержимое нечитаемым при отладке, но и ломает поиск: сравнение подстроки
+    /// в SQL перестаёт находить то, что человек ввёл. Название кодировщика пугает,
+    /// но относится к вставке JSON в HTML — здесь это локальный файл базы.
+    /// </remarks>
+    private static readonly JsonSerializerOptions Options = new(JsonSerializerDefaults.General)
+    {
+        TypeInfoResolver = StorageJsonContext.Default,
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+    };
+
     public static string SerializeContext(MeasurementContext value) =>
-        JsonSerializer.Serialize(value, StorageJsonContext.Default.MeasurementContext);
+        JsonSerializer.Serialize<MeasurementContext>(value, Options);
 
     public static MeasurementContext? DeserializeContext(string? json) =>
         string.IsNullOrEmpty(json)
             ? null
-            : JsonSerializer.Deserialize(json, StorageJsonContext.Default.MeasurementContext);
+            : JsonSerializer.Deserialize<MeasurementContext>(json, Options);
 
     public static string SerializeFacts(ProbeFact[] value) =>
-        JsonSerializer.Serialize(value, StorageJsonContext.Default.ProbeFactArray);
+        JsonSerializer.Serialize<ProbeFact[]>(value, Options);
 
     public static ProbeFact[] DeserializeFacts(string? json) =>
         string.IsNullOrEmpty(json)
             ? []
-            : JsonSerializer.Deserialize(json, StorageJsonContext.Default.ProbeFactArray) ?? [];
+            : JsonSerializer.Deserialize<ProbeFact[]>(json, Options) ?? [];
+
+    public static string SerializeTags(string[] value) =>
+        JsonSerializer.Serialize<string[]>(value, Options);
+
+    public static string[] DeserializeTags(string? json) =>
+        string.IsNullOrEmpty(json)
+            ? []
+            : JsonSerializer.Deserialize<string[]>(json, Options) ?? [];
 
     public static string SerializeParameters(Dictionary<string, string?> value) =>
-        JsonSerializer.Serialize(value, StorageJsonContext.Default.DictionaryStringString);
+        JsonSerializer.Serialize<Dictionary<string, string?>>(value, Options);
 
     public static Dictionary<string, string?> DeserializeParameters(string? json) =>
         string.IsNullOrEmpty(json)
             ? []
-            : JsonSerializer.Deserialize(json, StorageJsonContext.Default.DictionaryStringString) ?? [];
+            : JsonSerializer.Deserialize<Dictionary<string, string?>>(json, Options) ?? [];
 }
 
 [JsonSourceGenerationOptions(
@@ -51,6 +77,7 @@ internal static class StorageJson
 [JsonSerializable(typeof(MeasurementContext))]
 [JsonSerializable(typeof(ProbeFact[]))]
 [JsonSerializable(typeof(Dictionary<string, string?>))]
+[JsonSerializable(typeof(string[]))]
 internal sealed partial class StorageJsonContext : JsonSerializerContext
 {
 }

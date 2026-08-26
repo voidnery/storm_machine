@@ -2,6 +2,7 @@ using System.CommandLine;
 using Microsoft.Extensions.DependencyInjection;
 using StormMachine.Application;
 using StormMachine.Application.Abstractions;
+using StormMachine.Application.Presets;
 using StormMachine.Application.Probes;
 using StormMachine.Application.Runs;
 using StormMachine.Cli.Rendering;
@@ -60,8 +61,17 @@ internal static class ProbeCommandFactory
             Description = "Сохранить прогон в журнал (storm runs list).",
         };
 
+        // Сквозной принцип «сохранить как пресет»: пресет рождается не из формы,
+        // а из измерения, которое только что оказалось полезным.
+        var savePresetOption = new Option<string>("--save-preset")
+        {
+            Description = "Сохранить эти параметры как пресет с указанным именем.",
+            DefaultValueFactory = _ => string.Empty,
+        };
+
         command.Options.Add(quietOption);
         command.Options.Add(saveOption);
+        command.Options.Add(savePresetOption);
 
         command.SetAction(async (parseResult, cancellationToken) =>
         {
@@ -84,6 +94,7 @@ internal static class ProbeCommandFactory
                 request,
                 parseResult.GetValue(quietOption),
                 parseResult.GetValue(saveOption),
+                parseResult.GetValue(savePresetOption),
                 cancellationToken).ConfigureAwait(false);
         });
 
@@ -96,6 +107,7 @@ internal static class ProbeCommandFactory
         ProbeRequest request,
         bool quiet,
         bool save,
+        string? savePresetName,
         CancellationToken cancellationToken)
     {
         var environment = services.GetRequiredService<INetworkEnvironment>();
@@ -121,7 +133,13 @@ internal static class ProbeCommandFactory
         }
 
         await clock.CalibrateAsync(cancellationToken).ConfigureAwait(false);
-        ProbeRenderer.WriteHeader(descriptor, request.Target, BuildContext(environment.GetPrimaryAdapter(), clock, descriptor.Methodology), environment.GetPrimaryAdapter());
+
+        var adapter = environment.GetPrimaryAdapter();
+        ProbeRenderer.WriteHeader(
+            descriptor,
+            request.Target,
+            ProbeRenderer.BuildContext(adapter, clock, descriptor.Methodology),
+            adapter);
 
         // Ctrl+C отменяет измерение, но не прерывает подведение итога: уже измеренное
         // должно и показаться, и — при --save — доехать до журнала.
@@ -168,7 +186,48 @@ internal static class ProbeCommandFactory
             Console.WriteLine($"  storm runs show {runId}");
         }
 
+        if (!string.IsNullOrWhiteSpace(savePresetName))
+        {
+            await SavePresetAsync(services, descriptor.Name, request, savePresetName, cancellationToken)
+                .ConfigureAwait(false);
+        }
+
         return outcome.Result.SuccessCount > 0 ? 0 : 1;
+    }
+
+    private static async Task SavePresetAsync(
+        IServiceProvider services,
+        string probeName,
+        ProbeRequest request,
+        string name,
+        CancellationToken cancellationToken)
+    {
+        var presets = services.GetRequiredService<PresetService>();
+        var preset = PresetService.FromRequest(name, probeName, request);
+
+        var existing = await presets.FindByNameAsync(name, cancellationToken).ConfigureAwait(false);
+
+        if (existing is not null)
+        {
+            // Совпадение по имени — это тот же тест, а не второй такой же.
+            // Библиотека из десяти «Шлюз (1)…(10)» бесполезна.
+            preset = preset with { Id = existing.Id, CreatedUtc = existing.CreatedUtc };
+        }
+
+        try
+        {
+            var saved = await presets.SaveAsync(preset, cancellationToken).ConfigureAwait(false);
+
+            Console.WriteLine();
+            Console.WriteLine(existing is null
+                ? $"Сохранено как пресет «{saved.Name}» (редакция {saved.Version})."
+                : $"Пресет «{saved.Name}» обновлён (редакция {saved.Version}).");
+            Console.WriteLine($"  storm presets run \"{saved.Name}\"");
+        }
+        catch (InvalidOperationException ex)
+        {
+            Console.Error.WriteLine($"Пресет не сохранён: {ex.Message}");
+        }
     }
 
     private static (Option Option, Func<ParseResult, object?> Read) CreateOption(ProbeParameter parameter)
@@ -241,17 +300,4 @@ internal static class ProbeCommandFactory
             ? Target.Gateway("шлюз по умолчанию")
             : Target.Parse(raw);
 
-    private static MeasurementContext BuildContext(
-        NetworkAdapter? adapter,
-        IHighResolutionClock clock,
-        Methodology methodology) => new()
-        {
-            InterfaceName = adapter?.Name ?? "неизвестен",
-            AdapterKind = adapter?.Kind ?? AdapterKind.Unknown,
-            InterfaceAddress = adapter?.IPv4Address,
-            CalibrationBaselineMs = clock.CalibrationBaselineMs,
-            ProductVersion = ProductInfo.Version,
-            Methodology = methodology,
-            StartedUtc = DateTimeOffset.UtcNow,
-        };
 }

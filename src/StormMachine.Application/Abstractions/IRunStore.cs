@@ -28,6 +28,19 @@ public sealed record RunDescriptor
     /// </remarks>
     public IReadOnlyDictionary<string, object?> Parameters { get; init; } =
         new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>Пресет, из которого запущен прогон, если запуск шёл из библиотеки.</summary>
+    public Guid? PresetId { get; init; }
+
+    /// <summary>
+    /// Редакция пресета на момент запуска.
+    /// </summary>
+    /// <remarks>
+    /// Нужна, чтобы было видно: результат получен пресетом второй редакции, а в библиотеке
+    /// сейчас пятая — сравнивать их напрямую нельзя. Историю редакций хранить не требуется:
+    /// фактические параметры лежат в самом прогоне.
+    /// </remarks>
+    public int? PresetVersion { get; init; }
 }
 
 /// <summary>

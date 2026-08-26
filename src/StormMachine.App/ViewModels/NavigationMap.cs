@@ -13,11 +13,13 @@ internal static class NavigationMap
     public const string Dashboard = "/";
     public const string Latency = "/local/tests/latency";
     public const string Runs = "/runs";
+    public const string Presets = "/presets";
 
     public static IReadOnlyList<NavigationSection> Sections { get; } =
     [
         new(Dashboard, "Дашборд", "Состояние сети, активные мониторы, алерты, быстрый запуск.", null),
         new(Latency, "Задержка", "Непрерывный ping с живым графиком, джиттером и PDV.", null),
+        new(Presets, "Библиотека", "Пресеты: именованные тесты, которые можно повторить и передать.", null),
         new(Runs, "Журнал", "История прогонов с разбором до сырых измерений.", null),
         new("/local/topology", "Карта сети", "Граф топологии с редактором и отметками достоверности связей.", "И-9"),
         new("/local/devices", "Устройства", "Инвентарь: адреса, MAC, вендор, имена, история.", "И-8"),
@@ -28,7 +30,6 @@ internal static class NavigationMap
         new("/internet/speed", "Скорость и качество", "Speedtest, bufferbloat, IPv6, тип NAT.", "И-13"),
         new("/internet/inspect", "Инспекторы", "DNS, TLS и HTTP: разбор ответов и таймингов.", "И-11"),
         new("/monitors", "Мониторы", "Постоянные проверки, доступность, SLA.", "И-14"),
-        new("/presets", "Библиотека", "Пресеты и наборы тестов.", "И-5"),
         new("/schedule", "Расписание", "Периодические запуски и окна обслуживания.", "И-14"),
         new("/reports", "Отчёты", "Формирование PDF с методиками и условиями измерения.", "И-6"),
         new("/alerts", "Алерты", "Правила и лента событий.", "И-14"),

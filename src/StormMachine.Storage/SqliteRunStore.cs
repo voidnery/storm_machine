@@ -59,6 +59,16 @@ public sealed class SqliteRunStore : IRunStore
 
     public string Location { get; }
 
+    /// <summary>
+    /// Строка подключения к той же базе.
+    /// </summary>
+    /// <remarks>
+    /// Открыта для хранилища пресетов: библиотека и журнал живут в одном файле,
+    /// и заводить второе соединение со своей строкой значило бы дублировать
+    /// разбор пути и настройки открытия.
+    /// </remarks>
+    internal string ConnectionString => _connectionString;
+
     public static string DefaultDatabasePath() => Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         "StormMachine",
@@ -112,10 +122,10 @@ public sealed class SqliteRunStore : IRunStore
             command.CommandText = """
                 INSERT INTO runs
                     (id, probe_kind, probe_name, shape, target_kind, target_value, target_label,
-                     unit, started_ticks, state, context_json, parameters_json)
+                     unit, started_ticks, state, context_json, parameters_json, preset_id, preset_version)
                 VALUES
                     ($id, $kind, $name, $shape, $targetKind, $targetValue, $targetLabel,
-                     $unit, $started, $state, $context, $parameters);
+                     $unit, $started, $state, $context, $parameters, $presetId, $presetVersion);
                 """;
 
             command.Parameters.AddWithValue("$id", id.ToString());
@@ -130,6 +140,12 @@ public sealed class SqliteRunStore : IRunStore
             command.Parameters.AddWithValue("$state", (int)RunState.Running);
             command.Parameters.AddWithValue("$context", StorageJson.SerializeContext(descriptor.Context));
             command.Parameters.AddWithValue("$parameters", StorageJson.SerializeParameters(parameters));
+            command.Parameters.AddWithValue(
+                "$presetId",
+                descriptor.PresetId.HasValue ? descriptor.PresetId.Value.ToString() : DBNull.Value);
+            command.Parameters.AddWithValue(
+                "$presetVersion",
+                descriptor.PresetVersion.HasValue ? descriptor.PresetVersion.Value : DBNull.Value);
 
             await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
         }
@@ -167,7 +183,8 @@ public sealed class SqliteRunStore : IRunStore
 
         command.CommandText = $"""
             SELECT id, probe_kind, probe_name, shape, target_value, target_label, resolved_address,
-                   started_ticks, completed_ticks, state, sent_count, success_count, median_ms, has_raw_samples
+                   started_ticks, completed_ticks, state, sent_count, success_count, median_ms, has_raw_samples,
+                   preset_id, preset_version
               FROM runs
               {where}
              ORDER BY started_ticks DESC
@@ -203,7 +220,8 @@ public sealed class SqliteRunStore : IRunStore
             command.CommandText = """
                 SELECT id, probe_kind, probe_name, shape, target_value, target_label, resolved_address,
                        started_ticks, completed_ticks, state, sent_count, success_count, median_ms,
-                       has_raw_samples, target_kind, unit, context_json, parameters_json, facts_json
+                       has_raw_samples, preset_id, preset_version,
+                       target_kind, unit, context_json, parameters_json, facts_json
                   FROM runs
                  WHERE id = $id;
                 """;
@@ -218,12 +236,12 @@ public sealed class SqliteRunStore : IRunStore
             }
 
             summary = ReadSummary(reader);
-            var targetKind = (TargetKind)reader.GetInt32(14);
-            unit = (MeasurementUnit)reader.GetInt32(15);
-            context = StorageJson.DeserializeContext(reader.GetString(16))
+            var targetKind = (TargetKind)reader.GetInt32(16);
+            unit = (MeasurementUnit)reader.GetInt32(17);
+            context = StorageJson.DeserializeContext(reader.GetString(18))
                       ?? throw new InvalidOperationException("Условия измерения не читаются.");
-            parameters = StorageJson.DeserializeParameters(reader.GetString(17));
-            facts = StorageJson.DeserializeFacts(reader.IsDBNull(18) ? null : reader.GetString(18));
+            parameters = StorageJson.DeserializeParameters(reader.GetString(19));
+            facts = StorageJson.DeserializeFacts(reader.IsDBNull(20) ? null : reader.GetString(20));
 
             target = new Target
             {
@@ -454,6 +472,8 @@ public sealed class SqliteRunStore : IRunStore
         SuccessCount = reader.GetInt32(11),
         MedianMs = reader.IsDBNull(12) ? null : reader.GetDouble(12),
         HasRawSamples = reader.GetInt32(13) != 0,
+        PresetId = reader.IsDBNull(14) ? null : Guid.Parse(reader.GetString(14)),
+        PresetVersion = reader.IsDBNull(15) ? null : reader.GetInt32(15),
     };
 
     private static async Task<IReadOnlyList<SeriesStatistics>> ReadSeriesAsync(

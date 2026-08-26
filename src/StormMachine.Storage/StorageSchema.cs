@@ -12,7 +12,7 @@ namespace StormMachine.Storage;
 internal static class StorageSchema
 {
     /// <summary>Текущая версия схемы. Растёт при каждом изменении структуры.</summary>
-    public const int CurrentVersion = 1;
+    public const int CurrentVersion = 2;
 
     public static void EnsureCreated(SqliteConnection connection)
     {
@@ -40,12 +40,22 @@ internal static class StorageSchema
                 + "Обнови Storm Machine или укажи другой файл базы.");
         }
 
+        // Обновление идёт по ступеням: база версии 1, созданная прошлым выпуском,
+        // должна дойти до текущей, не потеряв данные. Прыжок сразу к последней схеме
+        // работал бы только для пустой базы.
         if (version == 0)
         {
             CreateVersion1(connection);
+            version = 1;
         }
 
-        WriteVersion(connection, CurrentVersion);
+        if (version == 1)
+        {
+            UpgradeToVersion2(connection);
+            version = 2;
+        }
+
+        WriteVersion(connection, version);
     }
 
     private static void CreateVersion1(SqliteConnection connection)
@@ -123,6 +133,55 @@ internal static class StorageSchema
             """);
 
         Execute(connection, "CREATE TABLE IF NOT EXISTS schema_version (version INTEGER NOT NULL);");
+    }
+
+    /// <summary>Библиотека пресетов и связь прогонов с пресетами.</summary>
+    private static void UpgradeToVersion2(SqliteConnection connection)
+    {
+        Execute(connection, """
+            CREATE TABLE IF NOT EXISTS presets (
+                id              TEXT    NOT NULL PRIMARY KEY,
+                name            TEXT    NOT NULL,
+                name_key        TEXT    NOT NULL,
+                description     TEXT,
+                probe_name      TEXT    NOT NULL,
+                target_kind     INTEGER NOT NULL,
+                target_value    TEXT    NOT NULL,
+                target_label    TEXT,
+                parameters_json TEXT    NOT NULL,
+                tags_json       TEXT    NOT NULL,
+                version         INTEGER NOT NULL,
+                created_ticks   INTEGER NOT NULL,
+                updated_ticks   INTEGER NOT NULL,
+                run_count       INTEGER NOT NULL DEFAULT 0,
+                last_run_ticks  INTEGER
+            );
+            """);
+
+        // Имя пресета уникально без учёта регистра: две записи «Пинг шлюза» и «пинг шлюза»
+        // — это ошибка оператора, а не две разные проверки.
+        Execute(connection, "CREATE UNIQUE INDEX IF NOT EXISTS ux_presets_name ON presets (name_key);");
+        Execute(connection, "CREATE INDEX IF NOT EXISTS ix_presets_probe ON presets (probe_name);");
+
+        // Прогон помнит, каким пресетом и какой его редакцией сделан. Историю редакций
+        // хранить не требуется: фактические параметры уже лежат в самом прогоне,
+        // и он самодостаточен для истолкования.
+        AddColumnIfMissing(connection, "runs", "preset_id", "TEXT");
+        AddColumnIfMissing(connection, "runs", "preset_version", "INTEGER");
+    }
+
+    private static void AddColumnIfMissing(SqliteConnection connection, string table, string column, string type)
+    {
+        using var check = connection.CreateCommand();
+        check.CommandText = $"SELECT COUNT(*) FROM pragma_table_info('{table}') WHERE name = $column;";
+        check.Parameters.AddWithValue("$column", column);
+
+        if (Convert.ToInt64(check.ExecuteScalar(), System.Globalization.CultureInfo.InvariantCulture) > 0)
+        {
+            return;
+        }
+
+        Execute(connection, $"ALTER TABLE {table} ADD COLUMN {column} {type};");
     }
 
     public static int ReadVersion(SqliteConnection connection)

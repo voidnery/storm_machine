@@ -93,6 +93,7 @@ public partial class LatencyPage : UserControl
             var signal = plot.Add.Signal(ys);
             signal.Color = Color.FromHex("#3B82F6");
             signal.LineWidth = 1.5f;
+            signal.LegendText = "RTT";
 
             // Порог разрешения рисуется линией: значения ниже него неотличимы
             // от собственной работы измерительного стека, и это должно быть видно,
@@ -103,10 +104,14 @@ public partial class LatencyPage : UserControl
                 floor.Color = Color.FromHex("#F59E0B");
                 floor.LineWidth = 1;
                 floor.LinePattern = LinePattern.Dashed;
-                floor.Text = "порог достоверности";
+
+                // Пояснение вынесено в легенду, а не в подпись самой линии: подпись
+                // ScottPlot рисует поверх оси Y и она перекрывает и шкалу, и данные.
+                floor.LegendText = "порог достоверности";
             }
 
             plot.Axes.AutoScale();
+            plot.ShowLegend(Edge.Top);
         }
 
         _chart.Refresh();

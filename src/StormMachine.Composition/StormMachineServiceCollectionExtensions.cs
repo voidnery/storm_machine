@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using StormMachine.Application;
 using StormMachine.Application.Abstractions;
 using StormMachine.Application.Probes;
+using StormMachine.Application.Presets;
 using StormMachine.Application.Runs;
 using StormMachine.Platform;
 using StormMachine.Probes;
@@ -36,6 +37,11 @@ public static class StormMachineServiceCollectionExtensions
             provider.GetRequiredService<StorageOptions>(),
             provider.GetService<ILogger<SqliteRunStore>>()));
         services.AddSingleton<RunOrchestrator>();
+
+        // Библиотека пресетов делит базу с журналом, поэтому строится поверх него.
+        services.AddSingleton<IPresetStore>(provider => new SqlitePresetStore(
+            (SqliteRunStore)provider.GetRequiredService<IRunStore>()));
+        services.AddSingleton<PresetService>();
 
         // Платформа
         services.AddSingleton<IHighResolutionClock, HighResolutionClock>();

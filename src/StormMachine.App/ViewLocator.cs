@@ -19,6 +19,7 @@ public sealed class ViewLocator : IDataTemplate
     {
         DashboardPageViewModel => new DashboardPage(),
         LatencyPageViewModel => new LatencyPage(),
+        PresetsPageViewModel => new PresetsPage(),
         RunsPageViewModel => new RunsPage(),
         PlaceholderPageViewModel => new PlaceholderPage(),
         _ => new TextBlock { Text = $"Нет представления для {param?.GetType().Name ?? "null"}" },

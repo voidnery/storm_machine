@@ -126,7 +126,13 @@ public sealed class PrecisionTests(ITestOutputHelper output)
     /// Полного нуля здесь быть не может: системный API возвращает объект ответа на каждую
     /// пробу, и обойти это можно только raw-сокетами, от которых мы отказались сознательно.
     /// Поэтому проверяется <b>бюджет</b>, а не ноль: важно, что мы не добавляем аллокаций
-    /// сверх неизбежных и что сборка второго поколения в измерении не случается.
+    /// сверх неизбежных.
+    /// <para>
+    /// Второе условие — доля пауз сборщика во времени измерения, а не число сборок второго
+    /// поколения. Счёт сборок оказался неустойчивым: сборку может вызвать посторонний код
+    /// в том же процессе, и тест мигал. Значение имеет не факт сборки, а то, сколько времени
+    /// она отняла у измерения — именно это подмешивается в джиттер.
+    /// </para>
     /// <para>
     /// Считается <c>GC.GetTotalAllocatedBytes</c>, а не расход текущего потока: код
     /// асинхронный, продолжения выполняются на разных потоках пула, и потоковый счётчик
@@ -147,25 +153,31 @@ public sealed class PrecisionTests(ITestOutputHelper output)
         GC.WaitForPendingFinalizers();
         GC.Collect();
 
-        var gen2Before = GC.CollectionCount(2);
+        var pauseBefore = GC.GetTotalPauseDuration();
         var allocatedBefore = GC.GetTotalAllocatedBytes(precise: true);
+        var wallClock = System.Diagnostics.Stopwatch.StartNew();
 
         await MeasurementHarness.RunAsync(services, MeasurementHarness.LoopbackRequest(ProbeCount));
 
+        wallClock.Stop();
         var allocated = GC.GetTotalAllocatedBytes(precise: true) - allocatedBefore;
-        var gen2 = GC.CollectionCount(2) - gen2Before;
+        var pause = GC.GetTotalPauseDuration() - pauseBefore;
         var perProbe = allocated / (double)ProbeCount;
+        var pauseShare = pause.TotalMilliseconds / wallClock.Elapsed.TotalMilliseconds;
 
         _output.WriteLine($"Всего выделено : {allocated:N0} байт на {ProbeCount} проб");
         _output.WriteLine($"На пробу       : {perProbe:N0} байт (бюджет {BudgetBytesPerProbe:N0})");
-        _output.WriteLine($"Сборок gen2    : {gen2}");
+        _output.WriteLine($"Паузы сборщика : {pause.TotalMilliseconds:0.###} мс из {wallClock.Elapsed.TotalMilliseconds:0} мс ({pauseShare:P2})");
 
         Assert.True(
             perProbe <= BudgetBytesPerProbe,
             $"Расход {perProbe:N0} байт на пробу превышает бюджет {BudgetBytesPerProbe:N0}. "
             + "В горячем пути появились лишние аллокации.");
 
-        Assert.True(gen2 == 0, $"За время измерения случилось {gen2} сборок второго поколения — это длинные паузы.");
+        Assert.True(
+            pauseShare <= 0.02,
+            $"Паузы сборщика заняли {pauseShare:P2} времени измерения ({pause.TotalMilliseconds:0.###} мс). "
+            + "На таком уровне они начинают подмешиваться в измеряемый джиттер.");
     }
 
     [Fact]

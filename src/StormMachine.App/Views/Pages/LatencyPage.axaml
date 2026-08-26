@@ -61,7 +61,17 @@
           </StackPanel>
         </Grid>
 
-        <TextBlock Text="{Binding StatusLine}" FontSize="12" Opacity="0.65" />
+        <!-- Сквозной принцип: пресет рождается не из формы, а из измерения,
+             которое только что оказалось полезным. -->
+        <Grid ColumnDefinitions="Auto,220,Auto,*">
+          <TextBlock Grid.Column="0" Text="Сохранить как пресет:" FontSize="12" Opacity="0.6"
+                     VerticalAlignment="Center" Margin="0,0,10,0" />
+          <TextBox Grid.Column="1" Text="{Binding PresetName}" PlaceholderText="имя пресета" FontSize="12" />
+          <Button Grid.Column="2" Content="Сохранить" Command="{Binding SaveAsPresetCommand}"
+                  FontSize="12" Padding="12,5" Margin="8,0,0,0" />
+          <TextBlock Grid.Column="3" Text="{Binding StatusLine}" FontSize="12" Opacity="0.65"
+                     VerticalAlignment="Center" Margin="16,0,0,0" TextTrimming="CharacterEllipsis" />
+        </Grid>
 
         <TextBlock Text="{Binding ErrorMessage}" FontSize="12"
                    Foreground="{StaticResource DangerBrush}" TextWrapping="Wrap"

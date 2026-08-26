@@ -13,6 +13,11 @@ public sealed record RunOptions
 
     /// <summary>Вызывается на каждый сэмпл по мере поступления — для живого вывода.</summary>
     public Action<Sample>? OnSample { get; init; }
+
+    /// <summary>Пресет, из которого идёт запуск. Попадает в журнал вместе с прогоном.</summary>
+    public Guid? PresetId { get; init; }
+
+    public int? PresetVersion { get; init; }
 }
 
 /// <summary>Чем закончился прогон.</summary>
@@ -74,6 +79,8 @@ public sealed class RunOrchestrator(
                     Context = context,
                     Unit = descriptor.Unit,
                     Parameters = request.Parameters,
+                    PresetId = options.PresetId,
+                    PresetVersion = options.PresetVersion,
                 },
                 cancellationToken).ConfigureAwait(false);
         }

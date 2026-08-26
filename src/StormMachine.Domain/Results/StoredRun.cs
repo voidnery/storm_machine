@@ -54,6 +54,12 @@ public sealed record RunSummary
 
     public required bool HasRawSamples { get; init; }
 
+    /// <summary>Пресет, из которого запущен прогон.</summary>
+    public Guid? PresetId { get; init; }
+
+    /// <summary>Редакция пресета на момент запуска.</summary>
+    public int? PresetVersion { get; init; }
+
     public int LostCount => SentCount - SuccessCount;
 
     public double LossPercent => SentCount == 0 ? 0 : LostCount * 100.0 / SentCount;

@@ -28,10 +28,13 @@ public partial class App : Avalonia.Application
             // не блокируется» относится к работе, а не к запуску: интерфейса ещё нет.
             _services.InitializeStormMachineAsync().GetAwaiter().GetResult();
 
-            desktop.MainWindow = new MainWindow
+            var window = new MainWindow
             {
                 DataContext = _services.GetRequiredService<MainWindowViewModel>(),
             };
+
+            window.AttachFilePicker(_services.GetRequiredService<FilePicker>());
+            desktop.MainWindow = window;
 
             desktop.ShutdownRequested += (_, _) => _services?.Dispose();
         }

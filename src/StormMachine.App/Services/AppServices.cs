@@ -23,6 +23,8 @@ internal static class AppServices
         services.AddStormMachine();
 
         services.AddSingleton<RunnerService>();
+        services.AddSingleton<FilePicker>();
+        services.AddSingleton<IFilePicker>(p => p.GetRequiredService<FilePicker>());
         services.AddSingleton<MainWindowViewModel>();
 
         // Страницы создаются по разделу: раздел знает свой путь, фабрика — чем его наполнить.
@@ -36,6 +38,7 @@ internal static class AppServices
     {
         NavigationMap.Dashboard => ActivatorUtilities.CreateInstance<DashboardPageViewModel>(provider, section),
         NavigationMap.Latency => ActivatorUtilities.CreateInstance<LatencyPageViewModel>(provider, section),
+        NavigationMap.Presets => ActivatorUtilities.CreateInstance<PresetsPageViewModel>(provider, section),
         NavigationMap.Runs => ActivatorUtilities.CreateInstance<RunsPageViewModel>(provider, section),
         _ => new PlaceholderPageViewModel(section),
     };

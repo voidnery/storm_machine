@@ -6,6 +6,7 @@ using CommunityToolkit.Mvvm.Input;
 using StormMachine.App.Services;
 using StormMachine.Application;
 using StormMachine.Application.Abstractions;
+using StormMachine.Application.Presets;
 using StormMachine.Application.Probes;
 using StormMachine.Domain.Measurements;
 using StormMachine.Domain.Results;
@@ -34,6 +35,7 @@ public sealed partial class LatencyPageViewModel : PageViewModel
     private const double ChartRefreshHz = 10;
 
     private readonly RunnerService _runner;
+    private readonly PresetService _presets;
     private readonly IProbeRegistry _registry;
     private readonly IRunStore _store;
     private readonly IHighResolutionClock _clock;
@@ -48,6 +50,7 @@ public sealed partial class LatencyPageViewModel : PageViewModel
     public LatencyPageViewModel(
         NavigationSection section,
         RunnerService runner,
+        PresetService presets,
         IProbeRegistry registry,
         IRunStore store,
         IHighResolutionClock clock,
@@ -55,6 +58,7 @@ public sealed partial class LatencyPageViewModel : PageViewModel
         : base(section)
     {
         _runner = runner ?? throw new ArgumentNullException(nameof(runner));
+        _presets = presets ?? throw new ArgumentNullException(nameof(presets));
         _registry = registry ?? throw new ArgumentNullException(nameof(registry));
         _store = store ?? throw new ArgumentNullException(nameof(store));
         _clock = clock ?? throw new ArgumentNullException(nameof(clock));
@@ -84,6 +88,10 @@ public sealed partial class LatencyPageViewModel : PageViewModel
 
     [ObservableProperty]
     private bool _saveToJournal = true;
+
+    /// <summary>Имя, под которым текущие параметры сохранятся в библиотеку.</summary>
+    [ObservableProperty]
+    private string _presetName = string.Empty;
 
     // ------------------------------------------------------------------ состояние
 
@@ -191,17 +199,9 @@ public sealed partial class LatencyPageViewModel : PageViewModel
             return;
         }
 
-        var request = new ProbeRequest
-        {
-            Target = parsedTarget,
-            Parameters = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
-            {
-                ["count"] = Continuous ? 1_000_000 : Math.Max(1, Count),
-                ["interval"] = Math.Max(1, IntervalMs),
-                ["size"] = 32,
-                ["timeout"] = 2000,
-            },
-        };
+        // Тот же построитель, что и у сохранения в пресет: иначе запуск и пресет
+        // однажды разъедутся, и оператор будет уверен, что повторяет то же измерение.
+        var request = BuildRequest(parsedTarget);
 
         var errors = probe.Validate(request);
         if (errors.Count > 0)
@@ -278,6 +278,74 @@ public sealed partial class LatencyPageViewModel : PageViewModel
 
     [RelayCommand]
     private async Task RefreshHistoryAsync() => await LoadHistoryAsync().ConfigureAwait(true);
+
+    /// <summary>
+    /// Сохраняет текущие параметры как пресет.
+    /// </summary>
+    /// <remarks>
+    /// Сквозной принцип §2 анализа: пресет рождается не из формы, а из измерения,
+    /// которое только что оказалось полезным.
+    /// </remarks>
+    [RelayCommand]
+    private async Task SaveAsPresetAsync()
+    {
+        ErrorMessage = null;
+
+        if (string.IsNullOrWhiteSpace(PresetName))
+        {
+            ErrorMessage = "Укажи имя пресета.";
+            return;
+        }
+
+        Domain.Targets.Target parsedTarget;
+        try
+        {
+            parsedTarget = ParseTarget(TargetText);
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = $"Цель «{TargetText}» не разобрана: {ex.Message}";
+            return;
+        }
+
+        var request = BuildRequest(parsedTarget);
+        var preset = PresetService.FromRequest(PresetName.Trim(), "ping", request);
+
+        try
+        {
+            var existing = await _presets.FindByNameAsync(preset.Name).ConfigureAwait(true);
+
+            if (existing is not null)
+            {
+                // Совпадение по имени — тот же тест, а не второй такой же.
+                preset = preset with { Id = existing.Id, CreatedUtc = existing.CreatedUtc };
+            }
+
+            var saved = await _presets.SaveAsync(preset).ConfigureAwait(true);
+
+            StatusLine = existing is null
+                ? $"Сохранено как пресет «{saved.Name}» (редакция {saved.Version}). Он в разделе «Библиотека»."
+                : $"Пресет «{saved.Name}» обновлён (редакция {saved.Version}).";
+
+            PresetName = string.Empty;
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = $"Пресет не сохранён: {ex.Message}";
+        }
+    }
+
+    private ProbeRequest BuildRequest(Domain.Targets.Target target) => new()
+    {
+        Target = target,
+        Parameters = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["count"] = Continuous ? 1_000_000 : Math.Max(1, Count),
+            ["interval"] = Math.Max(1, IntervalMs),
+            ["size"] = 32,
+            ["timeout"] = 2000,
+        },
+    };
 
     // ------------------------------------------------------------------ внутреннее
 

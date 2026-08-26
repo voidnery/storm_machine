@@ -26,6 +26,33 @@ internal static class ProbeRenderer
 
     private static string F(double value) => value.ToString("0.000", CultureInfo.InvariantCulture);
 
+    /// <summary>
+    /// Собирает условия измерения для показа.
+    /// </summary>
+    /// <remarks>
+    /// Живёт здесь, а не в фабрике команд, потому что нужен и обычному запуску пробы,
+    /// и запуску из библиотеки пресетов. Условия измерения показываются одинаково
+    /// независимо от того, откуда пришли параметры.
+    /// </remarks>
+    public static MeasurementContext BuildContext(
+        NetworkAdapter? adapter,
+        IHighResolutionClock clock,
+        Methodology methodology)
+    {
+        ArgumentNullException.ThrowIfNull(clock);
+
+        return new MeasurementContext
+        {
+            InterfaceName = adapter?.Name ?? "неизвестен",
+            AdapterKind = adapter?.Kind ?? AdapterKind.Unknown,
+            InterfaceAddress = adapter?.IPv4Address,
+            CalibrationBaselineMs = clock.CalibrationBaselineMs,
+            ProductVersion = Application.ProductInfo.Version,
+            Methodology = methodology,
+            StartedUtc = DateTimeOffset.UtcNow,
+        };
+    }
+
     public static void WriteHeader(
         ProbeDescriptor descriptor,
         Target target,

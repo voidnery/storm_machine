@@ -37,7 +37,13 @@ public sealed class RunnerService(RunOrchestrator orchestrator)
     /// <summary>
     /// Запускает пробу и возвращает объект, за которым можно следить.
     /// </summary>
-    public ActiveRunViewModel Start(IProbe probe, ProbeRequest request, bool save, string title)
+    public ActiveRunViewModel Start(
+        IProbe probe,
+        ProbeRequest request,
+        bool save,
+        string title,
+        Guid? presetId = null,
+        int? presetVersion = null)
     {
         ArgumentNullException.ThrowIfNull(probe);
         ArgumentNullException.ThrowIfNull(request);
@@ -49,7 +55,7 @@ public sealed class RunnerService(RunOrchestrator orchestrator)
         Active.Add(run);
         ActiveChanged?.Invoke(this, EventArgs.Empty);
 
-        _ = ExecuteAsync(run, probe, request, save, queue, cts);
+        _ = ExecuteAsync(run, probe, request, save, queue, cts, presetId, presetVersion);
 
         return run;
     }
@@ -60,7 +66,9 @@ public sealed class RunnerService(RunOrchestrator orchestrator)
         ProbeRequest request,
         bool save,
         ConcurrentQueue<Sample> queue,
-        CancellationTokenSource cts)
+        CancellationTokenSource cts,
+        Guid? presetId,
+        int? presetVersion)
     {
         try
         {
@@ -71,6 +79,8 @@ public sealed class RunnerService(RunOrchestrator orchestrator)
                 {
                     Save = save,
                     OnSample = queue.Enqueue,
+                    PresetId = presetId,
+                    PresetVersion = presetVersion,
                 },
                 cts.Token).ConfigureAwait(false);
 
