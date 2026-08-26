@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using StormMachine.App.Services;
 using StormMachine.Application.Abstractions;
 using StormMachine.Domain.Results;
 
@@ -30,9 +31,13 @@ public sealed record FactRow(string Category, string Name, string Value, bool Is
 /// </remarks>
 public sealed partial class RunsPageViewModel(
     NavigationSection section,
-    IRunStore store) : PageViewModel(section)
+    IRunStore store,
+    IReportRenderer reportRenderer,
+    IFilePicker filePicker) : PageViewModel(section)
 {
     private readonly IRunStore _store = store ?? throw new ArgumentNullException(nameof(store));
+    private readonly IReportRenderer _reportRenderer = reportRenderer ?? throw new ArgumentNullException(nameof(reportRenderer));
+    private readonly IFilePicker _filePicker = filePicker ?? throw new ArgumentNullException(nameof(filePicker));
 
     public ObservableCollection<RunSummary> Runs { get; } = [];
 
@@ -54,6 +59,9 @@ public sealed partial class RunsPageViewModel(
 
     [ObservableProperty]
     private string? _errorMessage;
+
+    [ObservableProperty]
+    private string? _message;
 
     public override async Task ActivateAsync(CancellationToken cancellationToken = default)
     {
@@ -95,6 +103,58 @@ public sealed partial class RunsPageViewModel(
         catch (Exception ex)
         {
             ErrorMessage = $"Журнал недоступен: {ex.Message}";
+        }
+    }
+
+    /// <summary>
+    /// Формирует отчёт по выбранному прогону.
+    /// </summary>
+    /// <remarks>
+    /// Третья часть сквозной триады: «в пресет», «в расписание», «в отчёт».
+    /// Движок PDF спрятан за <see cref="IReportRenderer"/> — страница о нём не знает
+    /// и знать не должна.
+    /// </remarks>
+    [RelayCommand]
+    private async Task SaveReportAsync()
+    {
+        Message = null;
+        ErrorMessage = null;
+
+        if (SelectedRun is null)
+        {
+            return;
+        }
+
+        var run = await _store.GetAsync(SelectedRun.Id).ConfigureAwait(true);
+
+        if (run is null)
+        {
+            ErrorMessage = "Прогон не найден — возможно, удалён политикой хранения.";
+            return;
+        }
+
+        try
+        {
+            var report = await _reportRenderer
+                .RenderAsync(new ReportRequest { Run = run, Author = Environment.UserName })
+                .ConfigureAwait(true);
+
+            var path = await _filePicker
+                .PickSaveAsync($"Куда сохранить отчёт {_reportRenderer.Format}", report.SuggestedFileName, report.FileExtension)
+                .ConfigureAwait(true);
+
+            if (path is null)
+            {
+                return;
+            }
+
+            await File.WriteAllBytesAsync(path, report.Content).ConfigureAwait(true);
+
+            Message = $"Отчёт сохранён: {path} ({report.Content.Length / 1024.0:0.0} КБ)";
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = $"Отчёт не сформирован: {ex.Message}";
         }
     }
 

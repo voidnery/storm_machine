@@ -18,6 +18,7 @@ internal static class RunsCommand
         {
             CreateList(services),
             CreateShow(services),
+            CreateReport(services),
             CreateDelete(services),
             CreatePurge(services),
             CreateUsage(services),
@@ -85,6 +86,69 @@ internal static class RunsCommand
             }
 
             RunRenderer.WriteDetails(run, parseResult.GetValue(samplesOption));
+            return 0;
+        });
+
+        return command;
+    }
+
+    private static Command CreateReport(IServiceProvider services)
+    {
+        var idArgument = new Argument<string>("id") { Description = "Идентификатор прогона; достаточно первых символов." };
+        var outOption = new Option<string>("--out", "-o")
+        {
+            Description = "Куда сохранить файл. Без него — рядом, с именем по умолчанию.",
+            DefaultValueFactory = _ => string.Empty,
+        };
+        var noChartOption = new Option<bool>("--no-chart") { Description = "Не рисовать график." };
+
+        var command = new Command("report", "Сформировать отчёт PDF по прогону.")
+        {
+            idArgument, outOption, noChartOption,
+        };
+
+        command.SetAction(async (parseResult, cancellationToken) =>
+        {
+            var store = services.GetRequiredService<IRunStore>();
+            await store.InitializeAsync(cancellationToken).ConfigureAwait(false);
+
+            var id = await ResolveIdAsync(store, parseResult.GetValue(idArgument)!, cancellationToken).ConfigureAwait(false);
+
+            if (id is null)
+            {
+                return 1;
+            }
+
+            var run = await store.GetAsync(id.Value, cancellationToken).ConfigureAwait(false);
+
+            if (run is null)
+            {
+                Console.Error.WriteLine($"Прогон {id} не найден.");
+                return 1;
+            }
+
+            var renderer = services.GetRequiredService<IReportRenderer>();
+
+            var report = await renderer.RenderAsync(
+                new ReportRequest
+                {
+                    Run = run,
+                    Author = Environment.UserName,
+                    IncludeChart = !parseResult.GetValue(noChartOption),
+                },
+                cancellationToken).ConfigureAwait(false);
+
+            var path = parseResult.GetValue(outOption);
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                path = report.SuggestedFileName;
+            }
+
+            await File.WriteAllBytesAsync(path, report.Content, cancellationToken).ConfigureAwait(false);
+
+            Console.WriteLine($"Отчёт {renderer.Format} сохранён: {Path.GetFullPath(path)}");
+            Console.WriteLine($"  {report.Content.Length / 1024.0:0.0} КБ");
+
             return 0;
         });
 

@@ -27,6 +27,10 @@ coverage/
 *.coverage
 *.trx
 
+# ---- Сформированные отчёты ----
+/storm-*.pdf
+/storm-presets*.json
+
 # ---- Локальные данные приложения ----
 *.db
 *.db-shm

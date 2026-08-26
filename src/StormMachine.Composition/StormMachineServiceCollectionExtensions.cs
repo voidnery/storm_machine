@@ -7,6 +7,7 @@ using StormMachine.Application.Presets;
 using StormMachine.Application.Runs;
 using StormMachine.Platform;
 using StormMachine.Probes;
+using StormMachine.Reporting;
 using StormMachine.Storage;
 
 namespace StormMachine.Composition;
@@ -42,6 +43,9 @@ public static class StormMachineServiceCollectionExtensions
         services.AddSingleton<IPresetStore>(provider => new SqlitePresetStore(
             (SqliteRunStore)provider.GetRequiredService<IRunStore>()));
         services.AddSingleton<PresetService>();
+
+        // Отчёты. Движок PDF спрятан за IReportRenderer — замена стоит день, а не месяц.
+        services.AddSingleton<IReportRenderer, PdfReportRenderer>();
 
         // Платформа
         services.AddSingleton<IHighResolutionClock, HighResolutionClock>();

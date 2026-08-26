@@ -75,6 +75,15 @@ public partial class LatencyPage : UserControl
         // ShowLegend() добавляет панель на каждый вызов, а перерисовка идёт десять раз
         // в секунду — легенды наслаивались друг на друга и съедали половину графика.
         plot.ShowLegend(Edge.Top);
+
+        // Оформление под тёмную тему приложения: по умолчанию ScottPlot рисует светлую
+        // плашку, и на тёмном графике она выглядит наклейкой поверх чужого окна.
+        // Настройки берутся у самой легенды, а не у панели, которую вернул ShowLegend:
+        // панель отвечает за размещение, легенда — за вид.
+        plot.Legend.BackgroundColor = Color.FromHex("#232A38");
+        plot.Legend.OutlineColor = Color.FromHex("#2E3648");
+        plot.Legend.FontColor = Color.FromHex("#C8D0DE");
+        plot.Legend.ShadowColor = Colors.Transparent;
     }
 
     private void Redraw()

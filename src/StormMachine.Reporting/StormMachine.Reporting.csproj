@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <Description>Формирование отчётов PDF.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\StormMachine.Application\StormMachine.Application.csproj" />
+  </ItemGroup>
+
+  <!-- QuestPDF — Community-лицензия: покрывает проекты с открытым исходным кодом.
+       Спрятан за IReportRenderer, чтобы замена стоила день, а не месяц.
+
+       ScottPlot здесь — БЕЗ Avalonia: только ядро, которое умеет рисовать в PNG
+       без графической подсистемы. График для печати светлый, а не тёмный, поэтому
+       общего кода с живым графиком в клиенте у него нет и не должно быть. -->
+  <ItemGroup>
+    <PackageReference Include="QuestPDF" Version="2026.8.0" />
+    <PackageReference Include="ScottPlot" Version="5.1.59" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.11" />
+  </ItemGroup>
+
+</Project>
