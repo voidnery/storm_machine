@@ -1,0 +1,155 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:StormMachine.App.ViewModels"
+             xmlns:sp="using:ScottPlot.Avalonia"
+             xmlns:results="using:StormMachine.Domain.Results"
+             x:Class="StormMachine.App.Views.Pages.LatencyPage"
+             x:DataType="vm:LatencyPageViewModel">
+
+  <Grid RowDefinitions="Auto,Auto,Auto,*,Auto" Margin="24,20">
+
+    <!-- Заголовок -->
+    <StackPanel Grid.Row="0" Spacing="4">
+      <TextBlock Text="{Binding Title}" FontSize="24" FontWeight="SemiBold" />
+      <TextBlock Text="{Binding MeasurementConditions}" FontSize="12" Opacity="0.6" />
+    </StackPanel>
+
+    <!-- Предупреждение об окружении -->
+    <Border Grid.Row="1" Margin="0,12,0,0" Padding="12,8" CornerRadius="4"
+            Background="#3A2E12" BorderBrush="{StaticResource WarningBrush}" BorderThickness="1"
+            IsVisible="{Binding TimingWarning, Converter={x:Static ObjectConverters.IsNotNull}}">
+      <TextBlock Text="{Binding TimingWarning}" TextWrapping="Wrap" FontSize="12"
+                 Foreground="{StaticResource WarningBrush}" />
+    </Border>
+
+    <!-- Панель запуска -->
+    <Border Grid.Row="2" Margin="0,12,0,0" Padding="14" CornerRadius="6"
+            Background="{StaticResource PanelBrush}">
+      <StackPanel Spacing="10">
+        <Grid ColumnDefinitions="2*,Auto,Auto,Auto,Auto" >
+          <StackPanel Grid.Column="0" Spacing="4" Margin="0,0,12,0">
+            <TextBlock Text="Цель" FontSize="11" Opacity="0.6" />
+            <TextBox Text="{Binding TargetText}" PlaceholderText="gateway, 192.168.1.1 или example.com"
+                     IsEnabled="{Binding CanStart}" />
+          </StackPanel>
+
+          <StackPanel Grid.Column="1" Spacing="4" Margin="0,0,12,0" Width="110">
+            <TextBlock Text="Интервал, мс" FontSize="11" Opacity="0.6" />
+            <NumericUpDown Value="{Binding IntervalMs}" Minimum="10" Maximum="600000" Increment="100"
+                           FormatString="0" IsEnabled="{Binding CanStart}" />
+          </StackPanel>
+
+          <StackPanel Grid.Column="2" Spacing="4" Margin="0,0,12,0" Width="110">
+            <TextBlock Text="Число проб" FontSize="11" Opacity="0.6" />
+            <NumericUpDown Value="{Binding Count}" Minimum="1" Maximum="1000000" Increment="10"
+                           FormatString="0"
+                           IsEnabled="{Binding !Continuous}" />
+          </StackPanel>
+
+          <StackPanel Grid.Column="3" Spacing="8" Margin="0,0,14,0" VerticalAlignment="Bottom">
+            <CheckBox IsChecked="{Binding Continuous}" Content="Непрерывно" FontSize="12"
+                      IsEnabled="{Binding CanStart}" />
+            <CheckBox IsChecked="{Binding SaveToJournal}" Content="Писать в журнал" FontSize="12"
+                      IsEnabled="{Binding CanStart}" />
+          </StackPanel>
+
+          <StackPanel Grid.Column="4" Orientation="Horizontal" Spacing="8" VerticalAlignment="Bottom">
+            <Button Content="Запустить" Command="{Binding StartCommand}" IsEnabled="{Binding CanStart}"
+                    Padding="18,7" Background="{StaticResource AccentBrush}" Foreground="White" />
+            <Button Content="Остановить" Command="{Binding StopCommand}" IsEnabled="{Binding CanStop}"
+                    Padding="14,7" />
+          </StackPanel>
+        </Grid>
+
+        <TextBlock Text="{Binding StatusLine}" FontSize="12" Opacity="0.65" />
+
+        <TextBlock Text="{Binding ErrorMessage}" FontSize="12"
+                   Foreground="{StaticResource DangerBrush}" TextWrapping="Wrap"
+                   IsVisible="{Binding ErrorMessage, Converter={x:Static ObjectConverters.IsNotNull}}" />
+      </StackPanel>
+    </Border>
+
+    <!-- График и история -->
+    <Grid Grid.Row="3" ColumnDefinitions="*,300" Margin="0,14,0,0">
+
+      <Border Grid.Column="0" CornerRadius="6" Background="#151922" Padding="6">
+        <sp:AvaPlot Name="Chart" />
+      </Border>
+
+      <Border Grid.Column="1" Margin="14,0,0,0" CornerRadius="6"
+              Background="{StaticResource PanelBrush}" Padding="12">
+        <Grid RowDefinitions="Auto,*,Auto">
+          <StackPanel Grid.Row="0" Spacing="2" Margin="0,0,0,8">
+            <TextBlock Text="История прогонов" FontWeight="SemiBold" FontSize="13" />
+            <TextBlock Text="Сохранённые измерения ping. Выбери — покажу на графике."
+                       FontSize="11" Opacity="0.55" TextWrapping="Wrap" />
+          </StackPanel>
+
+          <ListBox Grid.Row="1" Name="HistoryList" ItemsSource="{Binding History}"
+                   Background="Transparent" BorderThickness="0">
+            <ListBox.ItemTemplate>
+              <DataTemplate x:DataType="results:RunSummary">
+                <StackPanel Spacing="1" Margin="0,3">
+                  <TextBlock Text="{Binding TargetDisplay}" FontSize="12" TextTrimming="CharacterEllipsis" />
+                  <TextBlock FontSize="10" Opacity="0.5">
+                    <TextBlock.Text>
+                      <MultiBinding StringFormat="{}{0:dd.MM HH:mm:ss} · {1} проб · {2:0.0}% потерь">
+                        <Binding Path="StartedUtc.LocalDateTime" />
+                        <Binding Path="SentCount" />
+                        <Binding Path="LossPercent" />
+                      </MultiBinding>
+                    </TextBlock.Text>
+                  </TextBlock>
+                </StackPanel>
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+            <ListBox.Styles>
+              <Style Selector="ListBoxItem">
+                <Setter Property="Padding" Value="6,2" />
+              </Style>
+            </ListBox.Styles>
+          </ListBox>
+
+          <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="8" Margin="0,8,0,0">
+            <Button Content="Обновить" Command="{Binding RefreshHistoryCommand}" FontSize="12" Padding="10,4" />
+            <Button Content="Показать" FontSize="12" Padding="10,4"
+                    Command="{Binding LoadRunCommand}"
+                    CommandParameter="{Binding #HistoryList.SelectedItem}" />
+          </StackPanel>
+        </Grid>
+      </Border>
+    </Grid>
+
+    <!-- Показатели -->
+    <Border Grid.Row="4" Margin="0,14,0,0" Padding="14,10" CornerRadius="6"
+            Background="{StaticResource PanelBrush}">
+      <Grid ColumnDefinitions="*,*,*,*,*,*">
+        <StackPanel Grid.Column="0" Spacing="2">
+          <TextBlock Text="Отправлено" FontSize="11" Opacity="0.55" />
+          <TextBlock Text="{Binding Sent}" FontSize="18" />
+        </StackPanel>
+        <StackPanel Grid.Column="1" Spacing="2">
+          <TextBlock Text="Потери" FontSize="11" Opacity="0.55" />
+          <TextBlock Text="{Binding Loss}" FontSize="18" />
+        </StackPanel>
+        <StackPanel Grid.Column="2" Spacing="2">
+          <TextBlock Text="Последнее" FontSize="11" Opacity="0.55" />
+          <TextBlock Text="{Binding Last}" FontSize="18" />
+        </StackPanel>
+        <StackPanel Grid.Column="3" Spacing="2">
+          <TextBlock Text="Медиана" FontSize="11" Opacity="0.55" />
+          <TextBlock Text="{Binding Median}" FontSize="18" />
+        </StackPanel>
+        <StackPanel Grid.Column="4" Spacing="2">
+          <TextBlock Text="Джиттер RFC 3550" FontSize="11" Opacity="0.55" />
+          <TextBlock Text="{Binding Jitter}" FontSize="18" />
+        </StackPanel>
+        <StackPanel Grid.Column="5" Spacing="2">
+          <TextBlock Text="PDV (p99 − p50)" FontSize="11" Opacity="0.55" />
+          <TextBlock Text="{Binding Pdv}" FontSize="18" />
+        </StackPanel>
+      </Grid>
+    </Border>
+
+  </Grid>
+</UserControl>

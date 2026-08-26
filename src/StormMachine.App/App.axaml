@@ -1,10 +1,26 @@
 <Application xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="using:StormMachine.App"
              x:Class="StormMachine.App.App"
              RequestedThemeVariant="Dark">
+
+  <Application.DataTemplates>
+    <local:ViewLocator />
+  </Application.DataTemplates>
 
   <Application.Styles>
     <FluentTheme />
   </Application.Styles>
+
+  <Application.Resources>
+    <!-- Оформление намеренно нейтральное и собрано в одном месте: визуальный дизайн
+         прорабатывается отдельно, и менять его придётся здесь, а не по всем файлам. -->
+    <SolidColorBrush x:Key="ChromeBrush">#1F2430</SolidColorBrush>
+    <SolidColorBrush x:Key="SidebarBrush">#191D26</SolidColorBrush>
+    <SolidColorBrush x:Key="PanelBrush">#232A38</SolidColorBrush>
+    <SolidColorBrush x:Key="AccentBrush">#3B82F6</SolidColorBrush>
+    <SolidColorBrush x:Key="WarningBrush">#F59E0B</SolidColorBrush>
+    <SolidColorBrush x:Key="DangerBrush">#EF4444</SolidColorBrush>
+  </Application.Resources>
 
 </Application>

@@ -170,6 +170,40 @@ public sealed class ArchitectureRulesTests
             + "Движок отчётов спрятан за IReportRenderer, чтобы его замена стоила день, а не месяц.");
     }
 
+    [Fact(DisplayName = "Правило 8: у каждой страницы есть представление")]
+    public void EveryPageViewModel_IsMappedInViewLocator()
+    {
+        // Ошибка, которую иначе не поймать до запуска: новая страница добавлена,
+        // а сопоставление с представлением забыто. Проявилось бы надписью
+        // «Нет представления для …» у пользователя, а не при сборке.
+        var locatorPath = RepositoryLayout
+            .SourceFiles("src")
+            .FirstOrDefault(f => Path.GetFileName(f) == "ViewLocator.cs");
+
+        Assert.True(locatorPath is not null, "Не найден ViewLocator.cs");
+
+        var locator = File.ReadAllText(locatorPath!);
+
+        var pageViewModels = RepositoryLayout
+            .SourceFiles("src")
+            .SelectMany(file => System.Text.RegularExpressions.Regex
+                .Matches(RepositoryLayout.StripComments(File.ReadAllText(file)), @"class\s+(\w*PageViewModel)\b")
+                .Select(m => m.Groups[1].Value))
+            .Where(name => name != "PageViewModel")
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+
+        Assert.NotEmpty(pageViewModels);
+
+        var missing = pageViewModels
+            .Where(name => !locator.Contains(name, StringComparison.Ordinal))
+            .ToList();
+
+        Assert.True(
+            missing.Count == 0,
+            $"Страницы без представления в ViewLocator: {string.Join(", ", missing)}.");
+    }
+
     [Fact(DisplayName = "Структура репозитория на месте")]
     public void Repository_HasExpectedProjects()
     {

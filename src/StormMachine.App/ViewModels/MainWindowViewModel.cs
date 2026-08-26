@@ -1,55 +1,174 @@
+using System.Collections.ObjectModel;
+using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
+using StormMachine.App.Services;
 using StormMachine.Application;
+using StormMachine.Application.Abstractions;
+using StormMachine.Domain.Measurements;
 
 namespace StormMachine.App.ViewModels;
 
 /// <summary>
-/// Оболочка главного окна: боковая навигация и строка состояния.
+/// Оболочка главного окна: навигация, строка состояния и панель выполняющихся операций.
 /// </summary>
 /// <remarks>
-/// В итерации И-0 разделы — заглушки с честной пометкой, в какой итерации каждый появится.
-/// Первый рабочий экран (ping-монитор) приходит в И-4.
+/// Разделы, которых ещё нет, показываются с честной пометкой об итерации, а не прячутся
+/// (UX-принцип 6, docs/01-analysis.md §9.5). Готовые разделы подставляют свои страницы.
 /// </remarks>
 public sealed partial class MainWindowViewModel : ObservableObject
 {
-    public MainWindowViewModel()
-    {
-        Sections =
-        [
-            new("/", "Дашборд", "Состояние сети, активные мониторы, алерты, быстрый запуск.", "И-4"),
-            new("/local/topology", "Карта сети", "Граф топологии с редактором и отметками достоверности связей.", "И-9"),
-            new("/local/devices", "Устройства", "Инвентарь: адреса, MAC, вендор, имена, история.", "И-8"),
-            new("/local/discovery", "Обнаружение", "Сканирование подсети, история сканов, различия между ними.", "И-8"),
-            new("/local/tests", "Локальные тесты", "Доступность, задержка, джиттер, скорость, bufferbloat, сервисы.", "И-4"),
-            new("/internet/probes", "Внешние пробы", "Сценарии probe до узлов в интернете.", "И-11"),
-            new("/internet/path", "Анализ пути", "Traceroute и непрерывный MTR с потерями по хопам.", "И-7"),
-            new("/internet/speed", "Скорость и качество", "Speedtest, bufferbloat, IPv6, тип NAT.", "И-13"),
-            new("/internet/inspect", "Инспекторы", "DNS, TLS и HTTP: разбор ответов и таймингов.", "И-11"),
-            new("/monitors", "Мониторы", "Постоянные проверки, доступность, SLA.", "И-14"),
-            new("/presets", "Библиотека", "Пресеты и наборы тестов.", "И-5"),
-            new("/schedule", "Расписание", "Периодические запуски и окна обслуживания.", "И-14"),
-            new("/runs", "Журнал", "История прогонов с разбором до сырых измерений.", "И-3"),
-            new("/reports", "Отчёты", "Формирование PDF с методиками и условиями измерения.", "И-6"),
-            new("/alerts", "Алерты", "Правила и лента событий.", "И-14"),
-            new("/settings", "Настройки", "Профили сети, агенты, учётные данные, хранилище.", "И-16"),
-        ];
+    private readonly Func<NavigationSection, PageViewModel> _pageFactory;
+    private readonly INetworkEnvironment _environment;
+    private readonly IHighResolutionClock _clock;
+    private readonly Dictionary<string, PageViewModel> _pages = new(StringComparer.Ordinal);
 
-        SelectedSection = Sections[0];
+    public MainWindowViewModel(
+        RunnerService runner,
+        INetworkEnvironment environment,
+        IHighResolutionClock clock,
+        Func<NavigationSection, PageViewModel> pageFactory)
+    {
+        Runner = runner ?? throw new ArgumentNullException(nameof(runner));
+        _environment = environment ?? throw new ArgumentNullException(nameof(environment));
+        _clock = clock ?? throw new ArgumentNullException(nameof(clock));
+        _pageFactory = pageFactory ?? throw new ArgumentNullException(nameof(pageFactory));
+
+        Sections = NavigationMap.Sections;
+
+        Runner.ActiveChanged += (_, _) =>
+        {
+            OnPropertyChanged(nameof(HasActiveRuns));
+            OnPropertyChanged(nameof(ActiveRunsCaption));
+        };
+
+        UpdateStatus();
+        Navigate(Sections[0]);
     }
 
+    public RunnerService Runner { get; }
+
     public IReadOnlyList<NavigationSection> Sections { get; }
+
+    public ObservableCollection<ActiveRunViewModel> ActiveRuns => Runner.Active;
+
+    public bool HasActiveRuns => Runner.Active.Count > 0;
+
+    public string ActiveRunsCaption => Runner.Active.Count switch
+    {
+        0 => "Нет выполняющихся операций",
+        1 => "1 выполняющаяся операция",
+        _ => $"{Runner.Active.Count} выполняющихся операций",
+    };
 
     [ObservableProperty]
     private NavigationSection? _selectedSection;
 
+    [ObservableProperty]
+    private PageViewModel? _currentPage;
+
+    [ObservableProperty]
+    private bool _isDrawerOpen;
+
+    // ------------------------------------------------------------- строка состояния
+
+    [ObservableProperty]
+    private string _adapterLine = string.Empty;
+
+    [ObservableProperty]
+    private string? _adapterWarning;
+
+    [ObservableProperty]
+    private string _floorLine = string.Empty;
+
     public static string WindowTitle => ProductInfo.NameAndVersion;
 
-    /// <summary>
-    /// Заглушка строки состояния. В И-1 сюда придут настоящие данные об адаптере,
-    /// включая предупреждение о виртуальном коммутаторе или VPN.
-    /// </summary>
-    public static string StatusText =>
-        "Итерация И-0 — каркас. Сетевой адаптер будет определяться с И-1.";
-
     public static string LevelText => "Уровень 0 — ядро";
+
+    partial void OnSelectedSectionChanged(NavigationSection? value)
+    {
+        if (value is not null)
+        {
+            Navigate(value);
+        }
+    }
+
+    [RelayCommand]
+    private void ToggleDrawer() => IsDrawerOpen = !IsDrawerOpen;
+
+    /// <summary>Переход в раздел из содержимого страницы, а не из бокового меню.</summary>
+    [RelayCommand]
+    public void GoTo(string? route)
+    {
+        var section = Sections.FirstOrDefault(s => string.Equals(s.Route, route, StringComparison.Ordinal));
+
+        if (section is not null)
+        {
+            SelectedSection = section;
+        }
+    }
+
+    private void Navigate(NavigationSection section)
+    {
+        CurrentPage?.Deactivate();
+
+        // Страницы переиспользуются: возврат на экран измерений не должен терять
+        // введённые параметры и показанный график.
+        if (!_pages.TryGetValue(section.Route, out var page))
+        {
+            page = _pageFactory(section);
+            _pages[section.Route] = page;
+        }
+
+        CurrentPage = page;
+
+        if (SelectedSection?.Route != section.Route)
+        {
+            SelectedSection = section;
+        }
+
+        UpdateStatus();
+
+        _ = page.ActivateAsync();
+    }
+
+    private void UpdateStatus()
+    {
+        var adapter = _environment.GetPrimaryAdapter();
+
+        if (adapter is null)
+        {
+            AdapterLine = "Активный адаптер не определён";
+            AdapterWarning = null;
+        }
+        else
+        {
+            AdapterLine = $"{adapter.Name} · {DescribeKind(adapter.Kind)}"
+                          + (adapter.IPv4Address is { } ip ? $" · {ip}" : string.Empty);
+
+            // Предупреждение живёт в строке состояния намеренно: оператор должен
+            // видеть его до того, как поверит цифрам, а не после.
+            AdapterWarning = adapter.Kind switch
+            {
+                AdapterKind.Virtual => "измерение через виртуальный коммутатор — он вносит собственный джиттер",
+                AdapterKind.Vpn or AdapterKind.Tunnel => "измерение через VPN или туннель — задержка включает шифрование и обходной маршрут",
+                _ => null,
+            };
+        }
+
+        FloorLine = _clock.CalibrationBaselineMs > 0
+            ? $"порог {_clock.CalibrationBaselineMs.ToString("0.000", CultureInfo.InvariantCulture)} мс"
+            : "порог не измерен";
+    }
+
+    private static string DescribeKind(AdapterKind kind) => kind switch
+    {
+        AdapterKind.Physical => "физический",
+        AdapterKind.Wireless => "беспроводной",
+        AdapterKind.Virtual => "виртуальный коммутатор",
+        AdapterKind.Vpn => "VPN",
+        AdapterKind.Tunnel => "туннель",
+        AdapterKind.Loopback => "loopback",
+        _ => "тип не определён",
+    };
 }

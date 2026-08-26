@@ -1,0 +1,94 @@
+using System.Collections.Concurrent;
+using System.Collections.ObjectModel;
+using Avalonia.Threading;
+using StormMachine.App.ViewModels;
+using StormMachine.Application.Probes;
+using StormMachine.Application.Runs;
+using StormMachine.Domain.Measurements;
+
+namespace StormMachine.App.Services;
+
+/// <summary>
+/// Выполняющиеся прогоны приложения.
+/// </summary>
+/// <remarks>
+/// Существует ради Run Drawer: тесты длинные, и оператор не обязан сидеть на экране,
+/// с которого запустил измерение. Список активных операций доступен отовсюду
+/// (UX-каркас, docs/01-analysis.md §9.3).
+/// <para>
+/// Сэмплы приходят из фонового потока. В интерфейс они попадают <b>не по одному</b>:
+/// монитор с интервалом 100 мс дал бы десять обращений к диспетчеру в секунду на каждый
+/// прогон, а при нескольких прогонах — заметное дёрганье. Вместо этого сэмплы копятся
+/// в очереди, а страница разбирает её по таймеру (см. <see cref="ActiveRunViewModel"/>).
+/// </para>
+/// </remarks>
+public sealed class RunnerService(RunOrchestrator orchestrator)
+{
+    private readonly RunOrchestrator _orchestrator = orchestrator
+        ?? throw new ArgumentNullException(nameof(orchestrator));
+
+    /// <summary>Активные прогоны. Меняется только в потоке интерфейса.</summary>
+    public ObservableCollection<ActiveRunViewModel> Active { get; } = [];
+
+    public bool HasActive => Active.Count > 0;
+
+    public event EventHandler? ActiveChanged;
+
+    /// <summary>
+    /// Запускает пробу и возвращает объект, за которым можно следить.
+    /// </summary>
+    public ActiveRunViewModel Start(IProbe probe, ProbeRequest request, bool save, string title)
+    {
+        ArgumentNullException.ThrowIfNull(probe);
+        ArgumentNullException.ThrowIfNull(request);
+
+        var queue = new ConcurrentQueue<Sample>();
+        var cts = new CancellationTokenSource();
+        var run = new ActiveRunViewModel(probe.Descriptor, title, queue, cts);
+
+        Active.Add(run);
+        ActiveChanged?.Invoke(this, EventArgs.Empty);
+
+        _ = ExecuteAsync(run, probe, request, save, queue, cts);
+
+        return run;
+    }
+
+    private async Task ExecuteAsync(
+        ActiveRunViewModel run,
+        IProbe probe,
+        ProbeRequest request,
+        bool save,
+        ConcurrentQueue<Sample> queue,
+        CancellationTokenSource cts)
+    {
+        try
+        {
+            var outcome = await _orchestrator.RunAsync(
+                probe,
+                request,
+                new RunOptions
+                {
+                    Save = save,
+                    OnSample = queue.Enqueue,
+                },
+                cts.Token).ConfigureAwait(false);
+
+            await Dispatcher.UIThread.InvokeAsync(() => run.Finish(outcome));
+        }
+        catch (Exception ex)
+        {
+            await Dispatcher.UIThread.InvokeAsync(() => run.Fail(ex.Message));
+        }
+        finally
+        {
+            cts.Dispose();
+
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                Active.Remove(run);
+                ActiveChanged?.Invoke(this, EventArgs.Empty);
+            });
+        }
+    }
+}
