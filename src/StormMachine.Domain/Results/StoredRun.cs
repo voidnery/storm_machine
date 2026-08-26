@@ -106,6 +106,9 @@ public sealed record RunQuery
     public bool OnlyFailed { get; init; }
 
     public DateTimeOffset? Since { get; init; }
+
+    /// <summary>Только прогоны, запущенные из указанного пресета.</summary>
+    public Guid? PresetId { get; init; }
 }
 
 /// <summary>

@@ -179,6 +179,12 @@ public sealed class SqliteRunStore : IRunStore
             command.Parameters.AddWithValue("$since", since.UtcTicks);
         }
 
+        if (query.PresetId is { } presetId)
+        {
+            filters.Add("preset_id = $presetId");
+            command.Parameters.AddWithValue("$presetId", presetId.ToString());
+        }
+
         var where = filters.Count == 0 ? string.Empty : "WHERE " + string.Join(" AND ", filters);
 
         command.CommandText = $"""

@@ -70,6 +70,11 @@ public partial class LatencyPage : UserControl
 
         plot.XLabel("проба");
         plot.YLabel("RTT, мс");
+
+        // Легенда включается ОДИН раз, при настройке.
+        // ShowLegend() добавляет панель на каждый вызов, а перерисовка идёт десять раз
+        // в секунду — легенды наслаивались друг на друга и съедали половину графика.
+        plot.ShowLegend(Edge.Top);
     }
 
     private void Redraw()
@@ -111,7 +116,6 @@ public partial class LatencyPage : UserControl
             }
 
             plot.Axes.AutoScale();
-            plot.ShowLegend(Edge.Top);
         }
 
         _chart.Refresh();

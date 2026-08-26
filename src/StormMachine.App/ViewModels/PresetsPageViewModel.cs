@@ -1,9 +1,12 @@
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using System.Globalization;
 using StormMachine.App.Services;
+using StormMachine.Application.Abstractions;
 using StormMachine.Application.Presets;
 using StormMachine.Domain.Presets;
+using StormMachine.Domain.Results;
 
 namespace StormMachine.App.ViewModels;
 
@@ -21,15 +24,34 @@ public sealed partial class PresetsPageViewModel(
     NavigationSection section,
     PresetService presets,
     RunnerService runner,
+    IRunStore store,
     IFilePicker filePicker) : PageViewModel(section)
 {
     private readonly PresetService _presets = presets ?? throw new ArgumentNullException(nameof(presets));
     private readonly RunnerService _runner = runner ?? throw new ArgumentNullException(nameof(runner));
+    private readonly IRunStore _store = store ?? throw new ArgumentNullException(nameof(store));
     private readonly IFilePicker _filePicker = filePicker ?? throw new ArgumentNullException(nameof(filePicker));
 
     public ObservableCollection<Preset> Presets { get; } = [];
 
     public ObservableCollection<ParameterRow> Parameters { get; } = [];
+
+    /// <summary>
+    /// Прогоны, сделанные выбранным пресетом.
+    /// </summary>
+    /// <remarks>
+    /// Появились после проверки И-5: короткий пресет отрабатывает за секунду, панель
+    /// операций тут же пустеет, и оператору казалось, что запуск сорвался. Результат
+    /// должен быть виден там же, откуда запускали.
+    /// </remarks>
+    public ObservableCollection<RunSummary> Runs { get; } = [];
+
+    /// <summary>Есть ли что показывать в списке прогонов.</summary>
+    /// <remarks>
+    /// Отдельное свойство, потому что Avalonia не приводит число к признаку видимости:
+    /// привязка к <c>Runs.Count</c> молча не сработала бы.
+    /// </remarks>
+    public bool HasRuns => Runs.Count > 0;
 
     [ObservableProperty]
     private Preset? _selected;
@@ -49,10 +71,18 @@ public sealed partial class PresetsPageViewModel(
     [ObservableProperty]
     private string? _errorMessage;
 
+    /// <summary>Итог последнего запуска, сделанного с этой страницы.</summary>
+    [ObservableProperty]
+    private string? _lastOutcome;
+
     public override async Task ActivateAsync(CancellationToken cancellationToken = default) =>
         await RefreshAsync(cancellationToken).ConfigureAwait(true);
 
-    partial void OnSelectedChanged(Preset? value) => ShowDetails(value);
+    partial void OnSelectedChanged(Preset? value)
+    {
+        ShowDetails(value);
+        _ = LoadRunsAsync(value);
+    }
 
     partial void OnSearchChanged(string value) => _ = RefreshAsync();
 
@@ -115,7 +145,7 @@ public sealed partial class PresetsPageViewModel(
 
         var preset = Selected;
 
-        _runner.Start(
+        var run = _runner.Start(
             probe,
             PresetService.ToRequest(preset),
             save: true,
@@ -123,9 +153,14 @@ public sealed partial class PresetsPageViewModel(
             presetId: preset.Id,
             presetVersion: preset.Version);
 
+        // Итог показывается здесь же. Прогон из пресета может занять секунду,
+        // и без этого оператор видит только опустевшую панель операций.
+        run.Finished += (_, _) => OnRunFinished(preset, run);
+
         await _presets.RecordRunAsync(preset.Id).ConfigureAwait(true);
 
-        Message = $"Запущен «{preset.Name}». Ход выполнения — в панели операций, результат попадёт в журнал.";
+        LastOutcome = null;
+        Message = $"Запущен «{preset.Name}» — идёт измерение.";
 
         await RefreshAsync().ConfigureAwait(true);
     }
@@ -207,6 +242,63 @@ public sealed partial class PresetsPageViewModel(
         catch (Exception ex)
         {
             ErrorMessage = $"Файл не прочитан: {ex.Message}";
+        }
+    }
+
+    private void OnRunFinished(Preset preset, ActiveRunViewModel run)
+    {
+        if (run.Error is { } error)
+        {
+            LastOutcome = null;
+            ErrorMessage = $"«{preset.Name}»: {error}";
+            return;
+        }
+
+        if (run.Outcome?.Result is not { } result)
+        {
+            return;
+        }
+
+        var stats = Domain.Measurements.LatencyStatistics.Compute(result.Samples);
+        var median = stats.SampleCount == 0
+            ? "—"
+            : stats.P50Ms.ToString("0.000", CultureInfo.InvariantCulture) + " мс";
+
+        LastOutcome =
+            $"«{preset.Name}»: отправлено {result.SentCount}, потери {result.LossPercent:0.0} %, медиана {median}"
+            + (result.WasCancelled ? " (прогон остановлен)" : string.Empty);
+
+        Message = null;
+
+        _ = LoadRunsAsync(preset);
+    }
+
+    private async Task LoadRunsAsync(Preset? preset)
+    {
+        Runs.Clear();
+        OnPropertyChanged(nameof(HasRuns));
+
+        if (preset is null)
+        {
+            return;
+        }
+
+        try
+        {
+            var runs = await _store
+                .ListAsync(new RunQuery { Limit = 10, PresetId = preset.Id })
+                .ConfigureAwait(true);
+
+            foreach (var run in runs)
+            {
+                Runs.Add(run);
+            }
+
+            OnPropertyChanged(nameof(HasRuns));
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = $"Журнал недоступен: {ex.Message}";
         }
     }
 

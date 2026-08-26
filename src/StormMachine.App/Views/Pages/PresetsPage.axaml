@@ -2,6 +2,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:StormMachine.App.ViewModels"
              xmlns:presets="using:StormMachine.Domain.Presets"
+             xmlns:results="using:StormMachine.Domain.Results"
              x:Class="StormMachine.App.Views.Pages.PresetsPage"
              x:DataType="vm:PresetsPageViewModel">
 
@@ -17,6 +18,13 @@
 
       <TextBlock Text="{Binding Message}" FontSize="12" Opacity="0.8" TextWrapping="Wrap"
                  IsVisible="{Binding Message, Converter={x:Static ObjectConverters.IsNotNull}}" />
+
+      <!-- Итог запуска показывается здесь: прогон из пресета может занять секунду,
+           и без этого оператор видит только опустевшую панель операций. -->
+      <Border Padding="10,6" CornerRadius="4" Background="#16321F"
+              IsVisible="{Binding LastOutcome, Converter={x:Static ObjectConverters.IsNotNull}}">
+        <TextBlock Text="{Binding LastOutcome}" FontSize="12" TextWrapping="Wrap" Foreground="#7DD3A0" />
+      </Border>
       <TextBlock Text="{Binding ErrorMessage}" FontSize="12" Foreground="{StaticResource DangerBrush}" TextWrapping="Wrap"
                  IsVisible="{Binding ErrorMessage, Converter={x:Static ObjectConverters.IsNotNull}}" />
     </StackPanel>
@@ -67,19 +75,48 @@
                        Foreground="{StaticResource WarningBrush}" />
           </Border>
 
-          <StackPanel Grid.Row="2" Spacing="4" Margin="0,14,0,0">
-            <TextBlock Text="Параметры" FontWeight="SemiBold" FontSize="12" Opacity="0.7" />
-            <ItemsControl ItemsSource="{Binding Parameters}">
-              <ItemsControl.ItemTemplate>
-                <DataTemplate x:DataType="vm:ParameterRow">
-                  <Grid ColumnDefinitions="180,*" Margin="0,2">
-                    <TextBlock Grid.Column="0" Text="{Binding Name}" FontSize="12" Opacity="0.65" />
-                    <TextBlock Grid.Column="1" Text="{Binding Value}" FontSize="12" />
-                  </Grid>
-                </DataTemplate>
-              </ItemsControl.ItemTemplate>
-            </ItemsControl>
-          </StackPanel>
+          <ScrollViewer Grid.Row="2" Margin="0,14,0,0">
+            <StackPanel Spacing="14">
+              <StackPanel Spacing="4">
+                <TextBlock Text="Параметры" FontWeight="SemiBold" FontSize="12" Opacity="0.7" />
+                <ItemsControl ItemsSource="{Binding Parameters}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:ParameterRow">
+                      <Grid ColumnDefinitions="180,*" Margin="0,2">
+                        <TextBlock Grid.Column="0" Text="{Binding Name}" FontSize="12" Opacity="0.65" />
+                        <TextBlock Grid.Column="1" Text="{Binding Value}" FontSize="12" />
+                      </Grid>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </StackPanel>
+
+              <!-- Прогоны именно этого пресета: результат виден там, откуда запускали. -->
+              <StackPanel Spacing="4">
+                <TextBlock Text="Прогоны этого пресета" FontWeight="SemiBold" FontSize="12" Opacity="0.7" />
+
+                <TextBlock Text="Ещё не запускался." FontSize="12" Opacity="0.45"
+                           IsVisible="{Binding !HasRuns}" />
+
+                <ItemsControl ItemsSource="{Binding Runs}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="results:RunSummary">
+                      <Grid ColumnDefinitions="130,70,80,*" Margin="0,2">
+                        <TextBlock Grid.Column="0" FontSize="12" Opacity="0.65"
+                                   Text="{Binding StartedUtc.LocalDateTime, StringFormat='{}{0:dd.MM HH:mm:ss}'}" />
+                        <TextBlock Grid.Column="1" FontSize="12" Opacity="0.8"
+                                   Text="{Binding SentCount, StringFormat='{}{0} проб'}" />
+                        <TextBlock Grid.Column="2" FontSize="12" Opacity="0.8"
+                                   Text="{Binding LossPercent, StringFormat='{}{0:0.0}% потерь'}" />
+                        <TextBlock Grid.Column="3" FontSize="12"
+                                   Text="{Binding MedianMs, StringFormat='{}медиана {0:0.000} мс'}" />
+                      </Grid>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </StackPanel>
+            </StackPanel>
+          </ScrollViewer>
 
           <StackPanel Grid.Row="3" Orientation="Horizontal" Spacing="8" Margin="0,14,0,0">
             <Button Content="Запустить" Command="{Binding RunCommand}"
