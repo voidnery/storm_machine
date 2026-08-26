@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Ядро модели. Ноль зависимостей — ни на проекты, ни на пакеты.
+       Это правило проверяется тестом ProjectReferenceRules в tests/StormMachine.ArchTests. -->
+
+  <PropertyGroup>
+    <Description>Доменная модель Storm Machine: цели, измерения, результаты, вердикты.</Description>
+  </PropertyGroup>
+
+</Project>

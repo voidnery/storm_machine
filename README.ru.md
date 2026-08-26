@@ -48,7 +48,7 @@ Npcap **никогда не распространяется вместе с п�
 
 ## Технологии
 
-.NET 8 · Avalonia 11 · ScottPlot · QuestPDF · SharpSnmpLib · Quartz.NET · SQLite
+.NET 10 · Avalonia 12 · ScottPlot · QuestPDF · SharpSnmpLib · Quartz.NET · SQLite
 
 Обоснование — в [ADR-0001](docs/adr/ADR-0001-technology-stack.md).
 

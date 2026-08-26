@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <Description>Слой приложения: сценарии и порты. Не знает, кто его вызывает — GUI, CLI или сервер.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\StormMachine.Domain\StormMachine.Domain.csproj" />
+  </ItemGroup>
+
+  <!-- Только абстракции. Конкретные реализации внедряются из корня композиции,
+       иначе слой приложения потянул бы за собой инфраструктуру. -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.11" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.11" />
+  </ItemGroup>
+
+</Project>

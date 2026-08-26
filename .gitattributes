@@ -7,6 +7,7 @@
 *.cmd   text eol=crlf
 *.bat   text eol=crlf
 *.sln   text eol=crlf
+*.slnx  text eol=lf
 
 # Скрипты, которые исполняются как sh — строго LF, иначе Git Bash их не запустит
 .githooks/*  text eol=lf

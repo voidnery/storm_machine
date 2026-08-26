@@ -10,7 +10,9 @@
   </PropertyGroup>
 
   <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
+    <!-- .NET 10 (LTS, поддержка до ноября 2028). На .NET 8 стартовать нельзя:
+         его LTS-поддержка заканчивается в ноябре 2026. -->
+    <TargetFramework>net10.0</TargetFramework>
     <LangVersion>latest</LangVersion>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>

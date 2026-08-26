@@ -24,7 +24,7 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '8.0.x'
+          dotnet-version: '10.0.x'
 
       - name: Есть ли что публиковать
         id: probe
@@ -43,18 +43,13 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path artifacts | Out-Null
+          # Параметры публикации (single-file, trimmed, win-x64) заданы в самих .csproj,
+          # чтобы локальная сборка и сборка здесь давали идентичный артефакт.
           foreach ($name in @('StormMachine.App', 'StormMachine.Cli', 'StormMachine.Agent')) {
             $proj = Get-ChildItem -Path src -Filter "$name.csproj" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
             if (-not $proj) { continue }
             Write-Host "Публикую $name"
-            dotnet publish $proj.FullName `
-              --configuration Release `
-              --runtime win-x64 `
-              --self-contained true `
-              -p:PublishSingleFile=true `
-              -p:PublishTrimmed=true `
-              -p:IncludeNativeLibrariesForSelfExtract=true `
-              --output "artifacts/$name"
+            dotnet publish $proj.FullName --configuration Release --output "artifacts/$name"
           }
 
       - name: Упаковка и контрольные суммы

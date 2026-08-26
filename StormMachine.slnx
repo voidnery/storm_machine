@@ -1,0 +1,12 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/StormMachine.App/StormMachine.App.csproj" />
+    <Project Path="src/StormMachine.Application/StormMachine.Application.csproj" />
+    <Project Path="src/StormMachine.Cli/StormMachine.Cli.csproj" />
+    <Project Path="src/StormMachine.Domain/StormMachine.Domain.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/StormMachine.ArchTests/StormMachine.ArchTests.csproj" />
+    <Project Path="tests/StormMachine.Domain.UnitTests/StormMachine.Domain.UnitTests.csproj" />
+  </Folder>
+</Solution>

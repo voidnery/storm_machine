@@ -47,7 +47,7 @@ existing installation and explains what is unavailable without one.
 
 ## Technology
 
-.NET 8 · Avalonia 11 · ScottPlot · QuestPDF · SharpSnmpLib · Quartz.NET · SQLite
+.NET 10 · Avalonia 12 · ScottPlot · QuestPDF · SharpSnmpLib · Quartz.NET · SQLite
 
 See [ADR-0001](docs/adr/ADR-0001-technology-stack.md) for the reasoning.
 

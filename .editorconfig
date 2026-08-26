@@ -1,0 +1,71 @@
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+indent_style = space
+indent_size = 4
+trim_trailing_whitespace = true
+
+[*.{yml,yaml,json,md}]
+indent_size = 2
+
+[*.md]
+trim_trailing_whitespace = false
+
+[*.{cmd,bat,ps1}]
+end_of_line = crlf
+
+[*.{csproj,props,targets,slnx}]
+indent_size = 2
+
+[*.cs]
+indent_size = 4
+dotnet_sort_system_directives_first = true
+csharp_using_directive_placement = outside_namespace:warning
+csharp_style_namespace_declarations = file_scoped:warning
+csharp_prefer_braces = true:warning
+dotnet_style_require_accessibility_modifiers = for_non_interface_members:warning
+csharp_style_var_when_type_is_apparent = true:suggestion
+
+# --- Осознанные отступления от рекомендаций анализатора ---
+#
+# Правила ниже отключены не «чтобы не мешали», а потому что в этом проекте они
+# ошибаются или спорят с требованиями. Всё остальное остаётся ошибкой сборки:
+# в Directory.Build.props включён TreatWarningsAsErrors.
+
+# CA1720: «идентификатор содержит имя типа».
+# Ложное срабатывание на членах перечислений, которые описывают ТИП вводимого значения
+# (ProbeParameterType.Integer, .Decimal). Переименование ухудшило бы читаемость модели.
+dotnet_diagnostic.CA1720.severity = none
+
+# CA2007: ConfigureAwait(false).
+# Актуально для библиотек с контекстом синхронизации. У консоли и у ядра его нет,
+# а в Avalonia возврат в UI-поток как раз нужен. Расстановка ConfigureAwait по всему
+# коду добавила бы шума без пользы.
+dotnet_diagnostic.CA2007.severity = none
+
+# CA1031: перехват общего Exception.
+# Прямо требуется отказоустойчивостью (docs/01-analysis.md §7): падение одной пробы
+# не должно ронять прогон. Оставлено подсказкой, чтобы такие места были видны на ревью.
+dotnet_diagnostic.CA1031.severity = suggestion
+
+# CA1848: делегаты LoggerMessage вместо интерполяции.
+# Оправдано в горячем пути; в остальном коде превращает логирование в церемонию.
+# В измерительном цикле логирования не будет вовсе — там действует запрет на аллокации.
+dotnet_diagnostic.CA1848.severity = suggestion
+
+# CA1303: строки-литералы через ресурсы.
+# Локализация делается в слое представления (RU/EN), а не в консольной диагностике.
+dotnet_diagnostic.CA1303.severity = none
+
+[tests/**/*.cs]
+# CA1707: подчёркивания в именах членов.
+# В тестах имя вида Метод_Сценарий_Ожидание — общепринятая форма, и она читается
+# в отчёте о прогоне лучше любой альтернативы. На рабочий код правило продолжает действовать.
+dotnet_diagnostic.CA1707.severity = none
+
+# CA1515: типы могут быть internal.
+# Тестовые классы обязаны быть public, иначе xunit их не найдёт.
+dotnet_diagnostic.CA1515.severity = none
