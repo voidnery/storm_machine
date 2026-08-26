@@ -42,6 +42,16 @@ public sealed record ProbeResult
 
     public required IReadOnlyList<Sample> Samples { get; init; }
 
+    /// <summary>
+    /// Структурные факты: записи DNS, цепочка сертификатов, заголовки HTTP.
+    /// </summary>
+    /// <remarks>
+    /// Второй канал результата рядом с сэмплами. Введён в И-2: половина проб сообщает
+    /// не только «сколько миллисекунд», но и «что именно там оказалось», и это не
+    /// укладывалось в числовой ряд.
+    /// </remarks>
+    public IReadOnlyList<ProbeFact> Facts { get; init; } = [];
+
     public required DateTimeOffset CompletedUtc { get; init; }
 
     /// <summary>Прогон был прерван оператором. Измеренное до прерывания сохраняется.</summary>

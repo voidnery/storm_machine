@@ -129,9 +129,11 @@ public sealed class IcmpProbe(IHighResolutionClock clock, TargetResolver resolve
 
     public async IAsyncEnumerable<Sample> ExecuteAsync(
         ProbeRequest request,
+        IProbeObserver observer,
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
+        ArgumentNullException.ThrowIfNull(observer);
 
         var count = request.GetParameter(ParameterCount, 4);
         var intervalMs = request.GetParameter(ParameterIntervalMs, 1000);
@@ -141,6 +143,7 @@ public sealed class IcmpProbe(IHighResolutionClock clock, TargetResolver resolve
         var dontFragment = request.GetParameter(ParameterDontFragment, false);
 
         var address = await _resolver.ResolveAsync(request.Target, cancellationToken).ConfigureAwait(false);
+        observer.OnResolved(address.ToString());
 
         // Всё, что можно выделить заранее, выделяется до цикла: буфер, параметры, объект Ping.
         // В горячем пути остаётся только то, что аллоцирует сам системный API.

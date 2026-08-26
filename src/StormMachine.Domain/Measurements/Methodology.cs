@@ -57,6 +57,43 @@ public sealed record Methodology
         Reference = "собственная методика: время до завершения трёхстороннего рукопожатия",
     };
 
+    public static readonly Methodology TcpConnect = TcpConnectLatency;
+
+    public static readonly Methodology UdpProbe = new()
+    {
+        Name = "UDP-проба",
+        Reference = "RFC 768; молчание не равно недоступности",
+        Url = "https://www.rfc-editor.org/rfc/rfc768",
+    };
+
+    public static readonly Methodology DnsQuery = new()
+    {
+        Name = "DNS-запрос",
+        Reference = "RFC 1035",
+        Url = "https://www.rfc-editor.org/rfc/rfc1035",
+    };
+
+    public static readonly Methodology TlsHandshake = new()
+    {
+        Name = "Рукопожатие TLS",
+        Reference = "RFC 8446 (TLS 1.3), RFC 5246 (TLS 1.2)",
+        Url = "https://www.rfc-editor.org/rfc/rfc8446",
+    };
+
+    public static readonly Methodology HttpTiming = new()
+    {
+        Name = "Разбивка времени HTTP по фазам",
+        Reference = "RFC 9110; фазы: DNS, TCP, TLS, первый байт, скачивание",
+        Url = "https://www.rfc-editor.org/rfc/rfc9110",
+    };
+
+    public static readonly Methodology Traceroute = new()
+    {
+        Name = "Traceroute по TTL",
+        Reference = "RFC 792; ICMP Time Exceeded",
+        Url = "https://www.rfc-editor.org/rfc/rfc792",
+    };
+
     public static readonly Methodology Unspecified = new()
     {
         Name = "Не указана",

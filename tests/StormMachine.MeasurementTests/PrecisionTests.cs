@@ -1,6 +1,7 @@
 using System.Globalization;
 using Microsoft.Extensions.DependencyInjection;
 using StormMachine.Application.Abstractions;
+using StormMachine.Application.Probes;
 using StormMachine.Domain.Measurements;
 using Xunit.Abstractions;
 
@@ -198,7 +199,7 @@ public sealed class PrecisionTests(ITestOutputHelper output)
 
         try
         {
-            await foreach (var sample in probe.ExecuteAsync(request, cts.Token))
+            await foreach (var sample in probe.ExecuteAsync(request, NullProbeObserver.Instance, cts.Token))
             {
                 samples.Add(sample);
 

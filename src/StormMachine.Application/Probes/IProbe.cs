@@ -44,7 +44,14 @@ public interface IProbe
     /// Выполняет измерение, отдавая сэмплы по мере получения.
     /// Обязана корректно завершаться по <paramref name="cancellationToken"/>.
     /// </summary>
-    IAsyncEnumerable<Sample> ExecuteAsync(ProbeRequest request, CancellationToken cancellationToken);
+    /// <param name="observer">
+    /// Побочный канал для структурных фактов и разрешённого адреса. Пробы, которым нечего
+    /// сообщать сверх чисел, им не пользуются.
+    /// </param>
+    IAsyncEnumerable<Sample> ExecuteAsync(
+        ProbeRequest request,
+        IProbeObserver observer,
+        CancellationToken cancellationToken);
 }
 
 /// <summary>Реестр доступных проб. Наполняется через внедрение зависимостей.</summary>

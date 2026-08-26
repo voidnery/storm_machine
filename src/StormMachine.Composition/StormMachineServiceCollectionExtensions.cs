@@ -28,8 +28,15 @@ public static class StormMachineServiceCollectionExtensions
         services.AddSingleton<INetworkEnvironment, WindowsNetworkEnvironment>();
         services.AddSingleton<TargetResolver>();
 
-        // Пробы
+        // Пробы. Порядок регистрации определяет порядок в `storm probes`:
+        // сначала скалярные серии, затем инспекторы, затем анализ пути.
         services.AddSingleton<IProbe, IcmpProbe>();
+        services.AddSingleton<IProbe, TcpConnectProbe>();
+        services.AddSingleton<IProbe, UdpProbe>();
+        services.AddSingleton<IProbe, DnsProbe>();
+        services.AddSingleton<IProbe, TlsProbe>();
+        services.AddSingleton<IProbe, HttpProbe>();
+        services.AddSingleton<IProbe, TracerouteProbe>();
 
         return services;
     }

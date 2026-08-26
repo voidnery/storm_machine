@@ -50,6 +50,28 @@ public readonly record struct Sample
     /// <summary>TTL в ответе — грубый признак операционной системы и числа хопов.</summary>
     public int? Ttl { get; init; }
 
+    /// <summary>
+    /// Имя составляющей измерения: фаза HTTP (<c>dns</c>, <c>connect</c>, <c>tls</c>,
+    /// <c>ttfb</c>, <c>download</c>), тип запроса DNS, имя резолвера.
+    /// </summary>
+    /// <remarks>
+    /// Добавлено в И-2. Оказалось, что не всякое измерение — точка в одномерном ряду:
+    /// один HTTP-запрос даёт пять длительностей, и они не следуют друг за другом
+    /// во времени как независимые пробы, а раскладывают одно событие на фазы.
+    /// Для ICMP, TCP и UDP остаётся <c>null</c>, и структура не тяжелеет.
+    /// </remarks>
+    public string? Label { get; init; }
+
+    /// <summary>
+    /// Номер группы, к которой относится сэмпл: хоп в traceroute, попытка в серии запросов.
+    /// </summary>
+    /// <remarks>
+    /// Второе измерение, которого не было в исходной модели. Traceroute даёт матрицу
+    /// «хоп × попытка», а не ряд: без группировки данные о потерях на конкретном хопе
+    /// восстановить нельзя.
+    /// </remarks>
+    public int? Group { get; init; }
+
     public bool IsSuccess => Status == SampleStatus.Success;
 
     public static Sample Ok(int sequence, DateTimeOffset timestampUtc, double value) => new()

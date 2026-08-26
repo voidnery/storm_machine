@@ -1,0 +1,71 @@
+using System.Globalization;
+using StormMachine.Application.Probes;
+
+namespace StormMachine.Probes;
+
+/// <summary>
+/// Проверка значений параметров по объявлению пробы.
+/// </summary>
+/// <remarks>
+/// Вынесено из <see cref="IcmpProbe"/> в И-2: с появлением шести проб стало ясно, что
+/// проверка границ одинакова для всех и зависит только от <c>ProbeDescriptor</c>.
+/// Это же подтверждает замысел «UI строит форму по объявлению»: если проверка выводима
+/// из объявления, то и форма выводима.
+/// </remarks>
+internal static class ProbeValidation
+{
+    public static IReadOnlyList<ProbeValidationError> Validate(ProbeDescriptor descriptor, ProbeRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(descriptor);
+        ArgumentNullException.ThrowIfNull(request);
+
+        var errors = new List<ProbeValidationError>();
+
+        foreach (var parameter in descriptor.Parameters)
+        {
+            if (!request.Parameters.TryGetValue(parameter.Name, out var raw) || raw is null)
+            {
+                continue;
+            }
+
+            if (parameter.Type is ProbeParameterType.Boolean or ProbeParameterType.Text)
+            {
+                continue;
+            }
+
+            if (!TryToDouble(raw, out var value))
+            {
+                errors.Add(new ProbeValidationError(parameter.Name, $"Значение «{raw}» не является числом."));
+                continue;
+            }
+
+            if (parameter.Minimum is { } min && value < min)
+            {
+                errors.Add(new ProbeValidationError(parameter.Name, $"Минимум — {min:0.###}, получено {value:0.###}."));
+            }
+
+            if (parameter.Maximum is { } max && value > max)
+            {
+                errors.Add(new ProbeValidationError(parameter.Name, $"Максимум — {max:0.###}, получено {value:0.###}."));
+            }
+        }
+
+        return errors;
+    }
+
+    private static bool TryToDouble(object raw, out double value)
+    {
+        switch (raw)
+        {
+            case int i: value = i; return true;
+            case long l: value = l; return true;
+            case double d: value = d; return true;
+            case string s when double.TryParse(s, NumberStyles.Any, CultureInfo.InvariantCulture, out var parsed):
+                value = parsed;
+                return true;
+            default:
+                value = 0;
+                return false;
+        }
+    }
+}

@@ -57,13 +57,20 @@ internal static class Program
 
     private static RootCommand BuildRootCommand(IServiceProvider services)
     {
-        return new RootCommand($"{ProductInfo.Name} — станция тестирования и диагностики сетей.")
+        var root = new RootCommand($"{ProductInfo.Name} — станция тестирования и диагностики сетей.");
+
+        // Команды не перечисляются вручную: каждая проба объявляет своё имя и параметры,
+        // и команда строится по объявлению. Новая проба появляется в CLI сама.
+        foreach (var probe in services.GetRequiredService<IEnumerable<IProbe>>())
         {
-            PingCommand.Create(services),
-            EnvCommand.Create(services),
-            BuildProbesCommand(services),
-            BuildAboutCommand(),
-        };
+            root.Subcommands.Add(ProbeCommandFactory.Create(services, probe));
+        }
+
+        root.Subcommands.Add(EnvCommand.Create(services));
+        root.Subcommands.Add(BuildProbesCommand(services));
+        root.Subcommands.Add(BuildAboutCommand());
+
+        return root;
     }
 
     private static Command BuildProbesCommand(IServiceProvider services)

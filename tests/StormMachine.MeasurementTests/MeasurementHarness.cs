@@ -38,13 +38,14 @@ internal static class MeasurementHarness
     public static async Task<List<Sample>> RunAsync(
         IServiceProvider services,
         ProbeRequest request,
+        IProbeObserver? observer = null,
         CancellationToken cancellationToken = default)
     {
         var registry = services.GetRequiredService<IProbeRegistry>();
         Assert.True(registry.TryGet("ping", out var probe), "Проба ping не зарегистрирована");
 
         var samples = new List<Sample>();
-        await foreach (var sample in probe.ExecuteAsync(request, cancellationToken))
+        await foreach (var sample in probe.ExecuteAsync(request, observer ?? NullProbeObserver.Instance, cancellationToken))
         {
             samples.Add(sample);
         }

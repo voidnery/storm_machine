@@ -12,5 +12,6 @@
     <Project Path="tests/StormMachine.ArchTests/StormMachine.ArchTests.csproj" />
     <Project Path="tests/StormMachine.Domain.UnitTests/StormMachine.Domain.UnitTests.csproj" />
     <Project Path="tests/StormMachine.MeasurementTests/StormMachine.MeasurementTests.csproj" />
+    <Project Path="tests/StormMachine.Probes.UnitTests/StormMachine.Probes.UnitTests.csproj" />
   </Folder>
 </Solution>

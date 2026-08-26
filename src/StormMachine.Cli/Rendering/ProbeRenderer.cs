@@ -1,0 +1,379 @@
+using System.Globalization;
+using StormMachine.Application.Abstractions;
+using StormMachine.Application.Probes;
+using StormMachine.Cli.Commands;
+using StormMachine.Domain.Measurements;
+using StormMachine.Domain.Results;
+using StormMachine.Domain.Targets;
+
+namespace StormMachine.Cli.Rendering;
+
+/// <summary>
+/// Показ результатов пробы. Способ подачи выбирается по объявленной форме результата.
+/// </summary>
+/// <remarks>
+/// Итерация И-2 показала, что шесть проб дают четыре несводимые формы данных. Ряд чисел,
+/// водопад фаз, набор рядов для сравнения и матрица «хоп × попытка» требуют разного показа:
+/// перцентили бессмысленны для водопада, а водопад бессмыслен для traceroute.
+/// <para>
+/// Форма берётся из объявления пробы, а не угадывается по содержимому сэмплов. Угадывание
+/// работало бы до первой пробы, которая не вписалась в эвристику.
+/// </para>
+/// </remarks>
+internal static class ProbeRenderer
+{
+    private const int WaterfallWidth = 40;
+
+    private static string F(double value) => value.ToString("0.000", CultureInfo.InvariantCulture);
+
+    public static void WriteHeader(
+        ProbeDescriptor descriptor,
+        Target target,
+        MeasurementContext context,
+        NetworkAdapter? adapter)
+    {
+        Console.WriteLine($"Проба     : {descriptor.Title}");
+        Console.WriteLine($"Цель      : {target.DisplayName}");
+        Console.WriteLine($"Интерфейс : {context.InterfaceName} ({EnvCommand.Describe(context.AdapterKind)})"
+                          + (adapter?.IPv4Address is { } ip ? $", {ip}" : string.Empty));
+        Console.WriteLine($"Методика  : {context.Methodology}");
+        Console.WriteLine($"Порог     : {F(context.CalibrationBaselineMs)} мс — ниже него измерения недостоверны");
+
+        if (context.TimingWarning is { } warning)
+        {
+            Console.WriteLine();
+            Console.WriteLine($"ВНИМАНИЕ: {warning}");
+        }
+
+        Console.WriteLine();
+    }
+
+    public static void WriteLiveSample(ProbeDescriptor descriptor, Sample sample)
+    {
+        switch (descriptor.Shape)
+        {
+            case ProbeResultShape.PhasedTiming:
+                // Фазы показываются целиком после завершения попытки: по одной строке
+                // они не читаются, смысл именно в соотношении между ними.
+                return;
+
+            case ProbeResultShape.PathTrace:
+                WritePathSample(sample);
+                return;
+
+            case ProbeResultShape.ComparedSeries:
+                WriteComparedSample(sample);
+                return;
+
+            default:
+                WriteScalarSample(sample);
+                return;
+        }
+    }
+
+    public static void WriteSummary(ProbeDescriptor descriptor, ProbeResult result, IHighResolutionClock clock)
+    {
+        Console.WriteLine();
+        Console.WriteLine($"--- {result.Target.DisplayName}"
+                          + (result.ResolvedAddress is { } resolved && resolved != result.Target.DisplayName
+                              ? $"  →  {resolved}"
+                              : string.Empty)
+                          + " ---");
+
+        if (result.WasCancelled)
+        {
+            Console.WriteLine("Прогон прерван. Ниже — то, что успели измерить.");
+        }
+
+        switch (descriptor.Shape)
+        {
+            case ProbeResultShape.PhasedTiming:
+                WriteWaterfall(result);
+                break;
+
+            case ProbeResultShape.ComparedSeries:
+                WriteComparison(result);
+                break;
+
+            case ProbeResultShape.PathTrace:
+                WritePathSummary(result);
+                break;
+
+            default:
+                WriteScalarSummary(result, clock);
+                break;
+        }
+
+        WriteFacts(result);
+    }
+
+    // ------------------------------------------------------------ скалярный ряд
+
+    private static void WriteScalarSample(Sample sample)
+    {
+        if (sample.IsSuccess)
+        {
+            var ttl = sample.Ttl is { } t ? $"  TTL={t}" : string.Empty;
+            Console.WriteLine($"  {sample.Sequence,5}  {F(sample.Value),9} мс{ttl}");
+            return;
+        }
+
+        Console.WriteLine($"  {sample.Sequence,5}  {Describe(sample.Status),22}");
+    }
+
+    private static void WriteScalarSummary(ProbeResult result, IHighResolutionClock clock)
+    {
+        Console.WriteLine($"Отправлено {result.SentCount}, получено {result.SuccessCount}, "
+                          + $"потеряно {result.LostCount} ({result.LossPercent.ToString("0.0", CultureInfo.InvariantCulture)}%)");
+
+        var stats = LatencyStatistics.Compute(result.Samples);
+
+        if (stats.SampleCount == 0)
+        {
+            Console.WriteLine("Успешных ответов нет — статистику посчитать не по чему.");
+            return;
+        }
+
+        Console.WriteLine();
+        Console.WriteLine($"  RTT        min {F(stats.MinMs)}   avg {F(stats.MeanMs)}   max {F(stats.MaxMs)} мс");
+        Console.WriteLine($"  Перцентили p50 {F(stats.P50Ms)}   p95 {F(stats.P95Ms)}   p99 {F(stats.P99Ms)} мс");
+        Console.WriteLine($"  Разброс    stddev {F(stats.StdDevMs)} мс");
+        Console.WriteLine($"  Джиттер    {F(stats.JitterRfc3550Ms)} мс   (RFC 3550 §6.4.1)");
+        Console.WriteLine($"  PDV        {F(stats.PdvMs)} мс   (p99 − p50)");
+
+        if (stats.P50Ms <= clock.CalibrationBaselineMs && clock.CalibrationBaselineMs > 0)
+        {
+            Console.WriteLine();
+            Console.WriteLine("  Замечание: медиана на уровне порога разрешения измерительного стека —");
+            Console.WriteLine("  различить сеть и собственные накладные расходы на таких значениях нельзя.");
+        }
+    }
+
+    // ------------------------------------------------------------- водопад фаз
+
+    private static void WriteWaterfall(ProbeResult result)
+    {
+        var attempts = result.Samples
+            .GroupBy(s => s.Group ?? 0)
+            .OrderBy(g => g.Key)
+            .ToList();
+
+        foreach (var attempt in attempts)
+        {
+            var phases = attempt.Where(s => s.IsSuccess).ToList();
+
+            if (phases.Count == 0)
+            {
+                var failed = attempt.First();
+                Console.WriteLine($"Попытка {attempt.Key + 1}: {Describe(failed.Status)} на фазе «{failed.Label}»");
+                continue;
+            }
+
+            var total = phases.Sum(p => p.Value);
+
+            if (attempts.Count > 1)
+            {
+                Console.WriteLine();
+                Console.WriteLine($"Попытка {attempt.Key + 1}:");
+            }
+
+            Console.WriteLine();
+
+            var offset = 0.0;
+            foreach (var phase in phases)
+            {
+                var share = total > 0 ? phase.Value / total : 0;
+                var startCell = (int)Math.Round(offset / Math.Max(total, 1e-9) * WaterfallWidth);
+                var width = Math.Max(1, (int)Math.Round(share * WaterfallWidth));
+
+                var bar = new string(' ', Math.Min(startCell, WaterfallWidth))
+                          + new string('█', Math.Min(width, Math.Max(0, WaterfallWidth - startCell)));
+
+                Console.WriteLine($"  {PhaseName(phase.Label),-14} {F(phase.Value),9} мс  {share,5:P0}  {bar}");
+                offset += phase.Value;
+            }
+
+            Console.WriteLine($"  {"ИТОГО",-14} {F(total),9} мс");
+        }
+
+        // Какая фаза съедает время — единственный вывод, ради которого водопад и нужен.
+        var slowest = result.Samples
+            .Where(s => s.IsSuccess && s.Label is not null)
+            .GroupBy(s => s.Label!)
+            .Select(g => (Phase: g.Key, Total: g.Sum(s => s.Value)))
+            .OrderByDescending(x => x.Total)
+            .FirstOrDefault();
+
+        if (slowest.Phase is not null)
+        {
+            Console.WriteLine();
+            Console.WriteLine($"  Больше всего времени занимает фаза «{PhaseName(slowest.Phase)}».");
+        }
+    }
+
+    private static string PhaseName(string? label) => label switch
+    {
+        "dns" => "DNS",
+        "connect" => "TCP",
+        "tls" => "TLS",
+        "ttfb" => "первый байт",
+        "download" => "скачивание",
+        null => "—",
+        _ => label,
+    };
+
+    // ------------------------------------------------- сравнение нескольких рядов
+
+    private static void WriteComparedSample(Sample sample)
+    {
+        var label = sample.Label ?? "—";
+
+        if (sample.IsSuccess)
+        {
+            Console.WriteLine($"  {label,-16} {F(sample.Value),9} мс");
+            return;
+        }
+
+        var detail = sample.RespondedBy is { } code ? code : Describe(sample.Status);
+        Console.WriteLine($"  {label,-16} {detail,12}");
+    }
+
+    private static void WriteComparison(ProbeResult result)
+    {
+        var groups = result.Samples
+            .Where(s => s.Label is not null)
+            .GroupBy(s => s.Label!)
+            .ToList();
+
+        if (groups.Count == 0)
+        {
+            Console.WriteLine("Данных для сравнения нет.");
+            return;
+        }
+
+        Console.WriteLine();
+        Console.WriteLine($"  {"Резолвер",-18} {"мин",9} {"медиана",9} {"макс",9}   {"ответов",8}");
+
+        foreach (var group in groups)
+        {
+            var stats = LatencyStatistics.Compute([.. group]);
+
+            if (stats.SampleCount == 0)
+            {
+                Console.WriteLine($"  {group.Key,-18} {"нет ответа",-30}");
+                continue;
+            }
+
+            Console.WriteLine($"  {group.Key,-18} {F(stats.MinMs),9} {F(stats.P50Ms),9} {F(stats.MaxMs),9}   "
+                              + $"{stats.SampleCount,3} из {group.Count(),-3}");
+        }
+
+        var fastest = groups
+            .Select(g => (Resolver: g.Key, Stats: LatencyStatistics.Compute([.. g])))
+            .Where(x => x.Stats.SampleCount > 0)
+            .OrderBy(x => x.Stats.P50Ms)
+            .FirstOrDefault();
+
+        if (fastest.Resolver is not null)
+        {
+            Console.WriteLine();
+            Console.WriteLine($"  Быстрее всех отвечает {fastest.Resolver} — медиана {F(fastest.Stats.P50Ms)} мс.");
+        }
+    }
+
+    // ------------------------------------------------------ матрица «хоп × попытка»
+
+    private static void WritePathSample(Sample sample)
+    {
+        // Живой вывод по хопам собирается в сводке: строка на попытку была бы нечитаемой.
+        _ = sample;
+    }
+
+    private static void WritePathSummary(ProbeResult result)
+    {
+        var hops = result.Samples
+            .Where(s => s.Group is not null)
+            .GroupBy(s => s.Group!.Value)
+            .OrderBy(g => g.Key)
+            .ToList();
+
+        if (hops.Count == 0)
+        {
+            Console.WriteLine("Маршрут не построен.");
+            return;
+        }
+
+        Console.WriteLine();
+        Console.WriteLine($"  {"хоп",3}  {"узел",-24} {"мин",8} {"медиана",8} {"макс",8}  {"потери",7}");
+
+        foreach (var hop in hops)
+        {
+            var samples = hop.ToList();
+            var stats = LatencyStatistics.Compute(samples);
+
+            var responder = samples
+                .Select(s => s.RespondedBy)
+                .FirstOrDefault(r => !string.IsNullOrEmpty(r)) ?? "*";
+
+            var lost = samples.Count(s => !s.IsSuccess);
+            var lossPercent = samples.Count == 0 ? 0 : lost * 100.0 / samples.Count;
+
+            if (stats.SampleCount == 0)
+            {
+                Console.WriteLine($"  {hop.Key,3}  {"*",-24} {"—",8} {"—",8} {"—",8}  {"100%",7}");
+                continue;
+            }
+
+            Console.WriteLine($"  {hop.Key,3}  {responder,-24} {F(stats.MinMs),8} {F(stats.P50Ms),8} {F(stats.MaxMs),8}  "
+                              + $"{lossPercent.ToString("0", CultureInfo.InvariantCulture) + "%",7}");
+        }
+    }
+
+    // ----------------------------------------------------------------- факты
+
+    private static void WriteFacts(ProbeResult result)
+    {
+        if (result.Facts.Count == 0)
+        {
+            return;
+        }
+
+        foreach (var category in result.Facts.Select(f => f.Category).Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            Console.WriteLine();
+            Console.WriteLine($"  [{category}]");
+
+            foreach (var fact in result.Facts.Where(f => string.Equals(f.Category, category, StringComparison.OrdinalIgnoreCase)))
+            {
+                var marker = fact.IsWarning ? "!" : " ";
+                Console.WriteLine($"  {marker} {fact.Name,-24} {fact.Value}{UnitSuffix(fact)}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Единица измерения рядом со значением факта.
+    /// </summary>
+    /// <remarks>
+    /// Число без единицы в отчёте бесполезно: «4.492» не даёт понять, много это или мало.
+    /// Единица берётся из самого факта — проба знает, что именно она измерила.
+    /// </remarks>
+    private static string UnitSuffix(ProbeFact fact) => fact.Unit switch
+    {
+        MeasurementUnit.Milliseconds => " мс",
+        MeasurementUnit.MegabitsPerSecond => " Мбит/с",
+        MeasurementUnit.Percent => " %",
+        MeasurementUnit.Bytes => " байт",
+        _ => string.Empty,
+    };
+
+    private static string Describe(SampleStatus status) => status switch
+    {
+        SampleStatus.Timeout => "таймаут",
+        SampleStatus.Unreachable => "недоступен",
+        SampleStatus.TtlExpired => "истёк TTL",
+        SampleStatus.Rejected => "отказ",
+        SampleStatus.Error => "ошибка",
+        _ => "успех",
+    };
+}
