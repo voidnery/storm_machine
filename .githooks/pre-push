@@ -1,0 +1,128 @@
+#!/bin/sh
+#
+# Storm Machine — автоматический подписанный тег версии при пуше в master.
+#
+# Как работает:
+#   1. Срабатывает при любом push (в т.ч. из GitHub Desktop — он использует git CLI
+#      и уважает core.hooksPath).
+#   2. Реагирует ТОЛЬКО на push в master. Ветка beta не тегируется — она рабочая.
+#   3. Версию берёт из <Version> в Directory.Build.props — единственный источник правды.
+#   4. Создаёт аннотированный ПОДПИСАННЫЙ тег vX.Y.Z и отправляет его на remote.
+#
+# Подпись — SSH-ключом (gpg.format=ssh). GnuPG не используется вообще: сборка GnuPG 2.4
+# в Git for Windows пытается обращаться к keyboxd по пути /usr/lib/gnupg/keyboxd,
+# которого на Windows не существует. SSH-подпись эту поломку обходит по построению.
+#
+# Настройка: tools/setup-repo.ps1
+
+set -e
+
+# --- Защита от рекурсии: внутренний push тега не должен снова запускать хук ---
+if [ -n "$STORM_SKIP_TAG_HOOK" ]; then
+    exit 0
+fi
+
+REMOTE="$1"
+ZERO="0000000000000000000000000000000000000000"
+
+MASTER_LOCAL_SHA=""
+MASTER_REMOTE_SHA=""
+
+# stdin: <local_ref> <local_sha> <remote_ref> <remote_sha>
+while read -r local_ref local_sha remote_ref remote_sha; do
+    case "$remote_ref" in
+        refs/heads/master)
+            MASTER_LOCAL_SHA="$local_sha"
+            MASTER_REMOTE_SHA="$remote_sha"
+            ;;
+    esac
+done
+
+# Пушат не master — выходим молча
+if [ -z "$MASTER_LOCAL_SHA" ]; then
+    exit 0
+fi
+
+# Удаление ветки — тег не нужен
+if [ "$MASTER_LOCAL_SHA" = "$ZERO" ]; then
+    exit 0
+fi
+
+# Не fast-forward — push, скорее всего, будет отклонён. Тег не создаём,
+# иначе на remote останется тег, указывающий на непринятый коммит.
+if [ "$MASTER_REMOTE_SHA" != "$ZERO" ]; then
+    if ! git merge-base --is-ancestor "$MASTER_REMOTE_SHA" "$MASTER_LOCAL_SHA" 2>/dev/null; then
+        echo "pre-push: push в master не fast-forward — тег не создаю."
+        exit 0
+    fi
+fi
+
+ROOT=$(git rev-parse --show-toplevel)
+PROPS="$ROOT/Directory.Build.props"
+
+if [ ! -f "$PROPS" ]; then
+    echo "pre-push: не найден Directory.Build.props — тег не создан."
+    exit 0
+fi
+
+VERSION=$(sed -n 's:.*<Version>\(.*\)</Version>.*:\1:p' "$PROPS" | head -n 1 | tr -d ' \r')
+
+if [ -z "$VERSION" ]; then
+    echo "pre-push: не удалось прочитать <Version> из Directory.Build.props — тег не создан."
+    exit 0
+fi
+
+# 0.0.0 — предрелизное состояние: тег сознательно не создаётся
+if [ "$VERSION" = "0.0.0" ]; then
+    echo "pre-push: версия 0.0.0 (предрелизная) — тег не создаётся."
+    echo "           Для релиза подними <Version> в Directory.Build.props."
+    exit 0
+fi
+
+TAG="v$VERSION"
+
+# Тег уже есть локально — значит эта версия уже выпускалась
+if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null 2>&1; then
+    echo "pre-push: тег $TAG уже существует. Подними <Version> в Directory.Build.props для нового релиза."
+    exit 0
+fi
+
+# Тег уже есть на remote (например, выпущен с другой машины)
+if git ls-remote --tags --exit-code "$REMOTE" "refs/tags/$TAG" >/dev/null 2>&1; then
+    echo "pre-push: тег $TAG уже опубликован на remote. Подними версию."
+    exit 0
+fi
+
+# --- Проверка готовности подписи. Не блокируем push, но громко предупреждаем. ---
+SIGN_FORMAT=$(git config --get gpg.format || true)
+SIGN_KEY=$(git config --get user.signingkey || true)
+
+if [ "$SIGN_FORMAT" != "ssh" ] || [ -z "$SIGN_KEY" ]; then
+    echo ""
+    echo "  ВНИМАНИЕ: подпись не настроена — тег $TAG НЕ создан."
+    echo "  Запусти:  powershell -ExecutionPolicy Bypass -File tools/setup-repo.ps1"
+    echo ""
+    exit 0
+fi
+
+echo "pre-push: создаю подписанный тег $TAG"
+
+if ! git tag -s "$TAG" "$MASTER_LOCAL_SHA" -m "Storm Machine $TAG"; then
+    echo ""
+    echo "  ОШИБКА: не удалось подписать тег $TAG."
+    echo "  Проверь подпись:  powershell -ExecutionPolicy Bypass -File tools/setup-repo.ps1 -Verify"
+    echo "  Push прерван, чтобы релиз не ушёл без тега."
+    echo ""
+    exit 1
+fi
+
+if ! STORM_SKIP_TAG_HOOK=1 git push "$REMOTE" "refs/tags/$TAG"; then
+    echo ""
+    echo "  ОШИБКА: тег $TAG создан локально, но не отправлен."
+    echo "  Отправь вручную:  git push origin $TAG"
+    echo ""
+    exit 1
+fi
+
+echo "pre-push: тег $TAG подписан и опубликован."
+exit 0

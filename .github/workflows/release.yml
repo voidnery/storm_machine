@@ -1,0 +1,79 @@
+name: Release
+
+# Срабатывает на подписанный тег vX.Y.Z, который создаёт локальный хук
+# .githooks/pre-push при переливке beta -> master.
+on:
+  push:
+    tags: [ 'v*' ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Есть ли что публиковать
+        id: probe
+        shell: pwsh
+        run: |
+          $app = Get-ChildItem -Path src -Filter 'StormMachine.App.csproj' -Recurse -ErrorAction SilentlyContinue
+          $cli = Get-ChildItem -Path src -Filter 'StormMachine.Cli.csproj' -Recurse -ErrorAction SilentlyContinue
+          if ($app -or $cli) { "found=true" >> $env:GITHUB_OUTPUT }
+          else {
+            "found=false" >> $env:GITHUB_OUTPUT
+            Write-Host "::notice::Публикуемых проектов ещё нет — релиз будет только с исходниками"
+          }
+
+      - name: Publish (self-contained, single-file)
+        if: steps.probe.outputs.found == 'true'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path artifacts | Out-Null
+          foreach ($name in @('StormMachine.App', 'StormMachine.Cli', 'StormMachine.Agent')) {
+            $proj = Get-ChildItem -Path src -Filter "$name.csproj" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+            if (-not $proj) { continue }
+            Write-Host "Публикую $name"
+            dotnet publish $proj.FullName `
+              --configuration Release `
+              --runtime win-x64 `
+              --self-contained true `
+              -p:PublishSingleFile=true `
+              -p:PublishTrimmed=true `
+              -p:IncludeNativeLibrariesForSelfExtract=true `
+              --output "artifacts/$name"
+          }
+
+      - name: Упаковка и контрольные суммы
+        if: steps.probe.outputs.found == 'true'
+        shell: pwsh
+        run: |
+          $tag = "${{ github.ref_name }}"
+          Compress-Archive -Path artifacts/* -DestinationPath "storm-machine-$tag-win-x64.zip" -Force
+          $hash = (Get-FileHash "storm-machine-$tag-win-x64.zip" -Algorithm SHA256).Hash
+          "$hash  storm-machine-$tag-win-x64.zip" | Set-Content "SHA256SUMS.txt" -Encoding ascii
+          Write-Host "SHA256: $hash"
+
+      - name: Создание релиза
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Storm Machine ${{ github.ref_name }}
+          generate_release_notes: true
+          draft: true          # черновик: оператор проверяет и публикует вручную
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          files: |
+            storm-machine-*.zip
+            SHA256SUMS.txt

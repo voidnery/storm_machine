@@ -1,0 +1,66 @@
+name: CI
+
+on:
+  push:
+    branches: [ beta, master ]
+  pull_request:
+    branches: [ beta, master ]
+  workflow_dispatch:
+
+# Продукт использует Windows-специфичные API (IPHLPAPI, DPAPI, Native Wifi),
+# поэтому сборка и тесты идут только на Windows.
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # нужна вся история для детерминированной сборки и SourceLink
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Есть ли что собирать
+        id: probe
+        shell: pwsh
+        run: |
+          $projects = Get-ChildItem -Path src -Filter *.csproj -Recurse -ErrorAction SilentlyContinue
+          if ($projects) {
+            "found=true" >> $env:GITHUB_OUTPUT
+            Write-Host "Найдено проектов: $($projects.Count)"
+          } else {
+            "found=false" >> $env:GITHUB_OUTPUT
+            Write-Host "::notice::В src/ ещё нет проектов — сборка пропущена (итерация И-0 не завершена)"
+          }
+
+      - name: Restore
+        if: steps.probe.outputs.found == 'true'
+        run: dotnet restore
+
+      - name: Build
+        if: steps.probe.outputs.found == 'true'
+        run: dotnet build --configuration Release --no-restore
+
+      - name: Test
+        if: steps.probe.outputs.found == 'true'
+        run: dotnet test --configuration Release --no-build --logger "trx;LogFileName=results.trx" --results-directory TestResults
+
+      - name: Публикация результатов тестов
+        if: always() && steps.probe.outputs.found == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: TestResults/
+          if-no-files-found: ignore
+
+      - name: Проверка подписи тега
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        run: |
+          echo "Тег: ${GITHUB_REF_NAME}"
+          git tag -v "${GITHUB_REF_NAME}" 2>&1 | head -20 || echo "::warning::Подпись тега не проверена в CI (нужен allowed_signers)"

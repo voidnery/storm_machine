@@ -1,0 +1,27 @@
+# Нормализация переводов строк: в репозитории всегда LF
+* text=auto eol=lf
+
+# Windows-специфичные файлы — CRLF в рабочей копии
+*.ps1   text eol=crlf
+*.psm1  text eol=crlf
+*.cmd   text eol=crlf
+*.bat   text eol=crlf
+*.sln   text eol=crlf
+
+# Скрипты, которые исполняются как sh — строго LF, иначе Git Bash их не запустит
+.githooks/*  text eol=lf
+*.sh         text eol=lf
+
+# Бинарные
+*.png   binary
+*.jpg   binary
+*.ico   binary
+*.pdf   binary
+*.mmdb  binary
+*.zip   binary
+*.dll   binary
+*.exe   binary
+
+# Не считать сгенерированное за исходники в статистике GitHub
+docs/**   linguist-documentation
+spikes/** linguist-vendored

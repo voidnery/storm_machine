@@ -1,0 +1,51 @@
+<Project>
+
+  <!-- ЕДИНЫЙ ИСТОЧНИК ВЕРСИИ.
+       Отсюда её читает хук .githooks/pre-push и создаёт подписанный тег vX.Y.Z
+       при пуше в master. Менять версию — только здесь. -->
+  <PropertyGroup>
+    <!-- 0.0.0 = предрелизное состояние, тег не создаётся.
+         Первый релиз: поднять до 0.1.0 перед переливкой beta -> master. -->
+    <Version>0.0.0</Version>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <AnalysisLevel>latest-recommended</AnalysisLevel>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <!-- Воспроизводимая сборка — условие бесплатной подписи SignPath Foundation.
+       ContinuousIntegrationBuild включается только в CI, иначе ломаются
+       относительные пути при локальной отладке. -->
+  <PropertyGroup>
+    <Deterministic>true</Deterministic>
+    <ContinuousIntegrationBuild Condition="'$(GITHUB_ACTIONS)' == 'true'">true</ContinuousIntegrationBuild>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <Product>Storm Machine</Product>
+    <Company>Storm Machine contributors</Company>
+    <Copyright>Copyright (c) 2026 Storm Machine contributors</Copyright>
+    <RepositoryType>git</RepositoryType>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+  </PropertyGroup>
+
+  <!-- Спайки — исследовательский код, к нему требования мягче -->
+  <PropertyGroup Condition="$(MSBuildProjectDirectory.Contains('spikes'))">
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <EnforceCodeStyleInBuild>false</EnforceCodeStyleInBuild>
+    <AnalysisLevel>none</AnalysisLevel>
+  </PropertyGroup>
+
+</Project>
