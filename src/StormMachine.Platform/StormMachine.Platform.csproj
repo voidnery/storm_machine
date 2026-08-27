@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <TargetFramework>net10.0-windows</TargetFramework>
-    <Description>Платформенный слой: таймер высокого разрешения и сведения о сетевом окружении Windows.</Description>
+    <Description>Платформенный слой: таймер высокого разрешения, сведения о сетевом окружении Windows и обогащение узлов маршрута.</Description>
   </PropertyGroup>
 
   <ItemGroup>

@@ -3,6 +3,7 @@ using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using StormMachine.Application.Abstractions;
+using StormMachine.Domain.Discovery;
 using StormMachine.Domain.Measurements;
 using StormMachine.Domain.Results;
 
@@ -23,11 +24,13 @@ public sealed partial class DashboardPageViewModel(
     NavigationSection section,
     INetworkEnvironment environment,
     IHighResolutionClock clock,
-    IRunStore store) : PageViewModel(section)
+    IRunStore store,
+    IDeviceStore devices) : PageViewModel(section)
 {
     private readonly INetworkEnvironment _environment = environment ?? throw new ArgumentNullException(nameof(environment));
     private readonly IHighResolutionClock _clock = clock ?? throw new ArgumentNullException(nameof(clock));
     private readonly IRunStore _store = store ?? throw new ArgumentNullException(nameof(store));
+    private readonly IDeviceStore _devices = devices ?? throw new ArgumentNullException(nameof(devices));
 
     public ObservableCollection<AdapterRow> Adapters { get; } = [];
 
@@ -44,6 +47,23 @@ public sealed partial class DashboardPageViewModel(
 
     [ObservableProperty]
     private string _journalInfo = string.Empty;
+
+    /// <summary>
+    /// Первый запуск: инвентарь пуст и оператору некуда смотреть.
+    /// </summary>
+    /// <remarks>
+    /// Требование итерации И-8: путь от «запустил» до «вижу свою сеть» не должен
+    /// требовать чтения документации. Поэтому на пустом инвентаре дашборд не показывает
+    /// пустые панели, а прямо предлагает единственное осмысленное первое действие.
+    /// </remarks>
+    [ObservableProperty]
+    private bool _isFirstRun;
+
+    [ObservableProperty]
+    private string _firstRunHint = string.Empty;
+
+    [ObservableProperty]
+    private string _inventoryInfo = string.Empty;
 
     public override async Task ActivateAsync(CancellationToken cancellationToken = default)
     {
@@ -77,6 +97,36 @@ public sealed partial class DashboardPageViewModel(
                 : null;
 
         await LoadJournalAsync(cancellationToken).ConfigureAwait(true);
+        await LoadInventoryAsync(primary, cancellationToken).ConfigureAwait(true);
+    }
+
+    /// <summary>Сколько устройств известно и что предложить, если ни одного.</summary>
+    private async Task LoadInventoryAsync(NetworkAdapter? primary, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await _devices.InitializeAsync(cancellationToken).ConfigureAwait(true);
+
+            var known = await _devices.ListDevicesAsync(cancellationToken).ConfigureAwait(true);
+
+            IsFirstRun = known.Count == 0;
+            InventoryInfo = known.Count == 0
+                ? "Инвентарь пуст."
+                : $"В инвентаре {known.Count} устройств, отвечали в последний раз "
+                  + $"{known.Count(d => d.IsOnline)}.";
+
+            FirstRunHint = primary?.SubnetCidr is { } subnet
+                ? $"Похоже, это первый запуск. Начните с того, что покажет вашу сеть целиком: "
+                  + $"сканирование подсети {subnet}. Оно займёт несколько секунд, не требует прав "
+                  + "администратора и найдёт даже те узлы, что молчат на ping."
+                : "Похоже, это первый запуск. Начните со сканирования своей сети — "
+                  + "оно займёт несколько секунд и не требует прав администратора.";
+        }
+        catch (Exception ex)
+        {
+            InventoryInfo = $"Инвентарь недоступен: {ex.Message}";
+            IsFirstRun = false;
+        }
     }
 
     [RelayCommand]

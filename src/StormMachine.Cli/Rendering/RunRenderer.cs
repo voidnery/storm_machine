@@ -76,8 +76,16 @@ internal static class RunRenderer
             }
         }
 
-        WriteSeries(run);
-        Describe.WriteFacts(run.Facts);
+        if (run.Summary.Shape == ProbeResultShape.PathTrace)
+        {
+            RouteRenderer.Write(RouteRenderer.Analyse(run), run.Facts);
+            Describe.WriteFacts(RouteRenderer.RemainingFacts(run.Facts));
+        }
+        else
+        {
+            WriteSeries(run);
+            Describe.WriteFacts(run.Facts);
+        }
 
         Console.WriteLine();
         Console.WriteLine($"Отправлено {summary.SentCount}, получено {summary.SuccessCount}, "

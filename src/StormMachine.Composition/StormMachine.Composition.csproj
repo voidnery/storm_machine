@@ -13,6 +13,7 @@
   <ItemGroup>
     <ProjectReference Include="..\StormMachine.Application\StormMachine.Application.csproj" />
     <ProjectReference Include="..\StormMachine.Platform\StormMachine.Platform.csproj" />
+    <ProjectReference Include="..\StormMachine.Discovery\StormMachine.Discovery.csproj" />
     <ProjectReference Include="..\StormMachine.Probes\StormMachine.Probes.csproj" />
     <ProjectReference Include="..\StormMachine.Reporting\StormMachine.Reporting.csproj" />
     <ProjectReference Include="..\StormMachine.Storage\StormMachine.Storage.csproj" />

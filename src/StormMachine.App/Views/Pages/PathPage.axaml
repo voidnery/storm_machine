@@ -1,0 +1,246 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:StormMachine.App.ViewModels"
+             xmlns:results="using:StormMachine.Domain.Results"
+             x:Class="StormMachine.App.Views.Pages.PathPage"
+             x:DataType="vm:PathPageViewModel">
+
+  <UserControl.Styles>
+    <!-- Состояние хопа задаётся классами, а не кистями из модели:
+         внешний вид остаётся в разметке, где ему и место. -->
+    <Style Selector="Border.hop">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="2,0,0,0" />
+      <Setter Property="BorderBrush" Value="Transparent" />
+    </Style>
+    <Style Selector="Border.hop.silent">
+      <Setter Property="Opacity" Value="0.45" />
+    </Style>
+    <Style Selector="Border.hop.destination">
+      <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}" />
+      <Setter Property="Background" Value="#16202C" />
+    </Style>
+    <Style Selector="Border.hop.degraded">
+      <Setter Property="BorderBrush" Value="{StaticResource DangerBrush}" />
+      <Setter Property="Background" Value="#2A1618" />
+    </Style>
+  </UserControl.Styles>
+
+  <Grid RowDefinitions="Auto,Auto,Auto,Auto,*" Margin="24,20">
+
+    <!-- Заголовок -->
+    <StackPanel Grid.Row="0" Spacing="4">
+      <TextBlock Text="{Binding Title}" FontSize="24" FontWeight="SemiBold" />
+      <TextBlock Text="{Binding MeasurementConditions}" FontSize="12" Opacity="0.6" />
+    </StackPanel>
+
+    <!-- Предупреждение об окружении -->
+    <Border Grid.Row="1" Margin="0,12,0,0" Padding="12,8" CornerRadius="4"
+            Background="#3A2E12" BorderBrush="{StaticResource WarningBrush}" BorderThickness="1"
+            IsVisible="{Binding TimingWarning, Converter={x:Static ObjectConverters.IsNotNull}}">
+      <TextBlock Text="{Binding TimingWarning}" TextWrapping="Wrap" FontSize="12"
+                 Foreground="{StaticResource WarningBrush}" />
+    </Border>
+
+    <!-- Панель запуска -->
+    <Border Grid.Row="2" Margin="0,12,0,0" Padding="14" CornerRadius="6"
+            Background="{StaticResource PanelBrush}">
+      <StackPanel Spacing="10">
+        <Grid ColumnDefinitions="2*,Auto,Auto,Auto,Auto,Auto">
+          <StackPanel Grid.Column="0" Spacing="4" Margin="0,0,12,0">
+            <TextBlock Text="Цель" FontSize="11" Opacity="0.6" />
+            <TextBox Text="{Binding TargetText}" PlaceholderText="1.1.1.1, example.com или gateway"
+                     IsEnabled="{Binding CanStart}" />
+          </StackPanel>
+
+          <StackPanel Grid.Column="1" Spacing="4" Margin="0,0,12,0" Width="100">
+            <TextBlock Text="Предел хопов" FontSize="11" Opacity="0.6" />
+            <NumericUpDown Value="{Binding MaxHops}" Minimum="1" Maximum="255" Increment="1"
+                           FormatString="0" IsEnabled="{Binding CanStart}" />
+          </StackPanel>
+
+          <StackPanel Grid.Column="2" Spacing="4" Margin="0,0,12,0" Width="100">
+            <TextBlock Text="Циклов" FontSize="11" Opacity="0.6" />
+            <NumericUpDown Value="{Binding Rounds}" Minimum="1" Maximum="100000" Increment="10"
+                           FormatString="0" IsEnabled="{Binding !Continuous}" />
+          </StackPanel>
+
+          <StackPanel Grid.Column="3" Spacing="4" Margin="0,0,12,0" Width="110">
+            <TextBlock Text="Интервал, мс" FontSize="11" Opacity="0.6" />
+            <NumericUpDown Value="{Binding IntervalMs}" Minimum="100" Maximum="600000" Increment="100"
+                           FormatString="0" IsEnabled="{Binding CanStart}" />
+          </StackPanel>
+
+          <StackPanel Grid.Column="4" Spacing="8" Margin="0,0,14,0" VerticalAlignment="Bottom">
+            <CheckBox IsChecked="{Binding Continuous}" Content="Непрерывно" FontSize="12"
+                      IsEnabled="{Binding CanStart}" />
+            <CheckBox IsChecked="{Binding SaveToJournal}" Content="Писать в журнал" FontSize="12"
+                      IsEnabled="{Binding CanStart}" />
+          </StackPanel>
+
+          <StackPanel Grid.Column="5" Orientation="Horizontal" Spacing="8" VerticalAlignment="Bottom">
+            <Button Content="Запустить" Command="{Binding StartCommand}" IsEnabled="{Binding CanStart}"
+                    Padding="18,7" Background="{StaticResource AccentBrush}" Foreground="White" />
+            <Button Content="Остановить" Command="{Binding StopCommand}" IsEnabled="{Binding CanStop}"
+                    Padding="14,7" />
+          </StackPanel>
+        </Grid>
+
+        <Grid ColumnDefinitions="Auto,220,Auto,*">
+          <TextBlock Grid.Column="0" Text="Сохранить как пресет:" FontSize="12" Opacity="0.6"
+                     VerticalAlignment="Center" Margin="0,0,10,0" />
+          <TextBox Grid.Column="1" Text="{Binding PresetName}" PlaceholderText="имя пресета" FontSize="12" />
+          <Button Grid.Column="2" Content="Сохранить" Command="{Binding SaveAsPresetCommand}"
+                  FontSize="12" Padding="12,5" Margin="8,0,0,0" />
+          <TextBlock Grid.Column="3" Text="{Binding StatusLine}" FontSize="12" Opacity="0.65"
+                     VerticalAlignment="Center" Margin="16,0,0,0" TextTrimming="CharacterEllipsis" />
+        </Grid>
+
+        <TextBlock Text="{Binding ErrorMessage}" FontSize="12"
+                   Foreground="{StaticResource DangerBrush}" TextWrapping="Wrap"
+                   IsVisible="{Binding ErrorMessage, Converter={x:Static ObjectConverters.IsNotNull}}" />
+      </StackPanel>
+    </Border>
+
+    <!-- Итог: то, ради чего трассировку и открывают -->
+    <Border Grid.Row="3" Margin="0,12,0,0" Padding="14,10" CornerRadius="6"
+            Background="{StaticResource PanelBrush}">
+      <Grid ColumnDefinitions="*,Auto,Auto">
+        <StackPanel Grid.Column="0" Spacing="3" Margin="0,0,16,0">
+          <TextBlock Text="{Binding Verdict}" FontSize="13" TextWrapping="Wrap" />
+          <TextBlock Text="{Binding Degradation}" FontSize="12" TextWrapping="Wrap"
+                     Foreground="{StaticResource DangerBrush}"
+                     IsVisible="{Binding Degradation, Converter={x:Static ObjectConverters.IsNotNull}}" />
+          <TextBlock Text="{Binding PathLengthNote}" FontSize="11" Opacity="0.6" TextWrapping="Wrap"
+                     IsVisible="{Binding PathLengthNote, Converter={x:Static ObjectConverters.IsNotNull}}" />
+          <TextBlock Text="{Binding RouteChanges}" FontSize="11" Opacity="0.6" TextWrapping="Wrap"
+                     IsVisible="{Binding RouteChanges, Converter={x:Static ObjectConverters.IsNotNull}}" />
+          <TextBlock Text="{Binding AsnHint}" FontSize="11" Opacity="0.55" TextWrapping="Wrap"
+                     IsVisible="{Binding AsnHint, Converter={x:Static ObjectConverters.IsNotNull}}" />
+        </StackPanel>
+
+        <StackPanel Grid.Column="1" Spacing="2" Width="90">
+          <TextBlock Text="Хопов" FontSize="11" Opacity="0.55" />
+          <TextBlock Text="{Binding HopCount}" FontSize="18" />
+        </StackPanel>
+        <StackPanel Grid.Column="2" Spacing="2" Width="90">
+          <TextBlock Text="Молчащих" FontSize="11" Opacity="0.55" />
+          <TextBlock Text="{Binding SilentHops}" FontSize="18" />
+        </StackPanel>
+      </Grid>
+    </Border>
+
+    <!-- Маршрут и история -->
+    <Grid Grid.Row="4" ColumnDefinitions="*,300" Margin="0,14,0,0">
+
+      <Border Grid.Column="0" CornerRadius="6" Background="#151922" Padding="10">
+        <Grid RowDefinitions="Auto,*,Auto">
+
+          <Grid Grid.Row="0" ColumnDefinitions="40,*,70,110,80,80,80,80,50" Margin="4,0,4,6">
+            <TextBlock Grid.Column="0" Text="хоп" FontSize="11" Opacity="0.5" />
+            <TextBlock Grid.Column="1" Text="узел" FontSize="11" Opacity="0.5" />
+            <TextBlock Grid.Column="2" Text="отпр" FontSize="11" Opacity="0.5" />
+            <TextBlock Grid.Column="3" Text="потери" FontSize="11" Opacity="0.5" />
+            <TextBlock Grid.Column="4" Text="мин" FontSize="11" Opacity="0.5" />
+            <TextBlock Grid.Column="5" Text="медиана" FontSize="11" Opacity="0.5" />
+            <TextBlock Grid.Column="6" Text="макс" FontSize="11" Opacity="0.5" />
+            <TextBlock Grid.Column="7" Text="джиттер" FontSize="11" Opacity="0.5" />
+            <TextBlock Grid.Column="8" Text="MOS" FontSize="11" Opacity="0.5" />
+          </Grid>
+
+          <ScrollViewer Grid.Row="1">
+            <ItemsControl ItemsSource="{Binding Hops}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:HopRowViewModel">
+                  <Border Classes="hop"
+                          Classes.silent="{Binding IsSilent}"
+                          Classes.destination="{Binding IsDestination}"
+                          Classes.degraded="{Binding IsDegradationPoint}"
+                          Padding="6,3" CornerRadius="3" Margin="0,1">
+                    <StackPanel Spacing="1">
+                      <Grid ColumnDefinitions="40,*,70,110,80,80,80,80,50">
+                        <TextBlock Grid.Column="0" Text="{Binding Hop}" FontSize="12" Opacity="0.7" />
+                        <TextBlock Grid.Column="1" Text="{Binding Address}" FontSize="12"
+                                   TextTrimming="CharacterEllipsis" />
+                        <TextBlock Grid.Column="2" Text="{Binding Sent}" FontSize="12" Opacity="0.7" />
+
+                        <Grid Grid.Column="3" ColumnDefinitions="44,*" Margin="0,0,10,0">
+                          <TextBlock Grid.Column="0" Text="{Binding Loss}" FontSize="12" />
+                          <ProgressBar Grid.Column="1" Minimum="0" Maximum="100"
+                                       Value="{Binding LossPercent}" Height="4"
+                                       VerticalAlignment="Center" />
+                        </Grid>
+
+                        <TextBlock Grid.Column="4" Text="{Binding Min}" FontSize="12" Opacity="0.8" />
+                        <TextBlock Grid.Column="5" Text="{Binding Median}" FontSize="12" />
+                        <TextBlock Grid.Column="6" Text="{Binding Max}" FontSize="12" Opacity="0.8" />
+                        <TextBlock Grid.Column="7" Text="{Binding Jitter}" FontSize="12" Opacity="0.8" />
+                        <TextBlock Grid.Column="8" Text="{Binding Mos}" FontSize="12" />
+                      </Grid>
+
+                      <TextBlock Text="{Binding ShortPathNote}" FontSize="10" Opacity="0.5" Margin="40,0,0,0"
+                                 IsVisible="{Binding ShortPathNote, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                      <TextBlock Text="{Binding Annotation}" FontSize="10" Opacity="0.5" Margin="40,0,0,0"
+                                 TextTrimming="CharacterEllipsis"
+                                 IsVisible="{Binding Annotation, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                      <TextBlock Text="{Binding AlternateAddresses}" FontSize="10" Opacity="0.5" Margin="40,0,0,0"
+                                 TextTrimming="CharacterEllipsis"
+                                 IsVisible="{Binding AlternateAddresses, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                    </StackPanel>
+                  </Border>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </ScrollViewer>
+
+          <TextBlock Grid.Row="2" Margin="4,8,4,0" FontSize="10" Opacity="0.45" TextWrapping="Wrap"
+                     Text="MOS на транзитных хопах считается по задержке и дрожанию, без потерь: потери на транзитном узле — это ограничение его собственных ответов, а не потеря проходящего трафика." />
+        </Grid>
+      </Border>
+
+      <Border Grid.Column="1" Margin="14,0,0,0" CornerRadius="6"
+              Background="{StaticResource PanelBrush}" Padding="12">
+        <Grid RowDefinitions="Auto,*,Auto">
+          <StackPanel Grid.Row="0" Spacing="2" Margin="0,0,0,8">
+            <TextBlock Text="История трассировок" FontWeight="SemiBold" FontSize="13" />
+            <TextBlock Text="Сохранённые прогоны trace. Выбери — покажу маршрут."
+                       FontSize="11" Opacity="0.55" TextWrapping="Wrap" />
+          </StackPanel>
+
+          <ListBox Grid.Row="1" Name="HistoryList" ItemsSource="{Binding History}"
+                   Background="Transparent" BorderThickness="0">
+            <ListBox.ItemTemplate>
+              <DataTemplate x:DataType="results:RunSummary">
+                <StackPanel Spacing="1" Margin="0,3">
+                  <TextBlock Text="{Binding TargetDisplay}" FontSize="12" TextTrimming="CharacterEllipsis" />
+                  <TextBlock FontSize="10" Opacity="0.5">
+                    <TextBlock.Text>
+                      <MultiBinding StringFormat="{}{0:dd.MM HH:mm:ss} · {1} проб · {2:0.0}% потерь">
+                        <Binding Path="StartedUtc.LocalDateTime" />
+                        <Binding Path="SentCount" />
+                        <Binding Path="LossPercent" />
+                      </MultiBinding>
+                    </TextBlock.Text>
+                  </TextBlock>
+                </StackPanel>
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+            <ListBox.Styles>
+              <Style Selector="ListBoxItem">
+                <Setter Property="Padding" Value="6,2" />
+              </Style>
+            </ListBox.Styles>
+          </ListBox>
+
+          <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="8" Margin="0,8,0,0">
+            <Button Content="Обновить" Command="{Binding RefreshHistoryCommand}" FontSize="12" Padding="10,4" />
+            <Button Content="Показать" FontSize="12" Padding="10,4"
+                    Command="{Binding LoadRunCommand}"
+                    CommandParameter="{Binding #HistoryList.SelectedItem}" />
+          </StackPanel>
+        </Grid>
+      </Border>
+    </Grid>
+
+  </Grid>
+</UserControl>

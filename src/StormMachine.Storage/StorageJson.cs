@@ -1,6 +1,7 @@
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using StormMachine.Domain.Discovery;
 using StormMachine.Domain.Measurements;
 
 namespace StormMachine.Storage;
@@ -15,8 +16,10 @@ namespace StormMachine.Storage;
 /// в набор почти пустых полей.
 /// <para>
 /// Контекст сгенерирован исходниками, а не построен рефлексией: клиенты публикуются
-/// с обрезкой неиспользуемого кода, а рефлексивная сериализация при обрезке ломается —
-/// причём не при сборке, а при первом обращении у пользователя.
+/// с обрезкой неиспользуемого кода, а рефлексивная сериализация при обрезке ломается.
+/// Важна и форма вызова: перегрузка с <c>JsonSerializerOptions</c> помечена как
+/// несовместимая с обрезкой, и публикация с ней не собирается вовсе. Нужна перегрузка
+/// с <c>JsonTypeInfo</c> из контекста — настройки при этом задаются самому контексту.
 /// </para>
 /// </remarks>
 internal static class StorageJson
@@ -30,45 +33,52 @@ internal static class StorageJson
     /// в SQL перестаёт находить то, что человек ввёл. Название кодировщика пугает,
     /// но относится к вставке JSON в HTML — здесь это локальный файл базы.
     /// </remarks>
-    private static readonly JsonSerializerOptions Options = new(JsonSerializerDefaults.General)
+    private static readonly StorageJsonContext Context = new(new JsonSerializerOptions(JsonSerializerDefaults.General)
     {
-        TypeInfoResolver = StorageJsonContext.Default,
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
-    };
+    });
 
     public static string SerializeContext(MeasurementContext value) =>
-        JsonSerializer.Serialize<MeasurementContext>(value, Options);
+        JsonSerializer.Serialize(value, Context.MeasurementContext);
 
     public static MeasurementContext? DeserializeContext(string? json) =>
         string.IsNullOrEmpty(json)
             ? null
-            : JsonSerializer.Deserialize<MeasurementContext>(json, Options);
+            : JsonSerializer.Deserialize(json, Context.MeasurementContext);
 
     public static string SerializeFacts(ProbeFact[] value) =>
-        JsonSerializer.Serialize<ProbeFact[]>(value, Options);
+        JsonSerializer.Serialize(value, Context.ProbeFactArray);
 
     public static ProbeFact[] DeserializeFacts(string? json) =>
         string.IsNullOrEmpty(json)
             ? []
-            : JsonSerializer.Deserialize<ProbeFact[]>(json, Options) ?? [];
+            : JsonSerializer.Deserialize(json, Context.ProbeFactArray) ?? [];
 
     public static string SerializeTags(string[] value) =>
-        JsonSerializer.Serialize<string[]>(value, Options);
+        JsonSerializer.Serialize(value, Context.StringArray);
 
     public static string[] DeserializeTags(string? json) =>
         string.IsNullOrEmpty(json)
             ? []
-            : JsonSerializer.Deserialize<string[]>(json, Options) ?? [];
+            : JsonSerializer.Deserialize(json, Context.StringArray) ?? [];
+
+    public static string SerializeEvidence(Evidence[] value) =>
+        JsonSerializer.Serialize(value, Context.EvidenceArray);
+
+    public static Evidence[] DeserializeEvidence(string? json) =>
+        string.IsNullOrEmpty(json)
+            ? []
+            : JsonSerializer.Deserialize(json, Context.EvidenceArray) ?? [];
 
     public static string SerializeParameters(Dictionary<string, string?> value) =>
-        JsonSerializer.Serialize<Dictionary<string, string?>>(value, Options);
+        JsonSerializer.Serialize(value, Context.DictionaryStringString);
 
     public static Dictionary<string, string?> DeserializeParameters(string? json) =>
         string.IsNullOrEmpty(json)
             ? []
-            : JsonSerializer.Deserialize<Dictionary<string, string?>>(json, Options) ?? [];
+            : JsonSerializer.Deserialize(json, Context.DictionaryStringString) ?? [];
 }
 
 [JsonSourceGenerationOptions(
@@ -76,6 +86,7 @@ internal static class StorageJson
     PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]
 [JsonSerializable(typeof(MeasurementContext))]
 [JsonSerializable(typeof(ProbeFact[]))]
+[JsonSerializable(typeof(Evidence[]))]
 [JsonSerializable(typeof(Dictionary<string, string?>))]
 [JsonSerializable(typeof(string[]))]
 internal sealed partial class StorageJsonContext : JsonSerializerContext

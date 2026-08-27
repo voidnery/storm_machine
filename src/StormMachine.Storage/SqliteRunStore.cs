@@ -69,6 +69,17 @@ public sealed class SqliteRunStore : IRunStore
     /// </remarks>
     internal string ConnectionString => _connectionString;
 
+    /// <summary>
+    /// Через сколько молчания прогон считается брошенным.
+    /// </summary>
+    /// <remarks>
+    /// Запас взят с большим избытком: отметка обновляется каждые пару секунд, но пробы
+    /// с редким темпом — монитор раз в минуту — сбрасывают пачку только когда приходит
+    /// измерение. Ошибиться в сторону «ещё жив» безопаснее: упавший прогон дождётся
+    /// следующего запуска и будет помечен тогда, а живой не будет оболган никогда.
+    /// </remarks>
+    private static readonly TimeSpan HeartbeatTimeout = TimeSpan.FromMinutes(5);
+
     public static string DefaultDatabasePath() => Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         "StormMachine",
@@ -122,10 +133,12 @@ public sealed class SqliteRunStore : IRunStore
             command.CommandText = """
                 INSERT INTO runs
                     (id, probe_kind, probe_name, shape, target_kind, target_value, target_label,
-                     unit, started_ticks, state, context_json, parameters_json, preset_id, preset_version)
+                     unit, started_ticks, heartbeat_ticks, state, context_json, parameters_json,
+                     preset_id, preset_version)
                 VALUES
                     ($id, $kind, $name, $shape, $targetKind, $targetValue, $targetLabel,
-                     $unit, $started, $state, $context, $parameters, $presetId, $presetVersion);
+                     $unit, $started, $started, $state, $context, $parameters,
+                     $presetId, $presetVersion);
                 """;
 
             command.Parameters.AddWithValue("$id", id.ToString());
@@ -364,16 +377,22 @@ public sealed class SqliteRunStore : IRunStore
     private void MarkAbandonedRuns(SqliteConnection connection)
     {
         using var command = connection.CreateCommand();
+
+        // Отметка жизни, а не просто состояние «выполняется». Иначе второй процесс —
+        // консоль, запущенная рядом с приложением, — объявлял бы чужое живое измерение
+        // прерванным сбоем. Часовой MTR превратил этот случай из редкого в обычный.
         command.CommandText = """
             UPDATE runs
                SET state = $abandoned,
                    sent_count = (SELECT COUNT(*) FROM samples WHERE samples.run_id = runs.id),
                    success_count = (SELECT COUNT(*) FROM samples WHERE samples.run_id = runs.id AND status = 0)
-             WHERE state = $running;
+             WHERE state = $running
+               AND COALESCE(heartbeat_ticks, started_ticks) < $stale;
             """;
 
         command.Parameters.AddWithValue("$abandoned", (int)RunState.Abandoned);
         command.Parameters.AddWithValue("$running", (int)RunState.Running);
+        command.Parameters.AddWithValue("$stale", DateTimeOffset.UtcNow.Subtract(HeartbeatTimeout).UtcTicks);
 
         var affected = command.ExecuteNonQuery();
 

@@ -163,7 +163,7 @@ internal static class ProbeCommandFactory
                 new RunOptions
                 {
                     Save = save,
-                    OnSample = quiet ? null : sample => ProbeRenderer.WriteLiveSample(descriptor, sample),
+                    OnSample = quiet ? null : ProbeRenderer.CreateLiveWriter(descriptor),
                 },
                 linked.Token).ConfigureAwait(false);
         }

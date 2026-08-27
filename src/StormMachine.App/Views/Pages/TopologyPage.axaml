@@ -1,0 +1,139 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:StormMachine.App.ViewModels"
+             xmlns:controls="using:StormMachine.App.Views.Controls"
+             x:Class="StormMachine.App.Views.Pages.TopologyPage"
+             x:DataType="vm:TopologyPageViewModel">
+
+  <Grid RowDefinitions="Auto,Auto,*" Margin="24,20">
+
+    <StackPanel Grid.Row="0" Spacing="4">
+      <TextBlock Text="{Binding Title}" FontSize="24" FontWeight="SemiBold" />
+      <TextBlock Text="{Binding Summary}" FontSize="12" Opacity="0.65" TextWrapping="Wrap" />
+    </StackPanel>
+
+    <Border Grid.Row="1" Margin="0,12,0,0" Padding="14,10" CornerRadius="6"
+            Background="{StaticResource PanelBrush}">
+      <StackPanel Spacing="8">
+        <Grid ColumnDefinitions="Auto,Auto,Auto,Auto,*,Auto,Auto,Auto">
+          <CheckBox Grid.Column="0" IsChecked="{Binding IncludeExternalPaths}" FontSize="12"
+                    Content="Внешние пути" Margin="0,0,14,0"
+                    ToolTip.Tip="Узлы из сохранённых трассировок" />
+          <CheckBox Grid.Column="1" IsChecked="{Binding IncludeVirtualAdapters}" FontSize="12"
+                    Content="Виртуальные сети" Margin="0,0,14,0"
+                    ToolTip.Tip="Коммутаторы Hyper-V, Docker и VPN" />
+          <CheckBox Grid.Column="2" IsChecked="{Binding ExpandAll}" FontSize="12"
+                    Content="Все устройства" Margin="0,0,14,0"
+                    ToolTip.Tip="Не сворачивать конечные узлы в счётчик" />
+
+          <Button Grid.Column="3" Content="Развернуть выбранное" Command="{Binding ExpandCommand}"
+                  FontSize="12" Padding="10,4" Margin="0,0,10,0" />
+
+          <TextBlock Grid.Column="4" Text="{Binding StatusLine}" FontSize="12" Opacity="0.65"
+                     VerticalAlignment="Center" Margin="10,0" TextTrimming="CharacterEllipsis" />
+
+          <Button Grid.Column="5" Content="PNG" Command="{Binding ExportPngCommand}"
+                  FontSize="12" Padding="12,4" Margin="0,0,6,0" />
+          <Button Grid.Column="6" Content="SVG" Command="{Binding ExportSvgCommand}"
+                  FontSize="12" Padding="12,4" Margin="0,0,6,0" />
+          <Button Grid.Column="7" Content="JSON" Command="{Binding ExportJsonCommand}"
+                  FontSize="12" Padding="12,4" />
+        </Grid>
+
+        <TextBlock Text="{Binding ErrorMessage}" FontSize="12"
+                   Foreground="{StaticResource DangerBrush}" TextWrapping="Wrap"
+                   IsVisible="{Binding ErrorMessage, Converter={x:Static ObjectConverters.IsNotNull}}" />
+      </StackPanel>
+    </Border>
+
+    <Grid Grid.Row="2" ColumnDefinitions="*,320" Margin="0,14,0,0">
+
+      <Border Grid.Column="0" CornerRadius="6" ClipToBounds="True">
+        <Grid RowDefinitions="*,Auto">
+          <controls:TopologyCanvas Grid.Row="0" Name="Canvas"
+                                   Graph="{Binding Graph}"
+                                   SelectedNode="{Binding SelectedNode, Mode=TwoWay}" />
+
+          <!-- Легенда лежит прямо на карте: различие достоверности — главное,
+               что карта сообщает, и объяснять его надо там же, где смотрят. -->
+          <Border Grid.Row="1" Background="#1A1F2B" Padding="12,7">
+            <StackPanel Orientation="Horizontal" Spacing="18">
+              <StackPanel Orientation="Horizontal" Spacing="6">
+                <Rectangle Width="24" Height="2" Fill="#4B7FD1" VerticalAlignment="Center" />
+                <TextBlock Text="подтверждено" FontSize="11" Opacity="0.7" />
+              </StackPanel>
+              <StackPanel Orientation="Horizontal" Spacing="6">
+                <Rectangle Width="24" Height="2" Fill="#7A8AA5" VerticalAlignment="Center"
+                           StrokeDashArray="2,1.5" />
+                <TextBlock Text="выведено по правилу" FontSize="11" Opacity="0.7" />
+              </StackPanel>
+              <StackPanel Orientation="Horizontal" Spacing="6">
+                <Rectangle Width="24" Height="2" Fill="#5D6B82" VerticalAlignment="Center"
+                           StrokeDashArray="0.6,2" />
+                <TextBlock Text="допущение" FontSize="11" Opacity="0.7" />
+              </StackPanel>
+              <TextBlock Text="Колесо — масштаб, перетаскивание — сдвиг, щелчок — выбор узла."
+                         FontSize="11" Opacity="0.45" VerticalAlignment="Center" />
+            </StackPanel>
+          </Border>
+        </Grid>
+      </Border>
+
+      <Border Grid.Column="1" Margin="14,0,0,0" CornerRadius="6"
+              Background="{StaticResource PanelBrush}" Padding="12">
+        <Grid RowDefinitions="Auto,Auto,*,Auto">
+          <StackPanel Grid.Row="0" Spacing="2" Margin="0,0,0,8">
+            <TextBlock Text="Выбранный узел" FontWeight="SemiBold" FontSize="13" />
+            <TextBlock Text="Щёлкните узел на карте — покажу его связи и то, откуда они взялись."
+                       FontSize="11" Opacity="0.55" TextWrapping="Wrap" />
+          </StackPanel>
+
+          <StackPanel Grid.Row="1" Spacing="2" Margin="0,0,0,10"
+                      IsVisible="{Binding SelectedNode, Converter={x:Static ObjectConverters.IsNotNull}}">
+            <TextBlock Text="{Binding SelectedNode.Label}" FontSize="14" TextWrapping="Wrap" />
+            <TextBlock Text="{Binding SelectedNode.Address}" FontSize="12" Opacity="0.7"
+                       IsVisible="{Binding SelectedNode.Address, Converter={x:Static ObjectConverters.IsNotNull}}" />
+            <TextBlock Text="{Binding SelectedNode.MacAddress}" FontSize="12" Opacity="0.7"
+                       IsVisible="{Binding SelectedNode.MacAddress, Converter={x:Static ObjectConverters.IsNotNull}}" />
+            <TextBlock Text="{Binding SelectedNode.Vendor}" FontSize="12" Opacity="0.7"
+                       TextWrapping="Wrap"
+                       IsVisible="{Binding SelectedNode.Vendor, Converter={x:Static ObjectConverters.IsNotNull}}" />
+            <TextBlock Text="{Binding SelectedNode.Detail}" FontSize="11" Opacity="0.55"
+                       TextWrapping="Wrap"
+                       IsVisible="{Binding SelectedNode.Detail, Converter={x:Static ObjectConverters.IsNotNull}}" />
+          </StackPanel>
+
+          <ScrollViewer Grid.Row="2">
+            <ItemsControl ItemsSource="{Binding SelectedLinks}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:LinkRow">
+                  <Border Padding="8,6" Margin="0,0,0,6" CornerRadius="4" Background="#1A2130">
+                    <StackPanel Spacing="3">
+                      <Grid ColumnDefinitions="*,Auto">
+                        <TextBlock Grid.Column="0" Text="{Binding Peer}" FontSize="12"
+                                   TextTrimming="CharacterEllipsis" />
+                        <TextBlock Grid.Column="1" Text="{Binding Confidence}" FontSize="10"
+                                   Opacity="0.75" Margin="8,0,0,0" />
+                      </Grid>
+                      <!-- Догадка обязана себя объяснять: иначе её нельзя
+                           ни проверить, ни оспорить. -->
+                      <TextBlock Text="{Binding Because}" FontSize="10.5" Opacity="0.55"
+                                 TextWrapping="Wrap"
+                                 IsVisible="{Binding !IsConfirmed}" />
+                    </StackPanel>
+                  </Border>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </ScrollViewer>
+
+          <StackPanel Grid.Row="3" Orientation="Horizontal" Spacing="8" Margin="0,8,0,0">
+            <Button Content="Обновить" Command="{Binding RefreshCommand}" FontSize="12" Padding="10,4" />
+            <Button Content="Свернуть всё" Command="{Binding CollapseAllCommand}" FontSize="12" Padding="10,4" />
+          </StackPanel>
+        </Grid>
+      </Border>
+    </Grid>
+
+  </Grid>
+</UserControl>

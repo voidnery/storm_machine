@@ -50,6 +50,15 @@ jobs:
         if: steps.probe.outputs.found == 'true'
         run: dotnet test --configuration Release --no-build --logger "trx;LogFileName=results.trx" --results-directory TestResults
 
+      # Публикация с обрезкой проверяется на каждом изменении, а не только при релизе.
+      # Причина конкретная: сборка клиентов была сломана с И-3 по И-9 и никто этого
+      # не заметил — тесты проходили, а обрезчик запускался только по тегу.
+      - name: Проверка публикации с обрезкой
+        if: steps.probe.outputs.found == 'true'
+        run: |
+          dotnet publish src/StormMachine.Cli/StormMachine.Cli.csproj --configuration Release
+          dotnet publish src/StormMachine.App/StormMachine.App.csproj --configuration Release
+
       - name: Публикация результатов тестов
         if: always() && steps.probe.outputs.found == 'true'
         uses: actions/upload-artifact@v4

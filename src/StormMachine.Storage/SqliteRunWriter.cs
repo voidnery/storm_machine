@@ -170,6 +170,17 @@ internal sealed class SqliteRunWriter : IRunWriter
             command.ExecuteNonQuery();
         }
 
+        // Отметка жизни в той же транзакции, что и сэмплы: пока прогон пишет, он жив,
+        // и никакой другой процесс не должен считать его прерванным сбоем.
+        using (var heartbeat = _connection.CreateCommand())
+        {
+            heartbeat.Transaction = transaction;
+            heartbeat.CommandText = "UPDATE runs SET heartbeat_ticks = $now WHERE id = $run;";
+            heartbeat.Parameters.AddWithValue("$now", DateTimeOffset.UtcNow.UtcTicks);
+            heartbeat.Parameters.AddWithValue("$run", RunId.ToString());
+            heartbeat.ExecuteNonQuery();
+        }
+
         transaction.Commit();
 
         _pending.Clear();

@@ -38,6 +38,10 @@ internal static class AppServices
     {
         NavigationMap.Dashboard => ActivatorUtilities.CreateInstance<DashboardPageViewModel>(provider, section),
         NavigationMap.Latency => ActivatorUtilities.CreateInstance<LatencyPageViewModel>(provider, section),
+        NavigationMap.Path => ActivatorUtilities.CreateInstance<PathPageViewModel>(provider, section),
+        NavigationMap.Discovery => ActivatorUtilities.CreateInstance<DiscoveryPageViewModel>(provider, section),
+        NavigationMap.Devices => ActivatorUtilities.CreateInstance<DevicesPageViewModel>(provider, section),
+        NavigationMap.Topology => ActivatorUtilities.CreateInstance<TopologyPageViewModel>(provider, section),
         NavigationMap.Presets => ActivatorUtilities.CreateInstance<PresetsPageViewModel>(provider, section),
         NavigationMap.Runs => ActivatorUtilities.CreateInstance<RunsPageViewModel>(provider, section),
         _ => new PlaceholderPageViewModel(section),

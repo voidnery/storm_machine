@@ -176,7 +176,7 @@ internal static class PresetsCommand
                     new RunOptions
                     {
                         Save = save,
-                        OnSample = quiet ? null : sample => ProbeRenderer.WriteLiveSample(probe.Descriptor, sample),
+                        OnSample = quiet ? null : ProbeRenderer.CreateLiveWriter(probe.Descriptor),
                         PresetId = preset.Id,
                         PresetVersion = preset.Version,
                     },

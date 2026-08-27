@@ -16,6 +16,12 @@
          Цена: перетаскивание файлов из проводника средствами OLE. Понадобится —
          вернём COM и примем размер, но не раньше, чем эта функция реально появится. -->
     <BuiltInComInteropSupport>false</BuiltInComInteropSupport>
+
+    <!-- IL2104 сообщает, что сборка движка раскладки содержит места, опасные при обрезке.
+         Это правда, и потому она целиком внесена в корни обрезчика ниже: внутри неё
+         ничего не выкидывается, и предупреждение перестаёт описывать наш случай.
+         Гасится точечно — общий TreatWarningsAsErrors остаётся в силе. -->
+    <NoWarn>$(NoWarn);IL2104</NoWarn>
   </PropertyGroup>
 
   <!-- Параметры публикации закреплены здесь, а не в командной строке: локальная сборка
@@ -30,6 +36,14 @@
 
   <!-- Только слой приложения и корень композиции. Ссылок на инфраструктуру нет
        и быть не должно — это проверяется архитектурным тестом. -->
+  <!-- Движок раскладки не разбирается обрезчиком: внутри него рефлексия, и попытка
+       выкинуть «лишнее» кончилась бы падением у пользователя, а не при сборке.
+       Сборка кладётся целиком. Измерено: 54.5 МБ без этой строки против 56.7 МБ с ней —
+       2.2 МБ за то, чтобы карта сети не отвалилась молча. -->
+  <ItemGroup>
+    <TrimmerRootAssembly Include="AutomaticGraphLayout" />
+  </ItemGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\StormMachine.Application\StormMachine.Application.csproj" />
     <ProjectReference Include="..\StormMachine.Composition\StormMachine.Composition.csproj" />
@@ -43,6 +57,11 @@
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.11" />
     <PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.11" />
     <PackageReference Include="ScottPlot.Avalonia" Version="5.1.59" />
+
+    <!-- Движок раскладки графа (MSAGL, лицензия MIT). Берётся только геометрия:
+         рисуем сами, потому что достоверность связи должна быть видна видом линии,
+         а чужие стили под это не гнутся. Пригодность проверена спайком-04. -->
+    <PackageReference Include="AutomaticGraphLayout" Version="1.1.12" />
   </ItemGroup>
 
 </Project>

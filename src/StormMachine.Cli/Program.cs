@@ -66,6 +66,9 @@ internal static class Program
             root.Subcommands.Add(ProbeCommandFactory.Create(services, probe));
         }
 
+        root.Subcommands.Add(DiscoverCommand.CreateDiscover(services));
+        root.Subcommands.Add(DevicesCommand.Create(services));
+        root.Subcommands.Add(TopologyCommand.Create(services));
         root.Subcommands.Add(PresetsCommand.Create(services));
         root.Subcommands.Add(RunsCommand.Create(services));
         root.Subcommands.Add(EnvCommand.Create(services));

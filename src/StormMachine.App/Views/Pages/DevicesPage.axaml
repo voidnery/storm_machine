@@ -1,0 +1,130 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:StormMachine.App.ViewModels"
+             xmlns:discovery="using:StormMachine.Domain.Discovery"
+             x:Class="StormMachine.App.Views.Pages.DevicesPage"
+             x:DataType="vm:DevicesPageViewModel">
+
+  <UserControl.Styles>
+    <Style Selector="ListBoxItem">
+      <Setter Property="Padding" Value="6,2" />
+    </Style>
+  </UserControl.Styles>
+
+  <Grid RowDefinitions="Auto,Auto,*" Margin="24,20">
+
+    <StackPanel Grid.Row="0" Spacing="4">
+      <TextBlock Text="{Binding Title}" FontSize="24" FontWeight="SemiBold" />
+      <TextBlock Text="{Binding Summary}" FontSize="12" Opacity="0.6" TextWrapping="Wrap" />
+    </StackPanel>
+
+    <!-- Правка оператора: не запись в поле, а свидетельство с наивысшим весом -->
+    <Border Grid.Row="1" Margin="0,12,0,0" Padding="14,10" CornerRadius="6"
+            Background="{StaticResource PanelBrush}">
+      <StackPanel Spacing="8">
+        <Grid ColumnDefinitions="Auto,240,Auto,Auto,*">
+          <TextBlock Grid.Column="0" Text="Назвать выбранное:" FontSize="12" Opacity="0.6"
+                     VerticalAlignment="Center" Margin="0,0,10,0" />
+          <TextBox Grid.Column="1" Text="{Binding NewName}" PlaceholderText="как называть это устройство"
+                   FontSize="12" />
+          <Button Grid.Column="2" Content="Сохранить" Command="{Binding RenameCommand}"
+                  FontSize="12" Padding="12,5" Margin="8,0,0,0" />
+          <Button Grid.Column="3" Content="Обновить" Command="{Binding RefreshCommand}"
+                  FontSize="12" Padding="12,5" Margin="8,0,0,0" />
+          <TextBlock Grid.Column="4" Text="{Binding StatusLine}" FontSize="12" Opacity="0.65"
+                     VerticalAlignment="Center" Margin="16,0,0,0" TextWrapping="Wrap" />
+        </Grid>
+
+        <TextBlock Text="{Binding ErrorMessage}" FontSize="12"
+                   Foreground="{StaticResource DangerBrush}" TextWrapping="Wrap"
+                   IsVisible="{Binding ErrorMessage, Converter={x:Static ObjectConverters.IsNotNull}}" />
+      </StackPanel>
+    </Border>
+
+    <Grid Grid.Row="2" ColumnDefinitions="*,340" Margin="0,14,0,0">
+
+      <Border Grid.Column="0" CornerRadius="6" Background="#151922" Padding="10">
+        <Grid RowDefinitions="Auto,*,Auto">
+          <Grid Grid.Row="0" ColumnDefinitions="150,170,*,200,110" Margin="8,0,4,6">
+            <TextBlock Grid.Column="0" Text="адрес" FontSize="11" Opacity="0.5" />
+            <TextBlock Grid.Column="1" Text="MAC" FontSize="11" Opacity="0.5" />
+            <TextBlock Grid.Column="2" Text="имя" FontSize="11" Opacity="0.5" />
+            <TextBlock Grid.Column="3" Text="вендор" FontSize="11" Opacity="0.5" />
+            <TextBlock Grid.Column="4" Text="последний раз" FontSize="11" Opacity="0.5" />
+          </Grid>
+
+          <ListBox Grid.Row="1" ItemsSource="{Binding Rows}" SelectedItem="{Binding Selected}"
+                   Background="Transparent" BorderThickness="0">
+            <ListBox.ItemTemplate>
+              <DataTemplate x:DataType="vm:InventoryRow">
+                <Grid ColumnDefinitions="150,170,*,200,110" Opacity="{Binding IsOnline, Converter={x:Static vm:OpacityConverter.Instance}}">
+                  <StackPanel Grid.Column="0" Spacing="0">
+                    <TextBlock Text="{Binding Address}" FontSize="12" />
+                    <TextBlock Text="{Binding ExtraAddresses}" FontSize="9.5" Opacity="0.55"
+                               TextTrimming="CharacterEllipsis"
+                               IsVisible="{Binding ExtraAddresses, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                  </StackPanel>
+                  <TextBlock Grid.Column="1" Text="{Binding MacAddress}" FontSize="12" Opacity="0.8" />
+                  <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6">
+                    <TextBlock Text="{Binding HostName}" FontSize="12" TextTrimming="CharacterEllipsis" />
+                    <TextBlock Text="✎" FontSize="11" Opacity="0.6"
+                               ToolTip.Tip="Имя присвоено оператором — переживает пересканирование"
+                               IsVisible="{Binding IsNamedByOperator}" />
+                  </StackPanel>
+                  <TextBlock Grid.Column="3" Text="{Binding Vendor}" FontSize="12" Opacity="0.8"
+                             TextTrimming="CharacterEllipsis" />
+                  <TextBlock Grid.Column="4" Text="{Binding LastSeen}" FontSize="11" Opacity="0.6" />
+                </Grid>
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+          </ListBox>
+
+          <TextBlock Grid.Row="2" Margin="8,8,4,0" FontSize="10" Opacity="0.45" TextWrapping="Wrap"
+                     Text="Приглушённая строка — устройство известно, но в последнем сканировании не ответило. Пометка ✎ означает имя, присвоенное оператором: оно сильнее любого наблюдения." />
+        </Grid>
+      </Border>
+
+      <Border Grid.Column="1" Margin="14,0,0,0" CornerRadius="6"
+              Background="{StaticResource PanelBrush}" Padding="12">
+        <Grid RowDefinitions="Auto,Auto,Auto,*">
+          <StackPanel Grid.Row="0" Spacing="2" Margin="0,0,0,8">
+            <TextBlock Text="Что изменилось" FontWeight="SemiBold" FontSize="13" />
+            <TextBlock Text="Выберите раннее сканирование — сравню его с последним."
+                       FontSize="11" Opacity="0.55" TextWrapping="Wrap" />
+          </StackPanel>
+
+          <ComboBox Grid.Row="1" ItemsSource="{Binding Scans}" SelectedItem="{Binding CompareFrom}"
+                    HorizontalAlignment="Stretch" FontSize="12">
+            <ComboBox.ItemTemplate>
+              <DataTemplate x:DataType="discovery:DiscoveryScan">
+                <TextBlock FontSize="12">
+                  <TextBlock.Text>
+                    <MultiBinding StringFormat="{}{0:dd.MM HH:mm} · {1}">
+                      <Binding Path="StartedUtc.LocalDateTime" />
+                      <Binding Path="Range" />
+                    </MultiBinding>
+                  </TextBlock.Text>
+                </TextBlock>
+              </DataTemplate>
+            </ComboBox.ItemTemplate>
+          </ComboBox>
+
+          <Button Grid.Row="2" Content="Сравнить с последним" Command="{Binding CompareCommand}"
+                  FontSize="12" Padding="12,5" Margin="0,8,0,8" HorizontalAlignment="Stretch" />
+
+          <ScrollViewer Grid.Row="3">
+            <ItemsControl ItemsSource="{Binding Differences}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="x:String">
+                  <TextBlock Text="{Binding}" FontSize="11" Margin="0,2" TextWrapping="Wrap"
+                             FontFamily="Consolas,Menlo,monospace" />
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </ScrollViewer>
+        </Grid>
+      </Border>
+    </Grid>
+
+  </Grid>
+</UserControl>

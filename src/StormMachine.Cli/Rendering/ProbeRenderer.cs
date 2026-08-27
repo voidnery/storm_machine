@@ -75,6 +75,29 @@ internal static class ProbeRenderer
         Console.WriteLine();
     }
 
+    /// <summary>
+    /// Готовит живой вывод под форму результата.
+    /// </summary>
+    /// <remarks>
+    /// Появилось в И-7. Непрерывный MTR — первая проба, живой вывод которой требует памяти
+    /// о предыдущих сэмплах: строка на каждую пробу дала бы тридцать строк в секунду
+    /// на час наблюдения. Поэтому вместо статического метода — замыкание с состоянием
+    /// на один прогон.
+    /// </remarks>
+    public static Action<Sample> CreateLiveWriter(ProbeDescriptor descriptor)
+    {
+        ArgumentNullException.ThrowIfNull(descriptor);
+
+        if (descriptor.Shape != ProbeResultShape.PathTrace)
+        {
+            return sample => WriteLiveSample(descriptor, sample);
+        }
+
+        var writer = new PathLiveWriter();
+
+        return writer.Write;
+    }
+
     public static void WriteLiveSample(ProbeDescriptor descriptor, Sample sample)
     {
         switch (descriptor.Shape)
@@ -85,7 +108,8 @@ internal static class ProbeRenderer
                 return;
 
             case ProbeResultShape.PathTrace:
-                WritePathSample(sample);
+                // Живой вывод трассировки требует памяти о предыдущих сэмплах —
+                // им занимается PathLiveWriter из CreateLiveWriter.
                 return;
 
             case ProbeResultShape.ComparedSeries:
@@ -131,7 +155,9 @@ internal static class ProbeRenderer
                 break;
         }
 
-        Describe.WriteFacts(result.Facts);
+        Describe.WriteFacts(descriptor.Shape == ProbeResultShape.PathTrace
+            ? RouteRenderer.RemainingFacts(result.Facts)
+            : result.Facts);
     }
 
     // ------------------------------------------------------------ скалярный ряд
@@ -299,49 +325,92 @@ internal static class ProbeRenderer
 
     // ------------------------------------------------------ матрица «хоп × попытка»
 
-    private static void WritePathSample(Sample sample)
+    /// <summary>
+    /// Живой вывод трассировки: подробно на разведке, по строке на цикл дальше.
+    /// </summary>
+    /// <remarks>
+    /// Разведка идёт по одному хопу и читается построчно — так же, как <c>tracert</c>.
+    /// Циклы непрерывного наблюдения идут раз в секунду по всем хопам сразу, и подробный
+    /// вывод превратился бы в поток, в котором ничего не видно. Начало нового цикла
+    /// распознаётся по возврату TTL назад: цикл всегда начинается с первого хопа.
+    /// </remarks>
+    private sealed class PathLiveWriter
     {
-        // Живой вывод по хопам собирается в сводке: строка на попытку была бы нечитаемой.
-        _ = sample;
+        private int _lastTtl;
+        private int _round;
+        private int _roundProbes;
+        private int _roundSilent;
+        private double _lastRtt = double.NaN;
+        private string? _lastResponder;
+
+        public void Write(Sample sample)
+        {
+            if (sample.Group is not { } ttl)
+            {
+                return;
+            }
+
+            // Разведка идёт по нарастающей и повторяет один TTL несколько раз, цикл
+            // наблюдения проходит все хопы ровно по разу. Поэтому признак нового цикла
+            // разный: на разведке — только возврат TTL назад, дальше — ещё и повтор.
+            var isNewRound = _round == 0 ? ttl < _lastTtl : ttl <= _lastTtl;
+
+            if (isNewRound)
+            {
+                FlushRound();
+                _round++;
+            }
+
+            _lastTtl = ttl;
+
+            if (_round == 0)
+            {
+                WriteDiscovery(sample, ttl);
+                return;
+            }
+
+            _roundProbes++;
+
+            if (sample.IsSuccess)
+            {
+                _lastRtt = sample.Value;
+                _lastResponder = sample.RespondedBy;
+            }
+            else
+            {
+                _roundSilent++;
+            }
+        }
+
+        private static void WriteDiscovery(Sample sample, int ttl)
+        {
+            Console.WriteLine(sample.IsSuccess
+                ? $"  {ttl,3}  {sample.RespondedBy ?? "?",-24} {F(sample.Value),9} мс"
+                : $"  {ttl,3}  {"*",-24} {Describe.SampleStatus(sample.Status),12}");
+        }
+
+        private void FlushRound()
+        {
+            if (_round == 0)
+            {
+                Console.WriteLine();
+                return;
+            }
+
+            var rtt = double.IsNaN(_lastRtt) ? "—" : F(_lastRtt) + " мс";
+
+            Console.WriteLine($"  цикл {_round,-5} хопов {_roundProbes,3}   без ответа {_roundSilent,3}   "
+                              + $"последний ответ: {_lastResponder ?? "нет"} {rtt}");
+
+            _roundProbes = 0;
+            _roundSilent = 0;
+            _lastRtt = double.NaN;
+            _lastResponder = null;
+        }
     }
 
     private static void WritePathSummary(ProbeResult result)
     {
-        var hops = result.Samples
-            .Where(s => s.Group is not null)
-            .GroupBy(s => s.Group!.Value)
-            .OrderBy(g => g.Key)
-            .ToList();
-
-        if (hops.Count == 0)
-        {
-            Console.WriteLine("Маршрут не построен.");
-            return;
-        }
-
-        Console.WriteLine();
-        Console.WriteLine($"  {"хоп",3}  {"узел",-24} {"мин",8} {"медиана",8} {"макс",8}  {"потери",7}");
-
-        foreach (var hop in hops)
-        {
-            var samples = hop.ToList();
-            var stats = LatencyStatistics.Compute(samples);
-
-            var responder = samples
-                .Select(s => s.RespondedBy)
-                .FirstOrDefault(r => !string.IsNullOrEmpty(r)) ?? "*";
-
-            var lost = samples.Count(s => !s.IsSuccess);
-            var lossPercent = samples.Count == 0 ? 0 : lost * 100.0 / samples.Count;
-
-            if (stats.SampleCount == 0)
-            {
-                Console.WriteLine($"  {hop.Key,3}  {"*",-24} {"—",8} {"—",8} {"—",8}  {"100%",7}");
-                continue;
-            }
-
-            Console.WriteLine($"  {hop.Key,3}  {responder,-24} {F(stats.MinMs),8} {F(stats.P50Ms),8} {F(stats.MaxMs),8}  "
-                              + $"{lossPercent.ToString("0", CultureInfo.InvariantCulture) + "%",7}");
-        }
+        RouteRenderer.Write(PathAnalysis.Compute(result.Samples, result.ResolvedAddress), result.Facts);
     }
 }

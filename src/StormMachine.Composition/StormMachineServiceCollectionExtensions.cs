@@ -5,7 +5,10 @@ using StormMachine.Application.Abstractions;
 using StormMachine.Application.Probes;
 using StormMachine.Application.Presets;
 using StormMachine.Application.Runs;
+using StormMachine.Application.Topology;
+using StormMachine.Discovery;
 using StormMachine.Platform;
+using StormMachine.Platform.Geo;
 using StormMachine.Probes;
 using StormMachine.Reporting;
 using StormMachine.Storage;
@@ -44,6 +47,20 @@ public static class StormMachineServiceCollectionExtensions
             (SqliteRunStore)provider.GetRequiredService<IRunStore>()));
         services.AddSingleton<PresetService>();
 
+        // Инвентарь делит файл с журналом и библиотекой: заводить вторую базу значило бы
+        // получить два места, которые надо раздельно чинить, переносить и подчищать.
+        services.AddSingleton<IDeviceStore>(provider => new SqliteDeviceStore(
+            (SqliteRunStore)provider.GetRequiredService<IRunStore>()));
+
+        // Обнаружение. База OUI встроена в сборку — вендор по MAC входит в уровень 0.
+        services.AddSingleton<IArpResolver, WindowsArpResolver>();
+        services.AddSingleton<IOuiCatalog, OuiCatalog>();
+        services.AddSingleton<IDiscoveryService, DiscoveryService>();
+
+        // Карта сети своих измерений не делает: складывает инвентарь, трассировки
+        // и сетевое окружение, поэтому пересчитывается мгновенно.
+        services.AddSingleton<TopologyService>();
+
         // Отчёты. Движок PDF спрятан за IReportRenderer — замена стоит день, а не месяц.
         services.AddSingleton<IReportRenderer, PdfReportRenderer>();
 
@@ -51,6 +68,12 @@ public static class StormMachineServiceCollectionExtensions
         services.AddSingleton<IHighResolutionClock, HighResolutionClock>();
         services.AddSingleton<INetworkEnvironment, WindowsNetworkEnvironment>();
         services.AddSingleton<TargetResolver>();
+
+        // Обогащение маршрута. База принадлежности адресов не входит в поставку —
+        // её лицензия несовместима с MIT, поэтому оператор кладёт файл сам, а продукт
+        // работает и без него.
+        services.AddSingleton<IAsnDatabase>(_ => AsnDatabase.Open());
+        services.AddSingleton<IHopAnnotator, HopAnnotator>();
 
         // Пробы. Порядок регистрации определяет порядок в `storm probes`:
         // сначала скалярные серии, затем инспекторы, затем анализ пути.

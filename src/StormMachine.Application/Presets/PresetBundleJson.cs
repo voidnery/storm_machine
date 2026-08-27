@@ -19,9 +19,17 @@ namespace StormMachine.Application.Presets;
 /// </remarks>
 public static class PresetBundleJson
 {
-    private static readonly JsonSerializerOptions Options = new(JsonSerializerDefaults.General)
+    /// <summary>
+    /// Контекст с настройками — вместо пары «настройки и резолвер».
+    /// </summary>
+    /// <remarks>
+    /// Разница не косметическая. Перегрузка, принимающая <c>JsonSerializerOptions</c>,
+    /// помечена как несовместимая с обрезкой, и публикация клиента с ней не собирается
+    /// вовсе. Перегрузка, принимающая <c>JsonTypeInfo</c> из контекста, обрезку
+    /// переживает — а настройки при этом задаются самому контексту.
+    /// </remarks>
+    private static readonly PresetJsonContext Context = new(new JsonSerializerOptions(JsonSerializerDefaults.General)
     {
-        TypeInfoResolver = PresetJsonContext.Default,
         WriteIndented = true,
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
@@ -30,19 +38,19 @@ public static class PresetBundleJson
         // и файл перестаёт быть человекочитаемым, ради чего он и задуман. Название
         // кодировщика пугает, но относится к вставке JSON в HTML — здесь это локальный файл.
         Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
-    };
+    });
 
     public static string Write(PresetBundle bundle)
     {
         ArgumentNullException.ThrowIfNull(bundle);
-        return JsonSerializer.Serialize<PresetBundle>(bundle, Options);
+        return JsonSerializer.Serialize(bundle, Context.PresetBundle);
     }
 
     public static PresetBundle Read(string json)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(json);
 
-        var bundle = JsonSerializer.Deserialize<PresetBundle>(json, Options);
+        var bundle = JsonSerializer.Deserialize(json, Context.PresetBundle);
 
         return bundle
                ?? throw new FormatException("Файл пуст или не является набором пресетов Storm Machine.");

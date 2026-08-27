@@ -19,6 +19,7 @@
 *.ico   binary
 *.pdf   binary
 *.mmdb  binary
+*.gz    binary
 *.zip   binary
 *.dll   binary
 *.exe   binary

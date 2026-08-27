@@ -45,6 +45,18 @@ The product degrades honestly rather than demanding everything up front:
 Npcap is **never redistributed** — its license forbids it. The application detects an
 existing installation and explains what is unavailable without one.
 
+**The MAC vendor database** (IEEE registry, 53k entries) **is bundled**: its
+redistribution is unrestricted, and identifying a device's maker has to work right after
+launch and without internet access. Refresh it with `tools/update-oui.cmd`.
+
+**Address ownership data** — the AS numbers shown along a traceroute — comes from the
+offline [DB-IP Lite](https://db-ip.com/db/lite.php) database. Its CC BY-SA 4.0 license
+requires derivatives to inherit the same license, which is incompatible with our MIT
+code, so the database is not bundled. Download `dbip-asn-lite` (and optionally
+`dbip-country-lite`) in `.mmdb` format and drop it into `%LOCALAPPDATA%\StormMachine\geo`;
+no renaming needed, files are matched by pattern. Without it traceroute still works
+and still resolves reverse DNS names.
+
 ## Technology
 
 .NET 10 · Avalonia 12 · ScottPlot · QuestPDF · SharpSnmpLib · Quartz.NET · SQLite

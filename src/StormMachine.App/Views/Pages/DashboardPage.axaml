@@ -18,6 +18,22 @@
                    Foreground="{StaticResource WarningBrush}" />
       </Border>
 
+      <!-- Первый запуск: путь от «запустил» до «вижу свою сеть» не должен
+           требовать чтения документации. -->
+      <Border Padding="16" CornerRadius="6" Background="#16202C"
+              BorderBrush="{StaticResource AccentBrush}" BorderThickness="1"
+              IsVisible="{Binding IsFirstRun}">
+        <StackPanel Spacing="10">
+          <TextBlock Text="С чего начать" FontWeight="SemiBold" FontSize="14" />
+          <TextBlock Text="{Binding FirstRunHint}" FontSize="12.5" TextWrapping="Wrap" Opacity="0.85" />
+          <Button Content="Просканировать мою сеть"
+                  Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).GoToCommand}"
+                  CommandParameter="/local/discovery"
+                  Padding="18,8" HorizontalAlignment="Left"
+                  Background="{StaticResource AccentBrush}" Foreground="White" />
+        </StackPanel>
+      </Border>
+
       <!-- Окружение -->
       <Border Background="{StaticResource PanelBrush}" CornerRadius="6" Padding="16">
         <StackPanel Spacing="10">
@@ -55,6 +71,7 @@
           </Grid>
 
           <TextBlock Text="{Binding JournalInfo}" FontSize="12" Opacity="0.6" TextWrapping="Wrap" />
+          <TextBlock Text="{Binding InventoryInfo}" FontSize="12" Opacity="0.6" TextWrapping="Wrap" />
 
           <ItemsControl ItemsSource="{Binding RecentRuns}">
             <ItemsControl.ItemTemplate>

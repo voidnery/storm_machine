@@ -137,6 +137,10 @@ public sealed class SqliteRunStoreTests : IDisposable
             // CompleteAsync намеренно не вызывается — имитация падения процесса.
         }
 
+        // Отметка жизни отодвигается назад: без этого прогон выглядел бы живым,
+        // и брошенным его признали бы только через отведённый срок молчания.
+        Backdate(id, TimeSpan.FromHours(1));
+
         // Повторное открытие хранилища: именно здесь брошенные прогоны помечаются.
         var reopened = CreateStore();
         await reopened.InitializeAsync();
@@ -151,6 +155,51 @@ public sealed class SqliteRunStoreTests : IDisposable
         // Агрегаты записать было некому — они считаются при чтении.
         Assert.NotEmpty(run.Series);
         Assert.NotNull(run.Summary.MedianMs);
+    }
+
+    /// <summary>
+    /// Живой прогон не должен объявляться прерванным из-за чужого процесса.
+    /// </summary>
+    /// <remarks>
+    /// Пометка брошенных срабатывает при открытии хранилища, а хранилище открывает
+    /// каждый клиент. Консоль, запущенная рядом с приложением, объявляла бы чужое
+    /// идущее измерение прерванным сбоем. С разовыми пробами по секунде это почти
+    /// не встречалось; с часовым MTR стало обычным делом.
+    /// </remarks>
+    [Fact]
+    public async Task LiveRun_IsNotMistakenForAbandoned()
+    {
+        var store = CreateStore();
+        await store.InitializeAsync();
+
+        await using var writer = await store.BeginRunAsync(Descriptor());
+
+        for (var i = 0; i < 5; i++)
+        {
+            await writer.AppendAsync(Ok(i, 1.0 + i));
+        }
+
+        // Второй процесс открывает ту же базу, пока первый ещё пишет.
+        var other = CreateStore();
+        await other.InitializeAsync();
+
+        var run = await other.GetAsync(writer.RunId);
+
+        Assert.NotNull(run);
+        Assert.Equal(RunState.Running, run.Summary.State);
+    }
+
+    /// <summary>Отодвигает отметку жизни прогона назад — имитация молчания.</summary>
+    private void Backdate(Guid id, TimeSpan age)
+    {
+        using var connection = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={_databasePath}");
+        connection.Open();
+
+        using var command = connection.CreateCommand();
+        command.CommandText = "UPDATE runs SET heartbeat_ticks = $ticks WHERE id = $id;";
+        command.Parameters.AddWithValue("$ticks", DateTimeOffset.UtcNow.Subtract(age).UtcTicks);
+        command.Parameters.AddWithValue("$id", id.ToString());
+        command.ExecuteNonQuery();
     }
 
     [Fact]

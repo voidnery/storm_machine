@@ -12,7 +12,7 @@ namespace StormMachine.Storage;
 internal static class StorageSchema
 {
     /// <summary>Текущая версия схемы. Растёт при каждом изменении структуры.</summary>
-    public const int CurrentVersion = 2;
+    public const int CurrentVersion = 5;
 
     public static void EnsureCreated(SqliteConnection connection)
     {
@@ -53,6 +53,24 @@ internal static class StorageSchema
         {
             UpgradeToVersion2(connection);
             version = 2;
+        }
+
+        if (version == 2)
+        {
+            UpgradeToVersion3(connection);
+            version = 3;
+        }
+
+        if (version == 3)
+        {
+            UpgradeToVersion4(connection);
+            version = 4;
+        }
+
+        if (version == 4)
+        {
+            UpgradeToVersion5(connection);
+            version = 5;
         }
 
         WriteVersion(connection, version);
@@ -168,6 +186,144 @@ internal static class StorageSchema
         // и он самодостаточен для истолкования.
         AddColumnIfMissing(connection, "runs", "preset_id", "TEXT");
         AddColumnIfMissing(connection, "runs", "preset_version", "INTEGER");
+    }
+
+    /// <summary>
+    /// Отметка жизни выполняющегося прогона.
+    /// </summary>
+    /// <remarks>
+    /// Понадобилась в И-7. Пометка брошенных прогонов при старте считала незавершённым
+    /// всё, что числится выполняющимся, — и любой второй процесс (консоль рядом
+    /// с приложением) объявлял чужое живое измерение прерванным сбоем. С разовыми
+    /// пробами по секунде это почти не встречалось; с часовым MTR стало нормой.
+    /// <para>
+    /// Отметка обновляется при каждом сбросе пачки сэмплов, то есть не реже, чем
+    /// приходят измерения. Брошенным считается прогон, чья отметка устарела.
+    /// </para>
+    /// </remarks>
+    private static void UpgradeToVersion3(SqliteConnection connection) =>
+        AddColumnIfMissing(connection, "runs", "heartbeat_ticks", "INTEGER");
+
+    /// <summary>
+    /// Инвентарь: сканирования, устройства, свидетельства и журнал активных действий.
+    /// </summary>
+    /// <remarks>
+    /// Двух представлений здесь два не по недосмотру, а по смыслу.
+    /// <list type="bullet">
+    /// <item><c>scan_devices</c> — неизменяемый снимок: что именно было видно в тот раз.
+    /// По нему считаются различия между сканированиями, и переписывать его задним числом
+    /// нельзя, иначе история перестанет быть историей.</item>
+    /// <item><c>devices</c> и <c>device_evidence</c> — сводный инвентарь: всё, что мы
+    /// когда-либо узнали об устройстве. Он пересчитывается при каждом сканировании
+    /// и именно в нём живёт правка оператора.</item>
+    /// </list>
+    /// <para>
+    /// Свидетельства хранятся строками, а не одним полем JSON: по ним нужно искать
+    /// и заменять поштучно — например, чтобы правка оператора перекрыла ровно одно поле,
+    /// не тронув остальные.
+    /// </para>
+    /// </remarks>
+    private static void UpgradeToVersion4(SqliteConnection connection)
+    {
+        Execute(connection, """
+            CREATE TABLE IF NOT EXISTS scans (
+                id               TEXT    NOT NULL PRIMARY KEY,
+                range_text       TEXT    NOT NULL,
+                interface_name   TEXT    NOT NULL,
+                started_ticks    INTEGER NOT NULL,
+                completed_ticks  INTEGER,
+                probed           INTEGER NOT NULL,
+                cancelled        INTEGER NOT NULL DEFAULT 0
+            );
+            """);
+
+        Execute(connection, "CREATE INDEX IF NOT EXISTS ix_scans_started ON scans (started_ticks DESC);");
+
+        Execute(connection, """
+            CREATE TABLE IF NOT EXISTS scan_devices (
+                scan_id       TEXT    NOT NULL,
+                ordinal       INTEGER NOT NULL,
+                address       TEXT    NOT NULL,
+                identity      TEXT    NOT NULL,
+                is_online     INTEGER NOT NULL,
+                evidence_json TEXT    NOT NULL,
+                PRIMARY KEY (scan_id, ordinal)
+            );
+            """);
+
+        Execute(connection, """
+            CREATE TABLE IF NOT EXISTS devices (
+                identity          TEXT    NOT NULL PRIMARY KEY,
+                address           TEXT    NOT NULL,
+                first_seen_ticks  INTEGER NOT NULL,
+                last_seen_ticks   INTEGER NOT NULL,
+                is_online         INTEGER NOT NULL DEFAULT 0
+            );
+            """);
+
+        // Ключ включает значение: одно и то же утверждение от одного источника —
+        // это одно свидетельство, у которого обновляется лишь время наблюдения.
+        // Разные значения от одного источника — разные свидетельства, и решать
+        // между ними должно правило слияния, а не порядок записи.
+        Execute(connection, """
+            CREATE TABLE IF NOT EXISTS device_evidence (
+                identity       TEXT    NOT NULL,
+                source         INTEGER NOT NULL,
+                kind           INTEGER NOT NULL,
+                value          TEXT    NOT NULL,
+                observed_ticks INTEGER NOT NULL,
+                PRIMARY KEY (identity, source, kind, value)
+            );
+            """);
+
+        Execute(connection, """
+            CREATE TABLE IF NOT EXISTS audit (
+                id        TEXT    NOT NULL PRIMARY KEY,
+                at_ticks  INTEGER NOT NULL,
+                action    TEXT    NOT NULL,
+                target    TEXT    NOT NULL,
+                operator_name TEXT NOT NULL,
+                details   TEXT
+            );
+            """);
+
+        Execute(connection, "CREATE INDEX IF NOT EXISTS ix_audit_at ON audit (at_ticks DESC);");
+    }
+
+    /// <summary>
+    /// Все адреса устройства, а не только последний увиденный.
+    /// </summary>
+    /// <remarks>
+    /// Понадобилось сразу после первого боевого сканирования. Маршрутизаторы,
+    /// гипервизоры и хосты с несколькими подсетями занимают несколько адресов одним
+    /// интерфейсом; тождество опознаётся по MAC, и такие записи сводились в одно
+    /// устройство с одним адресом. Снаружи это выглядело потерей: сканирование
+    /// находило 75 адресов, инвентарь перечислял 74 устройства, и разница ничем
+    /// не объяснялась.
+    /// <para>
+    /// Отдельная таблица, а не колонка со списком: по адресам нужно искать —
+    /// в том числе чтобы понять, попадает ли устройство в просканированный диапазон.
+    /// </para>
+    /// </remarks>
+    private static void UpgradeToVersion5(SqliteConnection connection)
+    {
+        Execute(connection, """
+            CREATE TABLE IF NOT EXISTS device_addresses (
+                identity        TEXT    NOT NULL,
+                address         TEXT    NOT NULL,
+                last_seen_ticks INTEGER NOT NULL,
+                PRIMARY KEY (identity, address)
+            );
+            """);
+
+        Execute(connection, "CREATE INDEX IF NOT EXISTS ix_device_addresses ON device_addresses (address);");
+
+        // Существующие устройства переносят свой единственный адрес: иначе после
+        // обновления инвентарь на день остался бы вовсе без адресов.
+        Execute(connection, """
+            INSERT OR IGNORE INTO device_addresses (identity, address, last_seen_ticks)
+            SELECT identity, address, last_seen_ticks FROM devices;
+            """);
     }
 
     private static void AddColumnIfMissing(SqliteConnection connection, string table, string column, string type)
