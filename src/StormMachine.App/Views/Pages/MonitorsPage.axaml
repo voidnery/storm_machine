@@ -1,0 +1,255 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:StormMachine.App.ViewModels"
+             x:Class="StormMachine.App.Views.Pages.MonitorsPage"
+             x:DataType="vm:MonitorsPageViewModel">
+
+  <Grid RowDefinitions="Auto,*" Margin="24,20">
+
+    <StackPanel Grid.Row="0" Spacing="4" Margin="0,0,0,12">
+      <Grid ColumnDefinitions="*,Auto,Auto,Auto,Auto,Auto">
+        <TextBlock Grid.Column="0" Text="{Binding Title}" FontSize="24" FontWeight="SemiBold" />
+        <Button Grid.Column="1" Content="Завести" Command="{Binding ToggleEditorCommand}"
+                Padding="14,5" Margin="0,0,8,0"
+                Background="{StaticResource AccentBrush}" Foreground="White" />
+        <Button Grid.Column="2" Content="Проверить сейчас" Command="{Binding RunNowCommand}" Padding="12,5" Margin="0,0,8,0" />
+        <Button Grid.Column="3" Content="Вкл / выкл" Command="{Binding ToggleCommand}" Padding="12,5" Margin="0,0,8,0" />
+        <Button Grid.Column="4" Content="Обновить" Command="{Binding RefreshCommand}" Padding="12,5" Margin="0,0,8,0" />
+        <Button Grid.Column="5" Content="Удалить" Command="{Binding DeleteCommand}" Padding="12,5" />
+      </Grid>
+
+      <TextBlock Text="{Binding SchedulerState}" FontSize="11" Opacity="0.55" TextWrapping="Wrap" />
+
+      <TextBlock Text="{Binding Message}" FontSize="12" Foreground="#7DD3A0" TextWrapping="Wrap"
+                 IsVisible="{Binding Message, Converter={x:Static ObjectConverters.IsNotNull}}" />
+      <TextBlock Text="{Binding ErrorMessage}" FontSize="12" Foreground="{StaticResource DangerBrush}" TextWrapping="Wrap"
+                 IsVisible="{Binding ErrorMessage, Converter={x:Static ObjectConverters.IsNotNull}}" />
+    </StackPanel>
+
+    <Grid Grid.Row="1" ColumnDefinitions="380,*">
+
+      <!-- Список мониторов -->
+      <Border Grid.Column="0" Background="{StaticResource PanelBrush}" CornerRadius="6" Padding="8">
+        <ListBox ItemsSource="{Binding Monitors}"
+                 SelectedItem="{Binding Selected}"
+                 Background="Transparent" BorderThickness="0">
+          <ListBox.ItemTemplate>
+            <DataTemplate x:DataType="vm:MonitorRow">
+              <Grid ColumnDefinitions="Auto,*,Auto" Margin="0,4">
+
+                <!-- Цвет состояния — не украшение: это первое, что читают в списке -->
+                <Border Grid.Column="0" Width="8" Height="8" CornerRadius="4" VerticalAlignment="Center"
+                        Background="{Binding Level, Converter={x:Static vm:VerdictBrushConverter.Instance}}" />
+
+                <StackPanel Grid.Column="1" Spacing="1" Margin="10,0">
+                  <TextBlock Text="{Binding Name}" FontSize="13" TextTrimming="CharacterEllipsis" />
+                  <TextBlock Text="{Binding Subject}" FontSize="10" Opacity="0.5" TextTrimming="CharacterEllipsis" />
+                  <TextBlock Text="{Binding Schedule}" FontSize="10" Opacity="0.45" />
+                </StackPanel>
+
+                <StackPanel Grid.Column="2" Spacing="1" HorizontalAlignment="Right">
+                  <TextBlock Text="{Binding StateText}" FontSize="11" HorizontalAlignment="Right" />
+                  <TextBlock Text="{Binding NextText}" FontSize="10" Opacity="0.5" HorizontalAlignment="Right" />
+                  <TextBlock Text="алерт поднят" FontSize="10" HorizontalAlignment="Right"
+                             Foreground="{StaticResource DangerBrush}"
+                             IsVisible="{Binding IsAlerting}" />
+                </StackPanel>
+              </Grid>
+            </DataTemplate>
+          </ListBox.ItemTemplate>
+        </ListBox>
+      </Border>
+
+      <!-- Форма заведения. Занимает место подробностей, но не список: выбранный
+           монитор остаётся на виду, и с него можно списать настройки. -->
+      <Border Grid.Column="1" Margin="14,0,0,0" Background="{StaticResource PanelBrush}" CornerRadius="6"
+              Padding="16" IsVisible="{Binding IsEditorOpen}">
+        <Grid RowDefinitions="*,Auto">
+
+          <ScrollViewer Grid.Row="0" DataContext="{Binding Editor}">
+            <StackPanel x:DataType="vm:MonitorEditorViewModel" Spacing="12" Margin="0,0,10,0">
+
+              <TextBlock Text="Новый монитор" FontSize="14" FontWeight="SemiBold" />
+
+              <StackPanel Spacing="3">
+                <TextBlock Text="Имя" FontSize="11" Opacity="0.6" />
+                <TextBox PlaceholderText="шлюз, сайт заказчика" Text="{Binding Name}" />
+              </StackPanel>
+
+              <StackPanel Spacing="3">
+                <TextBlock Text="Что проверять" FontSize="11" Opacity="0.6" />
+                <ComboBox ItemsSource="{Binding Subjects}" SelectedItem="{Binding Subject}"
+                          HorizontalAlignment="Stretch" />
+                <TextBlock Text="{Binding TargetHint}" FontSize="10" Opacity="0.5" TextWrapping="Wrap" />
+              </StackPanel>
+
+              <StackPanel Spacing="3">
+                <TextBlock Text="Цель" FontSize="11" Opacity="0.6" />
+                <TextBox PlaceholderText="адрес, имя узла или URL" Text="{Binding Target}" />
+              </StackPanel>
+
+              <StackPanel Spacing="3">
+                <TextBlock Text="Как часто" FontSize="11" Opacity="0.6" />
+                <ComboBox ItemsSource="{Binding Schedules}" SelectedItem="{Binding Schedule}"
+                          HorizontalAlignment="Stretch" />
+
+                <!-- Cron вводится текстом: строка «0 3 * * 1-5» короче и точнее
+                     любого набора выпадающих списков -->
+                <TextBox PlaceholderText="0 3 * * *" Text="{Binding Cron}"
+                         IsVisible="{Binding NeedsCronText}" Margin="0,3,0,0" />
+                <TextBlock Text="{x:Static vm:MonitorEditorViewModel.CronHint}" FontSize="10" Opacity="0.5"
+                           TextWrapping="Wrap" IsVisible="{Binding NeedsCronText}" />
+              </StackPanel>
+
+              <CheckBox Content="После простоя выполнить один раз" IsChecked="{Binding CatchUp}" />
+
+              <StackPanel Spacing="4">
+                <TextBlock Text="Пороги" FontSize="11" Opacity="0.6" />
+
+                <Grid ColumnDefinitions="*,Auto">
+                  <TextBox Grid.Column="0" PlaceholderText="p95 &lt; 50" Text="{Binding ThresholdText}" />
+                  <Button Grid.Column="1" Content="Добавить" Command="{Binding AddThresholdCommand}"
+                          Padding="12,5" Margin="6,0,0,0" />
+                </Grid>
+
+                <ItemsControl ItemsSource="{Binding Thresholds}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="x:String">
+                      <Grid ColumnDefinitions="*,Auto" Margin="0,2">
+                        <TextBlock Grid.Column="0" Text="{Binding}" FontSize="12" VerticalAlignment="Center"
+                                   FontFamily="Consolas,Menlo,monospace" />
+                        <Button Grid.Column="1" Content="убрать" Padding="8,2" FontSize="10"
+                                Command="{Binding $parent[ItemsControl].((vm:MonitorEditorViewModel)DataContext).RemoveThresholdCommand}"
+                                CommandParameter="{Binding}" />
+                      </Grid>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
+                <TextBlock FontSize="10" Opacity="0.5" TextWrapping="Wrap"
+                           Text="Без порогов монитор копит историю, но ни о чём не судит." />
+              </StackPanel>
+
+              <CheckBox Content="Оповещать" IsChecked="{Binding Alert}" />
+
+              <StackPanel Spacing="6" IsVisible="{Binding Alert}" Margin="18,0,0,0">
+                <Grid ColumnDefinitions="*,10,*">
+                  <StackPanel Grid.Column="0" Spacing="2">
+                    <TextBlock Text="Поднять после, проверок" FontSize="10" Opacity="0.6" />
+                    <NumericUpDown Value="{Binding RaiseAfter}" Minimum="1" Maximum="20" Increment="1"
+                                   FormatString="0" />
+                  </StackPanel>
+                  <StackPanel Grid.Column="2" Spacing="2">
+                    <TextBlock Text="Снять после, проверок" FontSize="10" Opacity="0.6" />
+                    <NumericUpDown Value="{Binding ClearAfter}" Minimum="1" Maximum="20" Increment="1"
+                                   FormatString="0" />
+                  </StackPanel>
+                </Grid>
+
+                <StackPanel Spacing="2">
+                  <TextBlock Text="Пауза между оповещениями" FontSize="10" Opacity="0.6" />
+                  <TextBox PlaceholderText="15м" Text="{Binding Cooldown}" />
+                </StackPanel>
+
+                <TextBlock Text="{x:Static vm:MonitorEditorViewModel.HysteresisHint}"
+                           FontSize="10" Opacity="0.5" TextWrapping="Wrap" LineHeight="15" />
+              </StackPanel>
+
+              <StackPanel Spacing="3">
+                <TextBlock Text="Окно обслуживания" FontSize="11" Opacity="0.6" />
+                <TextBox PlaceholderText="пн-пт 02:00-04:00 регламент" Text="{Binding Maintenance}" />
+                <TextBlock FontSize="10" Opacity="0.5" TextWrapping="Wrap"
+                           Text="Проверки в это окно не идут, а время не считается ни простоем, ни работой." />
+              </StackPanel>
+
+              <StackPanel Spacing="3">
+                <TextBlock Text="Цель по доступности, %" FontSize="11" Opacity="0.6" />
+                <NumericUpDown Value="{Binding ObjectivePercent}" Minimum="50" Maximum="100"
+                               Increment="0.1" FormatString="0.###" />
+                <TextBlock Text="{Binding ObjectiveHint}" FontSize="10" Opacity="0.5" TextWrapping="Wrap" />
+              </StackPanel>
+
+              <!-- Что получится, сказанное словами: форма объясняет свой смысл
+                   до нажатия кнопки, а не после -->
+              <Border Padding="12,10" CornerRadius="4" Background="#232B3B">
+                <StackPanel Spacing="4">
+                  <TextBlock Text="Получится" FontSize="11" FontWeight="SemiBold" Opacity="0.75" />
+                  <TextBlock Text="{Binding Preview}" FontSize="11" TextWrapping="Wrap" LineHeight="17" />
+                </StackPanel>
+              </Border>
+
+              <TextBlock Text="{Binding Error}" FontSize="11" TextWrapping="Wrap"
+                         Foreground="{StaticResource DangerBrush}"
+                         IsVisible="{Binding Error, Converter={x:Static ObjectConverters.IsNotNull}}" />
+
+            </StackPanel>
+          </ScrollViewer>
+
+          <!-- Кнопки живут вне области формы: их команды принадлежат экрану, а не форме -->
+          <Grid Grid.Row="1" ColumnDefinitions="*,Auto" Margin="0,12,0,0">
+            <Button Grid.Column="0" Content="Отмена" Command="{Binding ToggleEditorCommand}"
+                    Padding="14,6" HorizontalAlignment="Left" />
+            <Button Grid.Column="1" Content="Завести монитор" Command="{Binding CreateCommand}"
+                    Padding="18,6" Background="{StaticResource AccentBrush}" Foreground="White" />
+          </Grid>
+        </Grid>
+      </Border>
+
+      <!-- Подробности -->
+      <Border Grid.Column="1" Margin="14,0,0,0" Background="{StaticResource PanelBrush}" CornerRadius="6" Padding="16"
+              IsVisible="{Binding !IsEditorOpen}">
+        <ScrollViewer>
+          <StackPanel Spacing="14">
+
+            <TextBlock Text="{Binding Details}" FontSize="13" TextWrapping="Wrap" LineHeight="20" />
+
+            <Border Padding="12,10" CornerRadius="4" Background="#232B3B"
+                    IsVisible="{Binding AvailabilityText, Converter={x:Static ObjectConverters.IsNotNull}}">
+              <StackPanel Spacing="6">
+                <TextBlock Text="Доступность" FontSize="12" FontWeight="SemiBold" Opacity="0.8" />
+                <TextBlock Text="{Binding AvailabilityText}" FontSize="12" TextWrapping="Wrap" LineHeight="19" />
+
+                <!-- Оговорка о покрытии не прячется: 100% при покрытии 4% —
+                     это отсутствие данных, а не отличная сеть -->
+                <Border Padding="9,6" CornerRadius="3" Background="#3A2E12"
+                        IsVisible="{Binding CoverageNotice, Converter={x:Static ObjectConverters.IsNotNull}}">
+                  <TextBlock Text="{Binding CoverageNotice}" FontSize="11" TextWrapping="Wrap" />
+                </Border>
+              </StackPanel>
+            </Border>
+
+            <StackPanel Spacing="6" IsVisible="{Binding HasChecks}">
+              <TextBlock Text="Последние проверки" FontSize="12" FontWeight="SemiBold" Opacity="0.8" />
+
+              <ItemsControl ItemsSource="{Binding Checks}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="vm:CheckRow">
+                    <Grid ColumnDefinitions="130,120,*" Margin="0,2">
+                      <TextBlock Grid.Column="0" Text="{Binding When}" FontSize="11" Opacity="0.6"
+                                 FontFamily="Consolas,Menlo,monospace" />
+                      <TextBlock Grid.Column="1" Text="{Binding State}" FontSize="11">
+                        <TextBlock.Styles>
+                          <Style Selector="TextBlock">
+                            <Setter Property="Opacity" Value="0.85" />
+                          </Style>
+                        </TextBlock.Styles>
+                      </TextBlock>
+                      <TextBlock Grid.Column="2" Text="{Binding Summary}" FontSize="11"
+                                 TextTrimming="CharacterEllipsis"
+                                 Opacity="{Binding IsGap, Converter={x:Static vm:GapOpacityConverter.Instance}}" />
+                    </Grid>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </StackPanel>
+
+            <TextBlock FontSize="11" Opacity="0.5" TextWrapping="Wrap"
+                       Text="Форма даёт разумные умолчания; полная власть над расписанием и гистерезисом —
+                             у storm monitors add. Экран и консоль работают с одной базой и одним планировщиком." />
+
+          </StackPanel>
+        </ScrollViewer>
+      </Border>
+    </Grid>
+  </Grid>
+</UserControl>

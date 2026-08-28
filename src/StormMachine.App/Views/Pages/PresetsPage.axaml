@@ -46,7 +46,7 @@
                     <TextBlock Text="{Binding Name}" FontSize="13" TextTrimming="CharacterEllipsis" />
                     <StackPanel Orientation="Horizontal" Spacing="8">
                       <Border Background="#2E3648" CornerRadius="3" Padding="5,1">
-                        <TextBlock Text="{Binding ProbeName}" FontSize="10" />
+                        <TextBlock Text="{Binding Subject}" FontSize="10" />
                       </Border>
                       <TextBlock Text="{Binding Target.DisplayName}" FontSize="10" Opacity="0.5"
                                  VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />

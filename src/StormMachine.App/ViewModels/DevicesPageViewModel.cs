@@ -205,7 +205,7 @@ public sealed partial class DevicesPageViewModel(
 
             Rows.Clear();
 
-            foreach (var device in _devices.OrderBy(d => Order(d.Address)))
+            foreach (var device in _devices.OrderBy(d => IpAddressOrder.Of(d.Address)))
             {
                 Rows.Add(InventoryRow.From(device));
             }
@@ -235,17 +235,4 @@ public sealed partial class DevicesPageViewModel(
         }
     }
 
-    /// <summary>Числовой порядок адреса — чтобы список шёл как в сети, а не как в словаре.</summary>
-    private static uint Order(string address)
-    {
-        if (!System.Net.IPAddress.TryParse(address, out var parsed)
-            || parsed.AddressFamily != System.Net.Sockets.AddressFamily.InterNetwork)
-        {
-            return uint.MaxValue;
-        }
-
-        var bytes = parsed.GetAddressBytes();
-
-        return ((uint)bytes[0] << 24) | ((uint)bytes[1] << 16) | ((uint)bytes[2] << 8) | bytes[3];
-    }
 }

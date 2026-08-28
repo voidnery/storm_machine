@@ -1,5 +1,6 @@
 using System.Globalization;
 using StormMachine.Domain.Discovery;
+using StormMachine.Domain.Snmp;
 
 namespace StormMachine.Domain.Topology;
 
@@ -13,6 +14,9 @@ public enum TopologyNodeKind
     Subnet,
 
     Router,
+
+    /// <summary>Коммутатор: опрошен по SNMP или объявлен соседом по LLDP.</summary>
+    Switch,
 
     Host,
 
@@ -155,6 +159,27 @@ public sealed record TopologyInput
 
     /// <summary>Подсети, которые оператор развернул целиком.</summary>
     public IReadOnlyList<string> ExpandedSubnets { get; init; } = [];
+
+    /// <summary>
+    /// Устройства, опрошенные по SNMP.
+    /// </summary>
+    /// <remarks>
+    /// Ради них и делался уровень 1. Без них карта отвечает «эти узлы в одном
+    /// широковещательном домене», с ними — «это устройство воткнуто вот в этот порт
+    /// вот этого коммутатора». Разница между догадкой и фактом, и на карте она
+    /// обязана быть видна.
+    /// </remarks>
+    public IReadOnlyList<SnmpDevice> Switches { get; init; } = [];
+
+    /// <summary>
+    /// Правки оператора: связи, которых инструмент не увидел, и связи, которые он
+    /// вывел ошибочно.
+    /// </summary>
+    /// <remarks>
+    /// Применяются последними и перекрывают наблюдения: у человека, который видел
+    /// провод, свидетельство весомее любой эвристики.
+    /// </remarks>
+    public IReadOnlyList<TopologyEdit> Edits { get; init; } = [];
 }
 
 /// <summary>
@@ -201,8 +226,14 @@ public sealed record TopologyGraph
 
         builder.AddThisMachine();
         builder.AddSubnets();
+
+        // Коммутаторы добавляются до устройств: узел, у которого нашёлся порт
+        // коммутатора, цепляется к нему, а не к подсети, и коммутатор к этому
+        // моменту уже должен быть на карте.
+        builder.AddSwitches();
         builder.AddDevices();
         builder.AddPaths();
+        builder.ApplyEdits();
 
         return builder.Finish();
     }
@@ -222,6 +253,14 @@ public sealed record TopologyGraph
 
         /// <summary>В каких трассировках встретился внешний узел.</summary>
         private readonly Dictionary<string, List<string>> _seenIn = new(StringComparer.Ordinal);
+
+        /// <summary>Связи, которые оператор объявил ошибочными, — в обе стороны.</summary>
+        private readonly HashSet<(string From, string To)> _removed = [];
+
+        /// <summary>MAC-адрес → порт коммутатора, в который он воткнут.</summary>
+        private readonly Dictionary<string, (string SwitchId, string Port)> _wired =
+            new(StringComparer.OrdinalIgnoreCase);
+
         private readonly TopologyInput _input = input;
 
         public void AddThisMachine()
@@ -306,6 +345,139 @@ public sealed record TopologyGraph
             EnsureInternet();
         }
 
+        /// <summary>
+        /// Коммутаторы, опрошенные по SNMP.
+        /// </summary>
+        /// <remarks>
+        /// Здесь карта перестаёт быть догадкой. Ответ на ARP говорит «в одном
+        /// широковещательном домене»; таблица пересылки коммутатора говорит
+        /// «в порту Gi0/2», и это разные утверждения по силе.
+        /// </remarks>
+        public void AddSwitches()
+        {
+            foreach (var device in _input.Switches.OrderBy(d => d.Address, StringComparer.Ordinal))
+            {
+                AddSwitch(device);
+            }
+
+            // Соседи добавляются после всех коммутаторов: связь между двумя опрошенными
+            // устройствами должна соединять их узлы, а не плодить двойников по имени.
+            foreach (var device in _input.Switches.OrderBy(d => d.Address, StringComparer.Ordinal))
+            {
+                AddNeighbors(device);
+            }
+        }
+
+        private void AddSwitch(SnmpDevice device)
+        {
+            var id = SwitchId(device.Address);
+
+            Add(new TopologyNode
+            {
+                Id = id,
+                Kind = TopologyNodeKind.Switch,
+                Label = device.DisplayName,
+                Address = device.Address,
+                Detail = $"{device.System.ShortDescription}; работает {device.System.DescribeUpTime()}",
+            });
+
+            foreach (var subnet in _input.Subnets)
+            {
+                if (InSubnet(device.Address, subnet))
+                {
+                    _links.Add(new TopologyLink(
+                        SubnetId(subnet.Cidr),
+                        id,
+                        LinkKind.Layer2,
+                        LinkConfidence.Confirmed,
+                        "коммутатор отвечает по SNMP с адресом в этой сети"));
+                }
+            }
+
+            RememberPorts(device, id);
+        }
+
+        /// <summary>
+        /// Запоминает, какой адрес в каком порту.
+        /// </summary>
+        /// <remarks>
+        /// Берутся только порты с <b>ровно одним</b> выученным адресом. Порт, за которым
+        /// видно десять адресов, ведёт не к десяти компьютерам, а к следующему
+        /// коммутатору, и цеплять к нему устройства поимённо значило бы нарисовать
+        /// заведомо неверную картину.
+        /// </remarks>
+        private void RememberPorts(SnmpDevice device, string switchId)
+        {
+            foreach (var port in device.Ports())
+            {
+                if (port.Neighbors.Count > 0 || port.SoleAddress is not { } mac || !port.Interface.IsPhysical)
+                {
+                    continue;
+                }
+
+                _wired[mac] = (switchId, port.Interface.DisplayName);
+            }
+        }
+
+        /// <summary>
+        /// Соседи, объявленные самим устройством.
+        /// </summary>
+        /// <remarks>
+        /// Самое сильное свидетельство о втором уровне: устройство называет и свой порт,
+        /// и порт соседа. Оговорка в строке «почему» обязательна — между двумя
+        /// объявившимися соседями может стоять неуправляемый коммутатор.
+        /// </remarks>
+        private void AddNeighbors(SnmpDevice device)
+        {
+            var from = SwitchId(device.Address);
+
+            foreach (var neighbor in device.Neighbors.OrderBy(n => n.LocalIfIndex))
+            {
+                var to = FindNeighbor(neighbor) ?? SwitchId(neighbor.DisplayName);
+
+                if (!_nodes.ContainsKey(to))
+                {
+                    Add(new TopologyNode
+                    {
+                        Id = to,
+                        Kind = TopologyNodeKind.Switch,
+                        Label = neighbor.DisplayName,
+                        Address = neighbor.RemoteAddress,
+                        MacAddress = neighbor.RemoteChassisId,
+                        Detail = neighbor.RemoteDescription is { } about
+                            ? $"{about}; объявлен соседом, сам не опрошен"
+                            : "объявлен соседом, сам не опрошен",
+                    });
+                }
+
+                if (!string.Equals(from, to, StringComparison.Ordinal))
+                {
+                    _links.Add(new TopologyLink(from, to, LinkKind.Layer2, LinkConfidence.Confirmed,
+                        neighbor.Because + " — между ними может стоять неуправляемый коммутатор"));
+                }
+            }
+        }
+
+        /// <summary>Узел соседа среди уже опрошенных: по имени или по адресу управления.</summary>
+        private string? FindNeighbor(SnmpNeighbor neighbor)
+        {
+            foreach (var known in _input.Switches)
+            {
+                var matches =
+                    (neighbor.RemoteAddress is { } address
+                     && string.Equals(known.Address, address, StringComparison.Ordinal))
+                    || (neighbor.RemoteName is { } name
+                        && string.Equals(known.System.Name, name, StringComparison.OrdinalIgnoreCase));
+
+                if (matches)
+                {
+                    return SwitchId(known.Address);
+                }
+            }
+
+            return null;
+        }
+
         public void AddDevices()
         {
             foreach (var subnet in _input.Subnets)
@@ -321,13 +493,19 @@ public sealed record TopologyGraph
 
             // Порядок фиксирован: карта обязана получаться одинаковой при каждом
             // пересчёте, иначе «что изменилось» покажет перестановку вместо изменений.
+            //
+            // Устройства, которых касались правки оператора, идут первыми и в свёртку
+            // не попадают. Если человек нарисовал к узлу связь, он этим узлом занят —
+            // спрятать его в счётчик значило бы стереть его же работу.
             var members = _input.Devices
                 .Where(d => !_nodes.ContainsKey(d.Identity) && BelongsTo(d, subnet))
-                .OrderBy(d => AddressOrder(d.Address))
+                .OrderByDescending(d => IsEdited(d))
+                .ThenBy(d => IpAddressOrder.Of(d.Address))
                 .ThenBy(d => d.Identity, StringComparer.Ordinal)
                 .ToList();
 
-            var shown = expanded ? members.Count : Math.Min(members.Count, _input.CollapseThreshold);
+            var pinned = members.Count(IsEdited);
+            var shown = expanded ? members.Count : Math.Max(pinned, Math.Min(members.Count, _input.CollapseThreshold));
 
             for (var i = 0; i < shown; i++)
             {
@@ -377,6 +555,20 @@ public sealed record TopologyGraph
                     ? "ещё адреса: " + string.Join(", ", device.ExtraAddresses)
                     : null,
             });
+
+            // Порт коммутатора весит больше принадлежности подсети: он называет
+            // не «где-то в этом домене», а «вот в этом гнезде».
+            if (device.MacAddress is { } mac && _wired.TryGetValue(mac, out var wired))
+            {
+                _links.Add(new TopologyLink(
+                    wired.SwitchId,
+                    device.Identity,
+                    LinkKind.Layer2,
+                    LinkConfidence.Confirmed,
+                    $"порт {wired.Port}: адрес выучен таблицей пересылки коммутатора (BRIDGE-MIB)"));
+
+                return;
+            }
 
             var (confidence, because) = Adjacency(device);
 
@@ -538,6 +730,98 @@ public sealed record TopologyGraph
             }
         }
 
+        /// <summary>
+        /// Накладывает правки оператора поверх наблюдений.
+        /// </summary>
+        /// <remarks>
+        /// Порядок обязателен: правки идут последними и перекрывают всё, что вывел
+        /// инструмент. Человек, который видел провод, знает больше любой эвристики —
+        /// и его связь помечается подтверждённой, а не выведенной.
+        /// <para>
+        /// Скрытые узлы удаляются вместе со своими связями: узел, которого нет,
+        /// не может быть ни к чему подключён.
+        /// </para>
+        /// </remarks>
+        public void ApplyEdits()
+        {
+            foreach (var edit in _input.Edits.OrderBy(e => e.AtUtc).ThenBy(e => e.Id))
+            {
+                switch (edit.Kind)
+                {
+                    case TopologyEditKind.AddLink when edit.Target is { } target:
+                        AddManualLink(edit, target);
+                        break;
+
+                    case TopologyEditKind.RemoveLink when edit.Target is { } target:
+                        Forbid(edit.Subject, target);
+                        break;
+
+                    case TopologyEditKind.HideNode:
+                        if (FindNode(edit.Subject) is { } hidden)
+                        {
+                            _nodes.Remove(hidden);
+                        }
+
+                        break;
+
+                    default:
+                        break;
+                }
+            }
+        }
+
+        /// <summary>Запрещает связь в обе стороны: направление рисования не должно решать.</summary>
+        private void Forbid(string subject, string target)
+        {
+            var from = FindNode(subject) ?? subject;
+            var to = FindNode(target) ?? target;
+
+            _removed.Add((from, to));
+            _removed.Add((to, from));
+        }
+
+        private void AddManualLink(TopologyEdit edit, string target)
+        {
+            var from = FindNode(edit.Subject);
+            var to = FindNode(target);
+
+            if (from is null || to is null)
+            {
+                // Связь к несуществующему узлу молча пропускается: устройство могло
+                // исчезнуть из сети после того, как оператор её нарисовал. Сама правка
+                // при этом остаётся — вернётся устройство, вернётся и связь.
+                return;
+            }
+
+            _links.Add(new TopologyLink(
+                from,
+                to,
+                LinkKind.Layer2,
+                LinkConfidence.Confirmed,
+                edit.Note is { Length: > 0 } note
+                    ? $"связь указана оператором: {note}"
+                    : "связь указана оператором"));
+        }
+
+        /// <summary>Находит узел по тождеству или по адресу — оператор называет и так, и так.</summary>
+        private string? FindNode(string reference)
+        {
+            if (_nodes.ContainsKey(reference))
+            {
+                return reference;
+            }
+
+            foreach (var node in _nodes.Values)
+            {
+                if (string.Equals(node.Address, reference, StringComparison.Ordinal))
+                {
+                    return node.Id;
+                }
+            }
+
+            return null;
+        }
+
         private void EnsureInternet() => Add(new TopologyNode
         {
             Id = InternetId,
@@ -559,6 +843,13 @@ public sealed record TopologyGraph
                     continue;
                 }
 
+                // Связь, объявленную оператором ошибочной, не рисуем — сколько бы
+                // наблюдений её ни подтверждало.
+                if (_removed.Contains((link.From, link.To)))
+                {
+                    continue;
+                }
+
                 var key = (link.From, link.To, link.Kind);
 
                 if (!best.TryGetValue(key, out var existing) || link.Confidence < existing.Confidence)
@@ -571,7 +862,7 @@ public sealed record TopologyGraph
             {
                 Nodes = [.. _nodes.Values
                     .OrderBy(n => (int)n.Kind)
-                    .ThenBy(n => AddressOrder(n.Address ?? string.Empty))
+                    .ThenBy(n => IpAddressOrder.Of(n.Address))
                     .ThenBy(n => n.Id, StringComparer.Ordinal)],
                 Links = [.. best.Values
                     .OrderBy(l => l.From, StringComparer.Ordinal)
@@ -605,21 +896,58 @@ public sealed record TopologyGraph
             return addresses.Any(a => System.Net.IPAddress.TryParse(a, out var parsed) && range.Contains(parsed));
         }
 
-        private static string SubnetId(string cidr) => "сеть:" + cidr;
-    }
-
-    /// <summary>Числовой порядок адреса — чтобы узлы шли как в сети, а не как в словаре.</summary>
-    private static uint AddressOrder(string address)
-    {
-        if (!System.Net.IPAddress.TryParse(address, out var parsed)
-            || parsed.AddressFamily != System.Net.Sockets.AddressFamily.InterNetwork)
+        /// <summary>Касались ли этого устройства правки оператора.</summary>
+        private bool IsEdited(Device device)
         {
-            return uint.MaxValue;
+            foreach (var edit in _input.Edits)
+            {
+                if (Mentions(edit, device))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
-        var bytes = parsed.GetAddressBytes();
+        private static bool Mentions(TopologyEdit edit, Device device)
+        {
+            if (Matches(edit.Subject, device) || (edit.Target is { } target && Matches(target, device)))
+            {
+                return edit.Kind != TopologyEditKind.HideNode;
+            }
 
-        return ((uint)bytes[0] << 24) | ((uint)bytes[1] << 16) | ((uint)bytes[2] << 8) | bytes[3];
+            return false;
+        }
+
+        /// <summary>
+        /// Правка может называть устройство и тождеством, и адресом.
+        /// </summary>
+        /// <remarks>
+        /// Оператор набирает то, что видит на экране, а видит он чаще адрес. Требовать
+        /// от него MAC значило бы сделать правку неудобной ровно там, где она нужна.
+        /// </remarks>
+        private static bool Matches(string reference, Device device) =>
+            string.Equals(reference, device.Identity, StringComparison.OrdinalIgnoreCase)
+            || device.Addresses.Contains(reference, StringComparer.Ordinal)
+            || string.Equals(reference, device.Address, StringComparison.Ordinal);
+
+        private static string SubnetId(string cidr) => "сеть:" + cidr;
+
+        private static string SwitchId(string address) => "свитч:" + address;
+
+        private static bool InSubnet(string address, LocalSubnet subnet)
+        {
+            try
+            {
+                return System.Net.IPAddress.TryParse(address, out var parsed)
+                       && AddressRange.Parse(subnet.Cidr).Contains(parsed);
+            }
+            catch (Exception ex) when (ex is FormatException or ArgumentException)
+            {
+                return false;
+            }
+        }
     }
 
     private static string Plural(int count, string one, string few, string many)

@@ -1,9 +1,12 @@
+<img src="assets/spike/spike-256.png" width="96" align="right" alt="Storm Machine">
+
 # Storm Machine
 
 Настольная станция тестирования и диагностики сетей под Windows — один инструмент вместо
 россыпи утилит, с памятью, расписанием и отчётностью.
 
-> **Статус: проектирование и ранняя разработка.** Пригодной для использования сборки пока нет.
+> **Статус: MVP собран, первый выпуск готовится.** Уровень 0 работает целиком; собранного
+> выпуска в разделе Releases пока нет.
 > English: [README.md](README.md)
 
 ## Что это
@@ -60,7 +63,12 @@ Npcap **никогда не распространяется вместе с п�
 
 ## Технологии
 
-.NET 10 · Avalonia 12 · ScottPlot · QuestPDF · SharpSnmpLib · Quartz.NET · SQLite
+.NET 10 · Avalonia 12 · ScottPlot · QuestPDF · MSAGL · Velopack · SQLite
+
+Quartz.NET значился здесь до И-14 и был отвергнут по итогам проверки: под обрезкой
+публикации он падает молча. Планировщик написан свой — [R-15](docs/02-research.md).
+Velopack ту же проверку прошёл — [R-19](docs/02-research.md). SharpSnmpLib появится
+с уровнем 1.
 
 Обоснование — в [ADR-0001](docs/adr/ADR-0001-technology-stack.md).
 
@@ -74,6 +82,7 @@ Npcap **никогда не распространяется вместе с п�
 | [STATUS.md](docs/STATUS.md) | Где проект находится прямо сейчас |
 | [ARCHITECTURE.md](docs/ARCHITECTURE.md) | Карта кода и границы |
 | [GITHUB-SETUP.md](docs/GITHUB-SETUP.md) | Репозиторий, подпись и порядок релизов |
+| [SIGNPATH.md](docs/SIGNPATH.md) | Заявка в SignPath Foundation: что готово, что делать руками |
 
 В каталоге [`spikes/`](spikes) лежат исследовательские программы, давшие цифры
 из документа исследования — они воспроизводимы.

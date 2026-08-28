@@ -1,6 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
+    <ApplicationIcon>Assets\storm.ico</ApplicationIcon>
+  </PropertyGroup>
+
+  <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <!-- Целевая платформа с суффиксом windows: клиент собирает те же службы,
          что и консоль, а корень композиции тянет платформенный слой с P/Invoke. -->
@@ -17,11 +21,6 @@
          вернём COM и примем размер, но не раньше, чем эта функция реально появится. -->
     <BuiltInComInteropSupport>false</BuiltInComInteropSupport>
 
-    <!-- IL2104 сообщает, что сборка движка раскладки содержит места, опасные при обрезке.
-         Это правда, и потому она целиком внесена в корни обрезчика ниже: внутри неё
-         ничего не выкидывается, и предупреждение перестаёт описывать наш случай.
-         Гасится точечно — общий TreatWarningsAsErrors остаётся в силе. -->
-    <NoWarn>$(NoWarn);IL2104</NoWarn>
   </PropertyGroup>
 
   <!-- Параметры публикации закреплены здесь, а не в командной строке: локальная сборка
@@ -31,17 +30,20 @@
     <SelfContained>true</SelfContained>
     <PublishSingleFile>true</PublishSingleFile>
     <PublishTrimmed>true</PublishTrimmed>
+
+    <!-- Клиент несёт ядро продукта целиком, а с ним движок раскладки графа.
+         Что из этого следует для обрезки — в Directory.Build.targets. -->
+    <HostsProductCore>true</HostsProductCore>
     <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
   </PropertyGroup>
 
   <!-- Только слой приложения и корень композиции. Ссылок на инфраструктуру нет
        и быть не должно — это проверяется архитектурным тестом. -->
-  <!-- Движок раскладки не разбирается обрезчиком: внутри него рефлексия, и попытка
-       выкинуть «лишнее» кончилась бы падением у пользователя, а не при сборке.
-       Сборка кладётся целиком. Измерено: 54.5 МБ без этой строки против 56.7 МБ с ней —
-       2.2 МБ за то, чтобы карта сети не отвалилась молча. -->
+  <!-- Знак продукта. Один и тот же файл идёт иконкой исполняемого файла
+       и ресурсом для окна и значка в трее: расходиться им незачем.
+       Пересоздаётся генератором tools/logo — см. assets/README.md. -->
   <ItemGroup>
-    <TrimmerRootAssembly Include="AutomaticGraphLayout" />
+    <AvaloniaResource Include="Assets\**" />
   </ItemGroup>
 
   <ItemGroup>
@@ -58,10 +60,10 @@
     <PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.11" />
     <PackageReference Include="ScottPlot.Avalonia" Version="5.1.59" />
 
-    <!-- Движок раскладки графа (MSAGL, лицензия MIT). Берётся только геометрия:
-         рисуем сами, потому что достоверность связи должна быть видна видом линии,
-         а чужие стили под это не гнутся. Пригодность проверена спайком-04. -->
-    <PackageReference Include="AutomaticGraphLayout" Version="1.1.12" />
+    <!-- Обновление продукта. Работоспособность под обрезкой проверена спайком-07:
+         в отличие от Quartz, разбор ленты и разностные пакеты переживают ILLink. -->
+    <PackageReference Include="Velopack" Version="1.2.0" />
+
   </ItemGroup>
 
 </Project>

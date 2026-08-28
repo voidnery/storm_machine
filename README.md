@@ -1,9 +1,12 @@
+<img src="assets/spike/spike-256.png" width="96" align="right" alt="Storm Machine">
+
 # Storm Machine
 
 A network testing and diagnostics workstation for Windows — one tool instead of a pile of
 utilities, with memory, scheduling and reporting.
 
-> **Status: in design and early development.** No usable build yet.
+> **Status: MVP complete, first release in preparation.** Level 0 works end to end;
+> no built release is published yet.
 > Русская версия: [README.ru.md](README.ru.md)
 
 ## What it is
@@ -59,7 +62,12 @@ and still resolves reverse DNS names.
 
 ## Technology
 
-.NET 10 · Avalonia 12 · ScottPlot · QuestPDF · SharpSnmpLib · Quartz.NET · SQLite
+.NET 10 · Avalonia 12 · ScottPlot · QuestPDF · MSAGL · Velopack · SQLite
+
+Quartz.NET was listed here until iteration 14 and was rejected after testing: it fails
+silently under trimmed publish. The scheduler is our own — [R-15](docs/02-research.md).
+Velopack passed the same test — [R-19](docs/02-research.md). SharpSnmpLib arrives
+with level 1.
 
 See [ADR-0001](docs/adr/ADR-0001-technology-stack.md) for the reasoning.
 
@@ -73,6 +81,7 @@ See [ADR-0001](docs/adr/ADR-0001-technology-stack.md) for the reasoning.
 | [STATUS.md](docs/STATUS.md) | Where the project stands right now |
 | [ARCHITECTURE.md](docs/ARCHITECTURE.md) | Code map and boundaries |
 | [GITHUB-SETUP.md](docs/GITHUB-SETUP.md) | Repository, signing and release workflow (RU) |
+| [SIGNPATH.md](docs/SIGNPATH.md) | Applying to SignPath Foundation for release signing |
 
 The [`spikes/`](spikes) directory holds the throwaway programs that produced the
 measurements in the research document — they are reproducible.

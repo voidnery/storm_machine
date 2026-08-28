@@ -1,0 +1,197 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:StormMachine.App.ViewModels"
+             x:Class="StormMachine.App.Views.Pages.ProbesPage"
+             x:DataType="vm:ProbesPageViewModel">
+
+  <UserControl.Styles>
+    <Style Selector="Border.step">
+      <Setter Property="BorderThickness" Value="3,0,0,0" />
+      <Setter Property="BorderBrush" Value="Transparent" />
+      <Setter Property="Padding" Value="10,6" />
+    </Style>
+    <Style Selector="Border.step.fail">
+      <Setter Property="BorderBrush" Value="#E05252" />
+    </Style>
+    <Style Selector="Border.step.warn">
+      <Setter Property="BorderBrush" Value="#D9A441" />
+    </Style>
+    <Style Selector="Border.step.pass">
+      <Setter Property="BorderBrush" Value="#4C9A5A" />
+    </Style>
+  </UserControl.Styles>
+
+  <Grid RowDefinitions="Auto,Auto,Auto,*" Margin="24,20">
+
+    <StackPanel Grid.Row="0" Spacing="4">
+      <TextBlock Text="{Binding Title}" FontSize="24" FontWeight="SemiBold" />
+      <TextBlock Text="{Binding Description}" FontSize="12" Opacity="0.6" TextWrapping="Wrap" />
+    </StackPanel>
+
+    <!-- Панель запуска. Шаблон и цель рядом: сценарий без цели не имеет смысла,
+         а цель без шаблона не говорит, что с ней делать. -->
+    <Border Grid.Row="1" Margin="0,12,0,0" Padding="14" CornerRadius="6"
+            Background="{StaticResource PanelBrush}">
+      <StackPanel Spacing="10">
+        <Grid ColumnDefinitions="2*,2*,Auto,Auto,Auto">
+          <StackPanel Grid.Column="0" Spacing="4" Margin="0,0,12,0">
+            <TextBlock Text="Сценарий" FontSize="11" Opacity="0.6" />
+            <ComboBox ItemsSource="{Binding Templates}" SelectedItem="{Binding Template}"
+                      HorizontalAlignment="Stretch" IsEnabled="{Binding CanStart}" />
+          </StackPanel>
+
+          <StackPanel Grid.Column="1" Spacing="4" Margin="0,0,12,0">
+            <TextBlock Text="Цель, список через запятую или имя набора" FontSize="11" Opacity="0.6" />
+            <TextBox Text="{Binding Target}" PlaceholderText="example.com или своё"
+                     IsEnabled="{Binding CanStart}" />
+          </StackPanel>
+
+          <StackPanel Grid.Column="2" Spacing="4" Margin="0,0,12,0" VerticalAlignment="Bottom">
+            <CheckBox IsChecked="{Binding Save}" Content="В журнал" IsEnabled="{Binding CanStart}" />
+          </StackPanel>
+
+          <Button Grid.Column="3" Content="Запустить" Margin="0,0,8,0" VerticalAlignment="Bottom"
+                  Command="{Binding RunCommand}" Padding="18,7"
+                  Background="{StaticResource AccentBrush}" Foreground="White" />
+
+          <Button Grid.Column="4" Content="Стоп" VerticalAlignment="Bottom"
+                  Command="{Binding StopCommand}" />
+        </Grid>
+
+        <!-- Наборы целей подставляются нажатием: помнить их наизусть незачем. -->
+        <StackPanel Orientation="Horizontal" Spacing="6">
+          <TextBlock Text="Наборы:" FontSize="11" Opacity="0.6" VerticalAlignment="Center" />
+          <ItemsControl ItemsSource="{Binding Sets}">
+            <ItemsControl.ItemsPanel>
+              <ItemsPanelTemplate>
+                <StackPanel Orientation="Horizontal" Spacing="6" />
+              </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="x:String">
+                <Button Content="{Binding}" FontSize="11" Padding="8,3"
+                        Command="{Binding $parent[UserControl].((vm:ProbesPageViewModel)DataContext).UseSetCommand}"
+                        CommandParameter="{Binding}" />
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </StackPanel>
+
+        <TextBlock Text="{Binding Progress}" FontSize="12" Opacity="0.75"
+                   IsVisible="{Binding IsRunning}" />
+        <TextBlock Text="{Binding Error}" FontSize="12" Foreground="#E05252" TextWrapping="Wrap"
+                   IsVisible="{Binding Error, Converter={x:Static ObjectConverters.IsNotNull}}" />
+      </StackPanel>
+    </Border>
+
+    <StackPanel Grid.Row="2" Margin="0,14,0,0" Spacing="2" IsVisible="{Binding HasSteps}">
+      <TextBlock Text="{Binding Caption}" FontSize="13" FontWeight="SemiBold" />
+      <TextBlock Text="{Binding BaselineCaption}" FontSize="11" Opacity="0.55" />
+    </StackPanel>
+
+    <ScrollViewer Grid.Row="3" Margin="0,10,0,0">
+      <StackPanel Spacing="12">
+
+        <ItemsControl ItemsSource="{Binding Steps}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:ScenarioStepRowViewModel">
+              <StackPanel>
+
+                <TextBlock Text="{Binding Name}" FontSize="13" FontWeight="SemiBold"
+                           Margin="0,10,0,4" IsVisible="{Binding IsSeparator}" />
+
+                <Border Classes="step" IsVisible="{Binding IsStep}"
+                        Classes.pass="{Binding Level, Converter={x:Static vm:VerdictConverters.IsPass}}"
+                        Classes.warn="{Binding Level, Converter={x:Static vm:VerdictConverters.IsWarn}}"
+                        Classes.fail="{Binding Level, Converter={x:Static vm:VerdictConverters.IsFail}}">
+                  <StackPanel Spacing="4">
+
+                    <Grid ColumnDefinitions="Auto,220,90,*">
+                      <TextBlock Grid.Column="0" Text="{Binding Mark}" FontFamily="Consolas"
+                                 Width="18" />
+                      <TextBlock Grid.Column="1" Text="{Binding Name}" />
+                      <TextBlock Grid.Column="2" Text="{Binding Measured}" FontFamily="Consolas"
+                                 HorizontalAlignment="Right" Margin="0,0,10,0" />
+                      <Rectangle Grid.Column="3" Height="10" HorizontalAlignment="Left"
+                                 VerticalAlignment="Center"
+                                 Width="{Binding BarWidth}" Fill="{StaticResource AccentBrush}" />
+                    </Grid>
+
+                    <TextBlock Text="{Binding Summary}" FontSize="11" Opacity="0.7"
+                               TextWrapping="Wrap" Margin="18,0,0,0" />
+
+                    <TextBlock Text="{Binding Explanation}" FontSize="11" Opacity="0.6"
+                               TextWrapping="Wrap" Margin="18,0,0,0"
+                               IsVisible="{Binding Explanation, Converter={x:Static ObjectConverters.IsNotNull}}" />
+
+                    <!-- Находки проб: пороги ставят на числа, а расхождение резолверов
+                         и истекающий сертификат числами не являются. -->
+                    <ItemsControl ItemsSource="{Binding Warnings}" Margin="18,0,0,0"
+                                  IsVisible="{Binding HasWarnings}">
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="x:String">
+                          <TextBlock Text="{Binding}" FontSize="11" Foreground="#D9A441"
+                                     TextWrapping="Wrap" />
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
+                    <StackPanel Margin="18,6,0,0" Spacing="2" IsVisible="{Binding HasParts}">
+                      <TextBlock Text="{Binding PartsCaption}" FontSize="10" Opacity="0.5" />
+                      <ItemsControl ItemsSource="{Binding Parts}">
+                        <ItemsControl.ItemTemplate>
+                          <DataTemplate x:DataType="vm:ScenarioPartRow">
+                            <Grid ColumnDefinitions="160,80,44,*" Margin="0,1">
+                              <TextBlock Grid.Column="0" Text="{Binding Label}" FontSize="11"
+                                         Opacity="0.8" />
+                              <TextBlock Grid.Column="1" Text="{Binding Value}" FontSize="11"
+                                         FontFamily="Consolas" HorizontalAlignment="Right"
+                                         Margin="0,0,10,0" />
+                              <TextBlock Grid.Column="2" Text="{Binding ShareText}" FontSize="11"
+                                         Opacity="0.6" HorizontalAlignment="Right" Margin="0,0,10,0" />
+                              <Rectangle Grid.Column="3" Height="6" HorizontalAlignment="Left"
+                                         VerticalAlignment="Center" Width="{Binding BarWidth}"
+                                         Fill="{StaticResource AccentBrush}" Opacity="0.5" />
+                            </Grid>
+                          </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                      </ItemsControl>
+                    </StackPanel>
+
+                  </StackPanel>
+                </Border>
+              </StackPanel>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
+        <TextBlock Text="{Binding Note}" FontSize="11" Opacity="0.55" TextWrapping="Wrap"
+                   IsVisible="{Binding HasSteps}" />
+
+        <!-- Сводка по набору: одна упавшая цель из пяти и пять из пяти —
+             разные неисправности. -->
+        <Border Padding="12" CornerRadius="6" Background="{StaticResource PanelBrush}"
+                IsVisible="{Binding HasTargets}">
+          <StackPanel Spacing="6">
+            <TextBlock Text="Итог по целям" FontSize="13" FontWeight="SemiBold" />
+            <ItemsControl ItemsSource="{Binding Targets}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:ScenarioTargetRow">
+                  <Grid ColumnDefinitions="Auto,240,150,*" Margin="0,2">
+                    <TextBlock Grid.Column="0" Text="{Binding Mark}" FontFamily="Consolas" Width="18" />
+                    <TextBlock Grid.Column="1" Text="{Binding Target}" />
+                    <TextBlock Grid.Column="2" Text="{Binding Verdict}" Opacity="0.75" />
+                    <TextBlock Grid.Column="3" Text="{Binding Where}" Opacity="0.6" />
+                  </Grid>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </StackPanel>
+        </Border>
+
+        <TextBlock Text="{Binding Conclusion}" FontSize="13" TextWrapping="Wrap" Margin="0,0,0,20" />
+
+      </StackPanel>
+    </ScrollViewer>
+  </Grid>
+</UserControl>

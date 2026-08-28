@@ -243,7 +243,7 @@ public sealed class DiscoveryService(
 
         foreach (var address in findings.Keys)
         {
-            candidates[Order(address)] = address;
+            candidates[IpAddressOrder.Of(address)] = address;
         }
 
         // Узел, ответивший только на ARP, — самый ценный улов сканирования:
@@ -252,7 +252,7 @@ public sealed class DiscoveryService(
         {
             if (IPAddress.TryParse(address, out var parsed) && request.Range.Contains(parsed))
             {
-                candidates[Order(address)] = address;
+                candidates[IpAddressOrder.Of(address)] = address;
             }
         }
 
@@ -429,20 +429,6 @@ public sealed class DiscoveryService(
             // Обратной записи нет — обычное дело в локальной сети.
             return null;
         }
-    }
-
-    /// <summary>Числовой порядок адреса — чтобы список шёл как в сети, а не как в словаре.</summary>
-    private static uint Order(string address)
-    {
-        if (!IPAddress.TryParse(address, out var parsed)
-            || parsed.AddressFamily != AddressFamily.InterNetwork)
-        {
-            return uint.MaxValue;
-        }
-
-        var bytes = parsed.GetAddressBytes();
-
-        return ((uint)bytes[0] << 24) | ((uint)bytes[1] << 16) | ((uint)bytes[2] << 8) | bytes[3];
     }
 
     private sealed record Finding(EvidenceSource Source, int? OpenPort);

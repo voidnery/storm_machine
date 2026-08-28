@@ -12,7 +12,7 @@ namespace StormMachine.Storage;
 internal static class StorageSchema
 {
     /// <summary>Текущая версия схемы. Растёт при каждом изменении структуры.</summary>
-    public const int CurrentVersion = 5;
+    public const int CurrentVersion = 12;
 
     public static void EnsureCreated(SqliteConnection connection)
     {
@@ -43,6 +43,24 @@ internal static class StorageSchema
         // Обновление идёт по ступеням: база версии 1, созданная прошлым выпуском,
         // должна дойти до текущей, не потеряв данные. Прыжок сразу к последней схеме
         // работал бы только для пустой базы.
+        //
+        // Все ступени и отметка версии выполняются ОДНОЙ транзакцией. Без неё смерть
+        // процесса посреди обновления оставляет базу в состоянии, из которого она
+        // больше не открывается: схема частично новая, отметка версии старая, и при
+        // следующем запуске ступень падает на «duplicate column name». В SQLite
+        // изменение схемы транзакционно, и пользоваться этим — не роскошь, а условие
+        // того, чтобы обновление продукта не стоило человеку истории измерений.
+        using var upgrade = connection.BeginTransaction();
+
+        version = Upgrade(connection, version);
+
+        WriteVersion(connection, version);
+        upgrade.Commit();
+    }
+
+    /// <summary>Выполняет ступени обновления и возвращает достигнутую версию.</summary>
+    private static int Upgrade(SqliteConnection connection, int version)
+    {
         if (version == 0)
         {
             CreateVersion1(connection);
@@ -73,7 +91,49 @@ internal static class StorageSchema
             version = 5;
         }
 
-        WriteVersion(connection, version);
+        if (version == 5)
+        {
+            UpgradeToVersion6(connection);
+            version = 6;
+        }
+
+        if (version == 6)
+        {
+            UpgradeToVersion7(connection);
+            version = 7;
+        }
+
+        if (version == 7)
+        {
+            UpgradeToVersion8(connection);
+            version = 8;
+        }
+
+        if (version == 8)
+        {
+            UpgradeToVersion9(connection);
+            version = 9;
+        }
+
+        if (version == 9)
+        {
+            UpgradeToVersion10(connection);
+            version = 10;
+        }
+
+        if (version == 10)
+        {
+            UpgradeToVersion11(connection);
+            version = 11;
+        }
+
+        if (version == 11)
+        {
+            UpgradeToVersion12(connection);
+            version = 12;
+        }
+
+        return version;
     }
 
     private static void CreateVersion1(SqliteConnection connection)
@@ -326,6 +386,293 @@ internal static class StorageSchema
             """);
     }
 
+    /// <summary>
+    /// Правки оператора: объединённые дубли и связи, нарисованные вручную.
+    /// </summary>
+    /// <remarks>
+    /// Хранится не результат правки, а сама правка. Разница принципиальная: инвентарь
+    /// и карта пересчитываются из свидетельств при каждом сканировании, и правка,
+    /// записанная в результат, была бы затёрта первым же пересчётом. Записанная
+    /// отдельно — переживает любое их число, а отменяется удалением одной строки.
+    /// </remarks>
+    /// <summary>
+    /// Сопряжённые агенты.
+    /// </summary>
+    /// <remarks>
+    /// Ключ — отпечаток, а не адрес. Имя машины и адрес меняются: DHCP выдал другой,
+    /// машину переименовали, площадка переехала. Отпечаток не меняется, он и есть
+    /// личность агента, и агент, сменивший адрес, обязан остаться тем же агентом.
+    /// </remarks>
+    private static void UpgradeToVersion12(SqliteConnection connection)
+    {
+        // Учётные данные SNMP. Пароли лежат зашифрованными средствами машины —
+        // шифрует их хранилище, а не эта таблица; здесь важно другое: они в отдельных
+        // колонках, а не в общем JSON, чтобы случайная выгрузка таблицы в поддержку
+        // не вынесла их вместе со всем остальным.
+        //
+        // Порядок перебора — своя колонка: на объекте, где ядро отвечает по v3,
+        // а доступ по v2c, важно, какой набор пробуется первым.
+        Execute(connection, """
+            CREATE TABLE IF NOT EXISTS snmp_credentials (
+                id                TEXT    NOT NULL PRIMARY KEY,
+                name              TEXT    NOT NULL UNIQUE,
+                version           INTEGER NOT NULL,
+                community         TEXT,
+                user_name         TEXT,
+                auth_protocol     INTEGER NOT NULL DEFAULT 0,
+                auth_password     TEXT,
+                privacy_protocol  INTEGER NOT NULL DEFAULT 0,
+                privacy_password  TEXT,
+                port              INTEGER NOT NULL DEFAULT 161,
+                timeout_ms        INTEGER NOT NULL DEFAULT 3000,
+                retries           INTEGER NOT NULL DEFAULT 1,
+                sort_order        INTEGER NOT NULL DEFAULT 0,
+                created_ticks     INTEGER NOT NULL,
+                updated_ticks     INTEGER NOT NULL
+            );
+            """);
+
+        Execute(
+            connection,
+            "CREATE INDEX IF NOT EXISTS ix_snmp_credentials_order ON snmp_credentials (sort_order, name);");
+    }
+
+    private static void UpgradeToVersion11(SqliteConnection connection)
+    {
+        // Профили сетевого окружения. Активным может быть только один — это
+        // обеспечивается частичным уникальным индексом, а не договорённостью
+        // в коде: два активных профиля означали бы два набора порогов на одно
+        // измерение, и поймать такое потом было бы нечем.
+        Execute(connection, """
+            CREATE TABLE IF NOT EXISTS profiles (
+                id             TEXT    NOT NULL PRIMARY KEY,
+                name           TEXT    NOT NULL UNIQUE,
+                description    TEXT,
+                targets_json   TEXT    NOT NULL DEFAULT '[]',
+                thresholds_json TEXT   NOT NULL DEFAULT '[]',
+                monitors_json  TEXT    NOT NULL DEFAULT '[]',
+                signature_json TEXT    NOT NULL DEFAULT '{}',
+                is_active      INTEGER NOT NULL DEFAULT 0,
+                created_ticks  INTEGER NOT NULL,
+                updated_ticks  INTEGER NOT NULL
+            );
+            """);
+
+        Execute(
+            connection,
+            "CREATE UNIQUE INDEX IF NOT EXISTS ux_profiles_active ON profiles (is_active) WHERE is_active = 1;");
+    }
+
+    private static void UpgradeToVersion10(SqliteConnection connection)
+    {
+        // Эталоны. Условия измерения хранятся вместе с числами и не выносятся
+        // в колонки: без них эталон превращается в набор цифр неизвестного
+        // происхождения, а сравнение с ним — в красивую ошибку.
+        //
+        // Ссылка на прогон намеренно без внешнего ключа: политика хранения удаляет
+        // старые прогоны, а эталон обязан пережить исходное измерение — он и заводится
+        // ради того, чтобы сравнивать с ним годами.
+        Execute(connection, """
+            CREATE TABLE IF NOT EXISTS baselines (
+                id             TEXT    NOT NULL PRIMARY KEY,
+                name           TEXT    NOT NULL UNIQUE,
+                description    TEXT,
+                subject        TEXT    NOT NULL,
+                target_kind    INTEGER NOT NULL,
+                target_value   TEXT    NOT NULL,
+                target_label   TEXT,
+                unit           INTEGER NOT NULL,
+                context_json   TEXT    NOT NULL,
+                metrics_json   TEXT    NOT NULL,
+                run_id         TEXT,
+                captured_ticks INTEGER NOT NULL
+            );
+            """);
+
+        Execute(connection, "CREATE INDEX IF NOT EXISTS ix_baselines_subject ON baselines (subject);");
+    }
+
+    private static void UpgradeToVersion9(SqliteConnection connection)
+    {
+        // Пресет научился хранить сценарий, а не только пробу. Колонка probe_name
+        // при этом сохранила имя: переименовывать её значило бы переписывать таблицу
+        // ради косметики, а в файлах обмена поле всё равно осталось прежним —
+        // наборы пресетов уже разошлись по рукам.
+        AddColumnIfMissing(connection, "presets", "kind", "INTEGER NOT NULL DEFAULT 0");
+    }
+
+    private static void UpgradeToVersion8(SqliteConnection connection)
+    {
+        // Определение монитора и его текущее состояние в одной строке. Разносить их
+        // по двум таблицам смысла нет: состояние ровно одно на монитор и живёт
+        // ровно столько же.
+        Execute(connection, """
+            CREATE TABLE IF NOT EXISTS monitors (
+                id               TEXT    NOT NULL PRIMARY KEY,
+                name             TEXT    NOT NULL UNIQUE,
+                description      TEXT,
+                kind             INTEGER NOT NULL,
+                subject          TEXT    NOT NULL,
+                target_kind      INTEGER NOT NULL,
+                target_value     TEXT    NOT NULL,
+                target_label     TEXT,
+                parameters_json  TEXT    NOT NULL DEFAULT '{}',
+                thresholds_json  TEXT    NOT NULL DEFAULT '[]',
+                schedule_json    TEXT    NOT NULL,
+                alert_json       TEXT,
+                objective_json   TEXT,
+                preset_id        TEXT,
+                enabled          INTEGER NOT NULL DEFAULT 1,
+                created_ticks    INTEGER NOT NULL,
+                updated_ticks    INTEGER NOT NULL,
+                next_due_ticks   INTEGER,
+                state_level      INTEGER NOT NULL DEFAULT 0,
+                last_run_ticks   INTEGER,
+                last_summary     TEXT,
+                alert_state_json TEXT
+            );
+            """);
+
+        Execute(connection, "CREATE INDEX IF NOT EXISTS ix_monitors_due ON monitors (next_due_ticks);");
+
+        // Журнал проверок — источник всей доступности. Хранит и то, чего не измеряли:
+        // пропуски и обслуживание. Без них доступность считалась бы по одним удачам.
+        Execute(connection, """
+            CREATE TABLE IF NOT EXISTS monitor_checks (
+                id             TEXT    NOT NULL PRIMARY KEY,
+                monitor_id     TEXT    NOT NULL,
+                started_ticks  INTEGER NOT NULL,
+                duration_ticks INTEGER NOT NULL DEFAULT 0,
+                kind           INTEGER NOT NULL,
+                level          INTEGER NOT NULL,
+                summary        TEXT    NOT NULL,
+                run_id         TEXT,
+                metric         TEXT,
+                value          REAL,
+                threshold      REAL,
+                missed_count   INTEGER NOT NULL DEFAULT 0,
+                error          TEXT,
+                FOREIGN KEY (monitor_id) REFERENCES monitors (id) ON DELETE CASCADE
+            );
+            """);
+
+        Execute(
+            connection,
+            "CREATE INDEX IF NOT EXISTS ix_checks_monitor ON monitor_checks (monitor_id, started_ticks DESC);");
+
+        // Лента алертов внешнего ключа НЕ имеет — намеренно. Удаление монитора убирает
+        // его проверки: без монитора они не значат ничего. Но факт «в четверг в три ночи
+        // сработал алерт» остаётся фактом и после того, как монитор убрали, — тем более
+        // что убрать его могли именно поэтому. Имя монитора продублировано в строке,
+        // чтобы событие читалось и без него.
+        Execute(connection, """
+            CREATE TABLE IF NOT EXISTS alerts (
+                id            TEXT    NOT NULL PRIMARY KEY,
+                monitor_id    TEXT    NOT NULL,
+                monitor_name  TEXT    NOT NULL,
+                at_ticks      INTEGER NOT NULL,
+                action        INTEGER NOT NULL,
+                level         INTEGER NOT NULL,
+                reason        TEXT    NOT NULL,
+                summary       TEXT,
+                check_id      TEXT,
+                notified      INTEGER NOT NULL DEFAULT 0,
+                channels_json TEXT,
+                errors_json   TEXT
+            );
+            """);
+
+        Execute(connection, "CREATE INDEX IF NOT EXISTS ix_alerts_at ON alerts (at_ticks DESC);");
+        Execute(connection, "CREATE INDEX IF NOT EXISTS ix_alerts_monitor ON alerts (monitor_id, at_ticks DESC);");
+
+        // Настройки ключ-значение. Появились здесь ради каналов оповещения: адрес
+        // webhook и параметры почты негде было держать. Пометка secret означает, что
+        // значение лежит зашифрованным средствами Windows и в резервной копии,
+        // унесённой на другую машину, не раскроется.
+        Execute(connection, """
+            CREATE TABLE IF NOT EXISTS settings (
+                key           TEXT    NOT NULL PRIMARY KEY,
+                value         TEXT,
+                secret        INTEGER NOT NULL DEFAULT 0,
+                updated_ticks INTEGER NOT NULL
+            );
+            """);
+    }
+
+    private static void UpgradeToVersion7(SqliteConnection connection)
+    {
+        Execute(connection, """
+            CREATE TABLE IF NOT EXISTS agents (
+                thumbprint     TEXT    NOT NULL PRIMARY KEY,
+                machine_name   TEXT    NOT NULL,
+                product        TEXT    NOT NULL,
+                address        TEXT,
+                port           INTEGER NOT NULL DEFAULT 0,
+                direction      INTEGER NOT NULL,
+                paired_ticks   INTEGER NOT NULL,
+                last_seen_ticks INTEGER,
+                capabilities   TEXT    NOT NULL DEFAULT '',
+                alias          TEXT
+            );
+            """);
+
+        Execute(connection, "CREATE INDEX IF NOT EXISTS ix_agents_paired ON agents (paired_ticks DESC);");
+
+        // Личность самого клиента живёт здесь же: она одна на установку, и терять её
+        // нельзя — новая означала бы потерю всех сопряжений разом.
+        Execute(connection, """
+            CREATE TABLE IF NOT EXISTS client_identity (
+                id           INTEGER NOT NULL PRIMARY KEY CHECK (id = 1),
+                container     BLOB    NOT NULL,
+                created_ticks INTEGER NOT NULL
+            );
+            """);
+    }
+
+    private static void UpgradeToVersion6(SqliteConnection connection)
+    {
+        // Ключ по псевдониму, а не по паре: одно тождество может присоединиться
+        // только к одному устройству, иначе объединение перестаёт быть однозначным.
+        Execute(connection, """
+            CREATE TABLE IF NOT EXISTS device_aliases (
+                alias        TEXT NOT NULL PRIMARY KEY,
+                primary_id   TEXT NOT NULL,
+                at_ticks     INTEGER NOT NULL,
+                operator_name TEXT NOT NULL
+            );
+            """);
+
+        Execute(connection, "CREATE INDEX IF NOT EXISTS ix_aliases_primary ON device_aliases (primary_id);");
+
+        Execute(connection, """
+            CREATE TABLE IF NOT EXISTS topology_edits (
+                id            TEXT NOT NULL PRIMARY KEY,
+                kind          INTEGER NOT NULL,
+                subject       TEXT NOT NULL,
+                target        TEXT,
+                at_ticks      INTEGER NOT NULL,
+                operator_name TEXT NOT NULL,
+                note          TEXT
+            );
+            """);
+    }
+
+    /// <summary>
+    /// Добавляет колонку, если её ещё нет.
+    /// </summary>
+    /// <remarks>
+    /// У SQLite нет «ALTER TABLE ADD COLUMN IF NOT EXISTS», а нужен он ровно так же,
+    /// как «CREATE TABLE IF NOT EXISTS», которым пользуются остальные ступени.
+    /// Без проверки повторный проход ступени падает на «duplicate column name»,
+    /// и база, у которой отметка версии почему-либо отстала от схемы, перестаёт
+    /// открываться навсегда.
+    /// <para>
+    /// Помощник существовал с четвёртой ступени, но девятая (вид пресета, И-14)
+    /// прошла мимо него прямым ALTER. Поймал это тест обновления, появившийся
+    /// в И-15, — и только он: обычные проверки хранилища всегда начинают с пустого
+    /// файла и обновление не трогают вовсе.
+    /// </para>
+    /// </remarks>
     private static void AddColumnIfMissing(SqliteConnection connection, string table, string column, string type)
     {
         using var check = connection.CreateCommand();

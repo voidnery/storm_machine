@@ -19,6 +19,7 @@ internal static class RunsCommand
             CreateList(services),
             CreateShow(services),
             CreateReport(services),
+            CreateExport(services),
             CreateDelete(services),
             CreatePurge(services),
             CreateUsage(services),
@@ -130,12 +131,10 @@ internal static class RunsCommand
             var renderer = services.GetRequiredService<IReportRenderer>();
 
             var report = await renderer.RenderAsync(
-                new ReportRequest
-                {
-                    Run = run,
-                    Author = Environment.UserName,
-                    IncludeChart = !parseResult.GetValue(noChartOption),
-                },
+                ReportRequest.ForRun(
+                    run,
+                    author: Environment.UserName,
+                    includeChart: !parseResult.GetValue(noChartOption)),
                 cancellationToken).ConfigureAwait(false);
 
             var path = parseResult.GetValue(outOption);
@@ -150,6 +149,109 @@ internal static class RunsCommand
             Console.WriteLine($"  {report.Content.Length / 1024.0:0.0} КБ");
 
             return 0;
+        });
+
+        return command;
+    }
+
+    /// <summary>
+    /// Выгрузка прогона в CSV, JSON или PNG.
+    /// </summary>
+    /// <remarks>
+    /// Отдельно от отчёта: отчёт объясняет, выгрузка отдаёт. В CSV и JSON всегда
+    /// попадают условия измерения — ряд чисел без интерфейса, методики и порога
+    /// достоверности нельзя ни повторить, ни сопоставить.
+    /// </remarks>
+    private static Command CreateExport(IServiceProvider services)
+    {
+        var idArgument = new Argument<string>("id")
+        {
+            Description = "Идентификатор прогона; достаточно первых символов.",
+        };
+
+        var formatOption = new Option<string>("--формат", "--format")
+        {
+            Description = "csv, json или png.",
+            DefaultValueFactory = _ => "csv",
+        };
+
+        var outOption = new Option<string>("--файл", "--out")
+        {
+            Description = "Куда сохранить. Без него — рядом, с именем по умолчанию.",
+            DefaultValueFactory = _ => string.Empty,
+        };
+
+        var command = new Command("export", "Выгрузить прогон: CSV, JSON или PNG.")
+        {
+            idArgument, formatOption, outOption,
+        };
+
+        command.SetAction(async (parseResult, cancellationToken) =>
+        {
+            var raw = parseResult.GetValue(formatOption)!.Trim().ToLowerInvariant();
+
+            var format = raw switch
+            {
+                "csv" => ExportFormat.Csv,
+                "json" => ExportFormat.Json,
+                "png" => ExportFormat.Png,
+                _ => (ExportFormat?)null,
+            };
+
+            if (format is null)
+            {
+                Console.Error.WriteLine($"Формат «{raw}» неизвестен. Доступны: csv, json, png.");
+
+                return 2;
+            }
+
+            var store = services.GetRequiredService<IRunStore>();
+            await store.InitializeAsync(cancellationToken).ConfigureAwait(false);
+
+            var id = await ResolveIdAsync(store, parseResult.GetValue(idArgument)!, cancellationToken)
+                .ConfigureAwait(false);
+
+            if (id is null)
+            {
+                return 1;
+            }
+
+            var run = await store.GetAsync(id.Value, cancellationToken).ConfigureAwait(false);
+
+            if (run is null)
+            {
+                Console.Error.WriteLine($"Прогон {id} не найден.");
+
+                return 1;
+            }
+
+            var exporter = services.GetRequiredService<IRunExporter>();
+
+            try
+            {
+                var file = await exporter.ExportAsync(run, format.Value, cancellationToken).ConfigureAwait(false);
+
+                var path = parseResult.GetValue(outOption) is { Length: > 0 } chosen
+                    ? chosen
+                    : file.SuggestedFileName;
+
+                await File.WriteAllBytesAsync(path, file.Content, cancellationToken).ConfigureAwait(false);
+
+                Console.WriteLine($"Выгружено: {Path.GetFullPath(path)} ({file.Content.Length / 1024.0:0.0} КБ)");
+
+                if (format == ExportFormat.Csv && !run.Summary.HasRawSamples)
+                {
+                    Console.WriteLine("Сырые измерения удалены политикой хранения — выгружены агрегаты.");
+                }
+
+                return 0;
+            }
+            catch (InvalidOperationException ex)
+            {
+                Console.Error.WriteLine(ex.Message);
+
+                return 1;
+            }
         });
 
         return command;

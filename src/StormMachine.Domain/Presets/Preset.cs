@@ -2,8 +2,18 @@ using StormMachine.Domain.Targets;
 
 namespace StormMachine.Domain.Presets;
 
+/// <summary>Что именно повторяет пресет.</summary>
+public enum PresetKind
+{
+    /// <summary>Одну пробу.</summary>
+    Probe,
+
+    /// <summary>Сценарий из цепочки шагов.</summary>
+    Scenario,
+}
+
 /// <summary>
-/// Именованный тест: проба, цель и параметры.
+/// Именованный тест: проба или сценарий, цель и параметры.
 /// </summary>
 /// <remarks>
 /// Смысл пресета не в экономии набора текста, а в повторяемости. Измерение, которое
@@ -23,8 +33,19 @@ public sealed record Preset
 
     public string? Description { get; init; }
 
-    /// <summary>Имя пробы: <c>ping</c>, <c>http</c>, <c>dns</c>.</summary>
-    public required string ProbeName { get; init; }
+    /// <summary>Проба это или сценарий.</summary>
+    public PresetKind Kind { get; init; } = PresetKind.Probe;
+
+    /// <summary>
+    /// Что запускать: имя пробы (<c>ping</c>, <c>http</c>) или ключ шаблона сценария.
+    /// </summary>
+    /// <remarks>
+    /// Названо <c>Subject</c>, а не <c>ProbeName</c>: с И-14 пресет хранит и сценарий,
+    /// и поле с именем «имя пробы» стало бы враньём в половине случаев. Так же называется
+    /// то же самое у монитора — это одно и то же понятие, и разные имена у него
+    /// заставляли бы читателя проверять, не разные ли это вещи.
+    /// </remarks>
+    public required string Subject { get; init; }
 
     public required Target Target { get; init; }
 
@@ -67,7 +88,8 @@ public sealed record Preset
     {
         ArgumentNullException.ThrowIfNull(other);
 
-        if (!string.Equals(ProbeName, other.ProbeName, StringComparison.OrdinalIgnoreCase))
+        if (Kind != other.Kind
+            || !string.Equals(Subject, other.Subject, StringComparison.OrdinalIgnoreCase))
         {
             return false;
         }
@@ -102,7 +124,8 @@ public sealed record PresetValidationError(string Field, string Message);
 /// <summary>Фильтр для списка пресетов.</summary>
 public sealed record PresetQuery
 {
-    public string? ProbeName { get; init; }
+    /// <summary>Имя пробы или ключ сценария.</summary>
+    public string? Subject { get; init; }
 
     public string? Tag { get; init; }
 

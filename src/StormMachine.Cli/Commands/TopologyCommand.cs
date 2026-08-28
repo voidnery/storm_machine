@@ -34,6 +34,20 @@ internal static class TopologyCommand
             Description = "Пропустить виртуальные коммутаторы и VPN.",
         };
 
+        // Опрос оборудования — отдельным ключом, а не по умолчанию: он идёт по чужой
+        // сети и занимает секунды на устройство. Делать это молча при каждом взгляде
+        // на карту значило бы слать трафик к оборудованию заказчика без спроса.
+        var snmpOption = new Option<bool>("--snmp")
+        {
+            Description = "Опросить оборудование по SNMP: порты коммутаторов и соседей.",
+        };
+
+        var deviceOption = new Option<string[]>("--устройство", "--device")
+        {
+            Description = "Кого опрашивать. Без ключа — шлюзы. Можно несколько раз.",
+            AllowMultipleArgumentsPerToken = true,
+        };
+
         var jsonOption = new Option<string>("--json")
         {
             Description = "Записать карту в файл JSON.",
@@ -45,8 +59,13 @@ internal static class TopologyCommand
             expandOption,
             noPathsOption,
             noVirtualOption,
+            snmpOption,
+            deviceOption,
             jsonOption,
         };
+
+        // Правки оператора — подкоманды той же команды: они про ту же карту.
+        TopologyEditCommands.AddTo(command, services);
 
         command.SetAction(async (parseResult, cancellationToken) =>
         {
@@ -58,7 +77,10 @@ internal static class TopologyCommand
                     IncludeExternalPaths = !parseResult.GetValue(noPathsOption),
                     IncludeVirtualAdapters = !parseResult.GetValue(noVirtualOption),
                     CollapseThreshold = parseResult.GetValue(expandOption) ? int.MaxValue : 12,
+                    UseSnmp = parseResult.GetValue(snmpOption),
+                    SnmpTargets = parseResult.GetValue(deviceOption) ?? [],
                 },
+                Console.WriteLine,
                 cancellationToken).ConfigureAwait(false);
 
             TopologyRenderer.Write(graph);

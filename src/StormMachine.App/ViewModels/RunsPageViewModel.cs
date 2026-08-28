@@ -4,7 +4,9 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using StormMachine.App.Services;
 using StormMachine.Application.Abstractions;
+using StormMachine.Domain.Reports;
 using StormMachine.Domain.Results;
+using StormMachine.Domain.Scenarios;
 
 namespace StormMachine.App.ViewModels;
 
@@ -33,11 +35,15 @@ public sealed partial class RunsPageViewModel(
     NavigationSection section,
     IRunStore store,
     IReportRenderer reportRenderer,
-    IFilePicker filePicker) : PageViewModel(section)
+    IFilePicker filePicker,
+    IRunExporter exporter,
+    IBaselineStore baselines) : PageViewModel(section)
 {
     private readonly IRunStore _store = store ?? throw new ArgumentNullException(nameof(store));
     private readonly IReportRenderer _reportRenderer = reportRenderer ?? throw new ArgumentNullException(nameof(reportRenderer));
     private readonly IFilePicker _filePicker = filePicker ?? throw new ArgumentNullException(nameof(filePicker));
+    private readonly IRunExporter _exporter = exporter ?? throw new ArgumentNullException(nameof(exporter));
+    private readonly IBaselineStore _baselines = baselines ?? throw new ArgumentNullException(nameof(baselines));
 
     public ObservableCollection<RunSummary> Runs { get; } = [];
 
@@ -114,6 +120,137 @@ public sealed partial class RunsPageViewModel(
     /// Движок PDF спрятан за <see cref="IReportRenderer"/> — страница о нём не знает
     /// и знать не должна.
     /// </remarks>
+    /// <summary>
+    /// Выгрузка выбранного прогона.
+    /// </summary>
+    /// <remarks>
+    /// Отдельно от отчёта: отчёт объясняет, выгрузка отдаёт. В CSV и JSON всегда
+    /// попадают условия измерения — ряд чисел без интерфейса, методики и порога
+    /// достоверности нельзя ни повторить, ни сопоставить.
+    /// </remarks>
+    [RelayCommand]
+    private async Task ExportAsync(string? format)
+    {
+        if (SelectedRun is null)
+        {
+            return;
+        }
+
+        var chosen = format?.ToLowerInvariant() switch
+        {
+            "json" => ExportFormat.Json,
+            "png" => ExportFormat.Png,
+            _ => ExportFormat.Csv,
+        };
+
+        Message = null;
+        ErrorMessage = null;
+
+        try
+        {
+            var run = await _store.GetAsync(SelectedRun.Id).ConfigureAwait(true);
+
+            if (run is null)
+            {
+                ErrorMessage = "Прогон не найден — возможно, его удалила политика хранения.";
+
+                return;
+            }
+
+            var file = await _exporter.ExportAsync(run, chosen).ConfigureAwait(true);
+
+            var path = await _filePicker
+                .PickSaveAsync($"Куда выгрузить {file.FileExtension.ToUpperInvariant()}", file.SuggestedFileName, file.FileExtension)
+                .ConfigureAwait(true);
+
+            if (path is null)
+            {
+                return;
+            }
+
+            await File.WriteAllBytesAsync(path, file.Content).ConfigureAwait(true);
+
+            Message = $"Выгружено: {path}"
+                      + (chosen == ExportFormat.Csv && !run.Summary.HasRawSamples
+                          ? ". Сырые измерения удалены политикой хранения — выгружены агрегаты."
+                          : string.Empty);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            ErrorMessage = ex.Message;
+        }
+    }
+
+    /// <summary>
+    /// Фиксирует эталон по выбранному прогону.
+    /// </summary>
+    /// <remarks>
+    /// Вместе с числами запоминаются условия измерения: сравнение с эталоном, снятым
+    /// в других условиях, даёт красивые цифры, которых не было, и продукт обязан уметь
+    /// это назвать.
+    /// </remarks>
+    [RelayCommand]
+    private async Task CaptureBaselineAsync()
+    {
+        if (SelectedRun is null)
+        {
+            return;
+        }
+
+        Message = null;
+        ErrorMessage = null;
+
+        try
+        {
+            var run = await _store.GetAsync(SelectedRun.Id).ConfigureAwait(true);
+
+            if (run is null)
+            {
+                ErrorMessage = "Прогон не найден — возможно, его удалила политика хранения.";
+
+                return;
+            }
+
+            var metrics = ProbeMetrics.FromStored(run.Series, run.Facts)
+                .Where(m => Baseline.IsComparable(m.Key))
+                .OrderBy(m => m.Key, StringComparer.OrdinalIgnoreCase)
+                .Select(m => new BaselineMetric(m.Key, m.Value, Baseline.HigherIsBetterFor(m.Key, run.Unit)))
+                .ToList();
+
+            if (metrics.Count == 0)
+            {
+                ErrorMessage = "У прогона нет ни одной метрики — фиксировать нечего.";
+
+                return;
+            }
+
+            var name = $"{run.Summary.ProbeName} → {run.Summary.TargetDisplay}, "
+                       + $"{run.Summary.StartedUtc.ToLocalTime():dd.MM.yyyy HH:mm}";
+
+            var existing = await _baselines.FindAsync(name).ConfigureAwait(true);
+
+            await _baselines.SaveAsync(new Baseline
+            {
+                Id = existing?.Id ?? Guid.NewGuid(),
+                Name = name,
+                Subject = run.Summary.ProbeName,
+                Target = run.Target,
+                Context = run.Context,
+                Unit = run.Unit,
+                Metrics = metrics,
+                RunId = run.Summary.Id,
+                CapturedUtc = DateTimeOffset.UtcNow,
+            }).ConfigureAwait(true);
+
+            Message = $"Эталон «{name}» зафиксирован: метрик {metrics.Count}. "
+                      + "Сравнить с ним можно на экране отчётов или командой storm baseline compare.";
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            ErrorMessage = ex.Message;
+        }
+    }
+
     [RelayCommand]
     private async Task SaveReportAsync()
     {
@@ -136,7 +273,7 @@ public sealed partial class RunsPageViewModel(
         try
         {
             var report = await _reportRenderer
-                .RenderAsync(new ReportRequest { Run = run, Author = Environment.UserName })
+                .RenderAsync(ReportRequest.ForRun(run, author: Environment.UserName))
                 .ConfigureAwait(true);
 
             var path = await _filePicker

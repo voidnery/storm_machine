@@ -1,8 +1,10 @@
+using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using System.Runtime.Versioning;
 using System.Security.Principal;
 using StormMachine.Application.Abstractions;
+using StormMachine.Domain.Discovery;
 using StormMachine.Domain.Measurements;
 
 namespace StormMachine.Platform;
@@ -68,6 +70,9 @@ public sealed class WindowsNetworkEnvironment : INetworkEnvironment
                 Kind = DetectKind(nic),
                 IPv4Address = unicast?.Address.ToString(),
                 PrefixLength = unicast?.PrefixLength ?? 0,
+                IPv6Addresses = [.. properties.UnicastAddresses
+                    .Where(a => IpAddressScope.IsGloballyRoutableV6(a.Address))
+                    .Select(a => a.Address.ToString())],
                 Gateways = [.. properties.GatewayAddresses
                     .Where(g => g.Address.AddressFamily == AddressFamily.InterNetwork)
                     .Select(g => g.Address.ToString())],

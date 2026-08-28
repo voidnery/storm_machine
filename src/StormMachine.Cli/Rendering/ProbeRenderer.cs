@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Globalization;
 using StormMachine.Application.Abstractions;
 using StormMachine.Application.Probes;
@@ -90,7 +91,7 @@ internal static class ProbeRenderer
 
         if (descriptor.Shape != ProbeResultShape.PathTrace)
         {
-            return sample => WriteLiveSample(descriptor, sample);
+            return new DenseLiveWriter(descriptor).Write;
         }
 
         var writer = new PathLiveWriter();
@@ -113,11 +114,11 @@ internal static class ProbeRenderer
                 return;
 
             case ProbeResultShape.ComparedSeries:
-                WriteComparedSample(sample);
+                WriteComparedSample(sample, descriptor.Unit);
                 return;
 
             default:
-                WriteScalarSample(sample);
+                WriteScalarSample(sample, descriptor.Unit);
                 return;
         }
     }
@@ -143,7 +144,7 @@ internal static class ProbeRenderer
                 break;
 
             case ProbeResultShape.ComparedSeries:
-                WriteComparison(result);
+                WriteComparison(result, descriptor);
                 break;
 
             case ProbeResultShape.PathTrace:
@@ -162,12 +163,12 @@ internal static class ProbeRenderer
 
     // ------------------------------------------------------------ скалярный ряд
 
-    private static void WriteScalarSample(Sample sample)
+    private static void WriteScalarSample(Sample sample, MeasurementUnit unit)
     {
         if (sample.IsSuccess)
         {
             var ttl = sample.Ttl is { } t ? $"  TTL={t}" : string.Empty;
-            Console.WriteLine($"  {sample.Sequence,5}  {F(sample.Value),9} мс{ttl}");
+            Console.WriteLine($"  {sample.Sequence,5}  {F(sample.Value),9}{Describe.UnitSuffix(unit)}{ttl}");
             return;
         }
 
@@ -176,14 +177,29 @@ internal static class ProbeRenderer
 
     private static void WriteScalarSummary(ProbeResult result, IHighResolutionClock clock)
     {
-        Console.WriteLine($"Отправлено {result.SentCount}, получено {result.SuccessCount}, "
-                          + $"потеряно {result.LostCount} ({result.LossPercent.ToString("0.0", CultureInfo.InvariantCulture)}%)");
+        // «Отправлено, получено, потеряно» — язык проб задержки, где каждый сэмпл
+        // это отдельный запрос. У пропускной способности сэмпл — это отсчёт скорости
+        // за отрезок времени, и говорить о его потере бессмысленно.
+        Console.WriteLine(result.Unit == MeasurementUnit.Milliseconds
+            ? $"Отправлено {result.SentCount}, получено {result.SuccessCount}, "
+              + $"потеряно {result.LostCount} ({result.LossPercent.ToString("0.0", CultureInfo.InvariantCulture)}%)"
+            : $"Отсчётов: {result.SuccessCount}");
 
         var stats = LatencyStatistics.Compute(result.Samples);
 
         if (stats.SampleCount == 0)
         {
             Console.WriteLine("Успешных ответов нет — статистику посчитать не по чему.");
+            return;
+        }
+
+        // Скалярный ряд — не обязательно задержка. У пропускной способности значения
+        // в мегабитах, и подписать их миллисекундами значило бы соврать о том, что
+        // измерено. Джиттер и PDV к скорости неприменимы вовсе: это понятия о задержке,
+        // и посчитать их по ряду скоростей можно, а истолковать нельзя.
+        if (result.Unit != MeasurementUnit.Milliseconds)
+        {
+            WriteRateSummary(stats, result.Unit);
             return;
         }
 
@@ -200,6 +216,26 @@ internal static class ProbeRenderer
             Console.WriteLine("  Замечание: медиана на уровне порога разрешения измерительного стека —");
             Console.WriteLine("  различить сеть и собственные накладные расходы на таких значениях нельзя.");
         }
+    }
+
+    /// <summary>
+    /// Сводка ряда, измеренного не во времени.
+    /// </summary>
+    /// <remarks>
+    /// Медиана, а не среднее, вынесена вперёд по той же причине, что и у задержки:
+    /// одна просадка канала утягивает среднее и не трогает медиану, а вопрос
+    /// «сколько обычно» — про медиану.
+    /// </remarks>
+    private static void WriteRateSummary(LatencyStatistics stats, MeasurementUnit unit)
+    {
+        var suffix = Describe.UnitSuffix(unit);
+
+        Console.WriteLine();
+        Console.WriteLine($"  Значения   min {F(stats.MinMs)}   медиана {F(stats.P50Ms)}   max {F(stats.MaxMs)}{suffix}");
+        Console.WriteLine($"  Среднее    {F(stats.MeanMs)}{suffix}   разброс {F(stats.StdDevMs)}{suffix}");
+        Console.WriteLine();
+        Console.WriteLine("  Джиттер и PDV здесь не считаются: это понятия о задержке,");
+        Console.WriteLine("  и к ряду скоростей они неприменимы.");
     }
 
     // ------------------------------------------------------------- водопад фаз
@@ -266,13 +302,13 @@ internal static class ProbeRenderer
 
     // ------------------------------------------------- сравнение нескольких рядов
 
-    private static void WriteComparedSample(Sample sample)
+    private static void WriteComparedSample(Sample sample, MeasurementUnit unit)
     {
         var label = sample.Label ?? "—";
 
         if (sample.IsSuccess)
         {
-            Console.WriteLine($"  {label,-16} {F(sample.Value),9} мс");
+            Console.WriteLine($"  {label,-16} {F(sample.Value),9}{Describe.UnitSuffix(unit)}");
             return;
         }
 
@@ -280,7 +316,7 @@ internal static class ProbeRenderer
         Console.WriteLine($"  {label,-16} {detail,12}");
     }
 
-    private static void WriteComparison(ProbeResult result)
+    private static void WriteComparison(ProbeResult result, ProbeDescriptor descriptor)
     {
         var groups = result.Samples
             .Where(s => s.Label is not null)
@@ -293,8 +329,15 @@ internal static class ProbeRenderer
             return;
         }
 
+        var noun = descriptor.SeriesNoun ?? "ряд";
+
+        // Единица в заголовке, а не в каждой ячейке: колонки читаются как одно целое,
+        // а без единицы «77.828» не говорит, много это или мало.
+        var unit = Describe.UnitSuffix(descriptor.Unit).Trim();
+        var header = unit.Length == 0 ? noun : $"{noun}, {unit}";
+
         Console.WriteLine();
-        Console.WriteLine($"  {"Резолвер",-18} {"мин",9} {"медиана",9} {"макс",9}   {"ответов",8}");
+        Console.WriteLine($"  {header,-18} {"мин",9} {"медиана",9} {"макс",9}   {"ответов",8}");
 
         foreach (var group in groups)
         {
@@ -310,16 +353,129 @@ internal static class ProbeRenderer
                               + $"{stats.SampleCount,3} из {group.Count(),-3}");
         }
 
+        // «Быстрее всех» — вывод только там, где ряды взаимозаменяемы. Для фаз одного
+        // измерения это не вывод, а его предмет: то, что под нагрузкой медленнее,
+        // и есть то, ради чего измерение делалось.
+        if (!descriptor.SeriesAreAlternatives)
+        {
+            return;
+        }
+
         var fastest = groups
-            .Select(g => (Resolver: g.Key, Stats: LatencyStatistics.Compute([.. g])))
+            .Select(g => (Series: g.Key, Stats: LatencyStatistics.Compute([.. g])))
             .Where(x => x.Stats.SampleCount > 0)
             .OrderBy(x => x.Stats.P50Ms)
             .FirstOrDefault();
 
-        if (fastest.Resolver is not null)
+        if (fastest.Series is not null)
         {
             Console.WriteLine();
-            Console.WriteLine($"  Быстрее всех отвечает {fastest.Resolver} — медиана {F(fastest.Stats.P50Ms)} мс.");
+            Console.WriteLine($"  Быстрее всех отвечает {fastest.Series} — медиана {F(fastest.Stats.P50Ms)} мс.");
+        }
+    }
+
+    /// <summary>
+    /// Живой вывод, который не тонет в частых отсчётах.
+    /// </summary>
+    /// <remarks>
+    /// Проба задержки под нагрузкой опрашивает цель двадцать раз в секунду — это её
+    /// устройство, а не настройка: всплески, ради которых измерение и делается, на редких
+    /// отсчётах не видны. Но триста строк в терминале не читает никто, и полезное в них
+    /// теряется вернее, чем если бы их не было вовсе.
+    /// <para>
+    /// Поэтому вывод переключается сам: пока отсчёты редкие — строка на отсчёт, как
+    /// у ping; как только они пошли чаще, дальше идёт сводка за полсекунды. Переключение
+    /// объявляется вслух — молча сменить смысл строк значило бы заставить читателя
+    /// гадать, что он видит. Ничего при этом не теряется: итоговая таблица считается
+    /// по всем отсчётам, а не по показанным.
+    /// </para>
+    /// </remarks>
+    private sealed class DenseLiveWriter(ProbeDescriptor descriptor)
+    {
+        /// <summary>Окно сводки. Полсекунды — предел, на котором глаз ещё считает строки живыми.</summary>
+        private static readonly TimeSpan Window = TimeSpan.FromMilliseconds(500);
+
+        /// <summary>Сколько отсчётов в окне ещё читаются поштучно.</summary>
+        private const int DenseThreshold = 4;
+
+        private readonly Stopwatch _watch = Stopwatch.StartNew();
+        private readonly Dictionary<string, List<double>> _window = new(StringComparer.Ordinal);
+
+        private TimeSpan _windowStart = TimeSpan.Zero;
+        private int _inWindow;
+        private bool _dense;
+
+        public void Write(Sample sample)
+        {
+            var now = _watch.Elapsed;
+
+            if (now - _windowStart >= Window)
+            {
+                Flush();
+                _windowStart = now;
+                _inWindow = 0;
+            }
+
+            _inWindow++;
+
+            if (!_dense && _inWindow > DenseThreshold)
+            {
+                _dense = true;
+
+                Console.WriteLine($"  … отсчёты идут чаще {DenseThreshold} за полсекунды — "
+                                  + "дальше сводка, а не строка на отсчёт");
+            }
+
+            if (!_dense)
+            {
+                WriteLiveSample(descriptor, sample);
+
+                return;
+            }
+
+            if (!sample.IsSuccess)
+            {
+                return;
+            }
+
+            var key = sample.Label ?? string.Empty;
+
+            if (!_window.TryGetValue(key, out var values))
+            {
+                values = [];
+                _window[key] = values;
+            }
+
+            values.Add(sample.Value);
+        }
+
+        /// <summary>
+        /// Сводка за окно.
+        /// </summary>
+        /// <remarks>
+        /// Медиана и максимум, а не среднее: измерение частыми отсчётами делается ради
+        /// всплесков, и среднее — единственное, что их прячет.
+        /// </remarks>
+        private void Flush()
+        {
+            foreach (var (label, values) in _window)
+            {
+                if (values.Count == 0)
+                {
+                    continue;
+                }
+
+                values.Sort();
+
+                var median = values[values.Count / 2];
+                var name = label.Length == 0 ? string.Empty : $"{label,-16} ";
+                var unit = Describe.UnitSuffix(descriptor.Unit);
+
+                Console.WriteLine($"  {name}{values.Count,4} отсч.  медиана {F(median)}{unit}"
+                                  + $"   макс {F(values[^1])}{unit}");
+            }
+
+            _window.Clear();
         }
     }
 

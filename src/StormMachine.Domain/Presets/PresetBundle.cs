@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace StormMachine.Domain.Presets;
 
 /// <summary>
@@ -14,7 +16,19 @@ public sealed record PortablePreset
 
     public string? Description { get; init; }
 
-    public required string ProbeName { get; init; }
+    /// <summary>
+    /// Что запускать.
+    /// </summary>
+    /// <remarks>
+    /// В файле поле по-прежнему называется <c>probeName</c>: наборы пресетов
+    /// передают друг другу, и переименование сломало бы всё, что уже выгружено.
+    /// Имя в коде исправлено, имя на проводе — нет.
+    /// </remarks>
+    [JsonPropertyName("probeName")]
+    public required string Subject { get; init; }
+
+    /// <summary>Вид: <c>Probe</c> или <c>Scenario</c>. Пусто в старых файлах — значит проба.</summary>
+    public string? Kind { get; init; }
 
     public required string TargetKind { get; init; }
 

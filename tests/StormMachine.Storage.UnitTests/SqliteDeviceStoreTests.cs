@@ -1,4 +1,5 @@
 using StormMachine.Domain.Discovery;
+using StormMachine.Domain.Topology;
 
 namespace StormMachine.Storage.UnitTests;
 
@@ -309,6 +310,160 @@ public sealed class SqliteDeviceStoreTests : IDisposable
         Assert.Equal("192.168.1.0/24", entry.Target);
         Assert.Equal("оператор", entry.Operator);
         Assert.Equal("254 адреса", entry.Details);
+    }
+
+    // ------------------------------------------------------------ объединение дублей
+
+    [Fact]
+    public async Task MergedDevices_BecomeOne()
+    {
+        // Ноутбук с проводом и Wi-Fi даёт два MAC. Инструмент не может знать,
+        // что это одно устройство: наблюдения у него разные и одинаково достоверные.
+        var store = CreateStore();
+        await store.InitializeAsync();
+
+        await store.SaveScanAsync(Scan(
+            "192.168.1.0/24",
+            [
+                Device("192.168.1.10", "AA-AA-AA-AA-AA-AA", "НОУТБУК"),
+                Device("192.168.1.11", "BB-BB-BB-BB-BB-BB"),
+            ]));
+
+        Assert.Equal(2, (await store.ListDevicesAsync()).Count);
+
+        await store.MergeAsync("AA-AA-AA-AA-AA-AA", "BB-BB-BB-BB-BB-BB", "оператор");
+
+        var device = Assert.Single(await store.ListDevicesAsync());
+
+        // Оба адреса при устройстве, имя не потерялось.
+        Assert.Equal(2, device.Addresses.Count);
+        Assert.Equal("НОУТБУК", device.HostName);
+        Assert.Equal("192.168.1.10", device.Address);
+    }
+
+    [Fact]
+    public async Task MergeSurvivesThreeRescans()
+    {
+        // Приёмка итерации: объединённые дубли не расходятся обратно.
+        var store = CreateStore();
+        await store.InitializeAsync();
+
+        Device[] both =
+        [
+            Device("192.168.1.10", "AA-AA-AA-AA-AA-AA"),
+            Device("192.168.1.11", "BB-BB-BB-BB-BB-BB"),
+        ];
+
+        await store.SaveScanAsync(Scan("192.168.1.0/24", both));
+        await store.MergeAsync("AA-AA-AA-AA-AA-AA", "BB-BB-BB-BB-BB-BB", "оператор");
+
+        for (var pass = 0; pass < 3; pass++)
+        {
+            await store.SaveScanAsync(Scan("192.168.1.0/24", both, Evening.AddMinutes(pass)));
+
+            Assert.Single(await store.ListDevicesAsync());
+        }
+    }
+
+    [Fact]
+    public async Task Unmerge_SplitsThemBack()
+    {
+        var store = CreateStore();
+        await store.InitializeAsync();
+
+        await store.SaveScanAsync(Scan(
+            "192.168.1.0/24",
+            [Device("192.168.1.10", "AA-AA-AA-AA-AA-AA"), Device("192.168.1.11", "BB-BB-BB-BB-BB-BB")]));
+
+        await store.MergeAsync("AA-AA-AA-AA-AA-AA", "BB-BB-BB-BB-BB-BB", "оператор");
+        Assert.Single(await store.ListDevicesAsync());
+
+        await store.UnmergeAsync("BB-BB-BB-BB-BB-BB");
+        Assert.Equal(2, (await store.ListDevicesAsync()).Count);
+    }
+
+    [Fact]
+    public async Task MergeChain_ResolvesToTheEnd()
+    {
+        // A присоединили к B, потом B к C — устройство должно остаться одно.
+        var store = CreateStore();
+        await store.InitializeAsync();
+
+        await store.SaveScanAsync(Scan(
+            "192.168.1.0/24",
+            [
+                Device("192.168.1.10", "AA-AA-AA-AA-AA-AA"),
+                Device("192.168.1.11", "BB-BB-BB-BB-BB-BB"),
+                Device("192.168.1.12", "CC-CC-CC-CC-CC-CC"),
+            ]));
+
+        await store.MergeAsync("BB-BB-BB-BB-BB-BB", "AA-AA-AA-AA-AA-AA", "оператор");
+        await store.MergeAsync("CC-CC-CC-CC-CC-CC", "BB-BB-BB-BB-BB-BB", "оператор");
+
+        var device = Assert.Single(await store.ListDevicesAsync());
+
+        Assert.Equal(3, device.Addresses.Count);
+    }
+
+    [Fact]
+    public async Task MergeIntoItself_IsRefused()
+    {
+        var store = CreateStore();
+        await store.InitializeAsync();
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => store.MergeAsync("AA-AA-AA-AA-AA-AA", "AA-AA-AA-AA-AA-AA", "оператор"));
+    }
+
+    [Fact]
+    public async Task CircularMerge_IsRefused()
+    {
+        // Кольцо повесило бы чтение инвентаря, поэтому отклоняется на входе.
+        var store = CreateStore();
+        await store.InitializeAsync();
+
+        await store.MergeAsync("AA-AA-AA-AA-AA-AA", "BB-BB-BB-BB-BB-BB", "оператор");
+
+        var error = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => store.MergeAsync("BB-BB-BB-BB-BB-BB", "AA-AA-AA-AA-AA-AA", "оператор"));
+
+        Assert.Contains("кольцо", error.Message, StringComparison.Ordinal);
+    }
+
+    // ------------------------------------------------------------ правки карты
+
+    [Fact]
+    public async Task TopologyEdits_RoundTrip()
+    {
+        var store = CreateStore();
+        await store.InitializeAsync();
+
+        var edit = TopologyEdit.Link("AA-AA-AA-AA-AA-AA", "BB-BB-BB-BB-BB-BB", "оператор", "видел провод");
+        await store.SaveTopologyEditAsync(edit);
+
+        var restored = Assert.Single(await store.ListTopologyEditsAsync());
+
+        Assert.Equal(edit.Id, restored.Id);
+        Assert.Equal(TopologyEditKind.AddLink, restored.Kind);
+        Assert.Equal("видел провод", restored.Note);
+        Assert.Equal("оператор", restored.Operator);
+    }
+
+    [Fact]
+    public async Task RemovedEdit_LeavesObservationsAlone()
+    {
+        // Отмена правки удаляет одну запись и не трогает наблюдения.
+        var store = CreateStore();
+        await store.InitializeAsync();
+
+        await store.SaveScanAsync(Scan("192.168.1.0/24", [Device("192.168.1.10", "AA-AA-AA-AA-AA-AA", "СЕРВЕР")]));
+
+        var edit = TopologyEdit.Hide("AA-AA-AA-AA-AA-AA", "оператор");
+        await store.SaveTopologyEditAsync(edit);
+        await store.RemoveTopologyEditAsync(edit.Id);
+
+        Assert.Empty(await store.ListTopologyEditsAsync());
+        Assert.Equal("СЕРВЕР", Assert.Single(await store.ListDevicesAsync()).HostName);
     }
 
     [Fact]

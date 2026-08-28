@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Клиентская сторона работы с агентами: сопряжение, память о них и удалённые пробы.
+       Инфраструктура: реализует порты слоя приложения поверх протокола. -->
+
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <Description>Клиентская сторона агентов Storm Machine: сопряжение и удалённые измерения.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\StormMachine.Application\StormMachine.Application.csproj" />
+    <ProjectReference Include="..\StormMachine.Protocol\StormMachine.Protocol.csproj" />
+  </ItemGroup>
+
+</Project>

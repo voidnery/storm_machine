@@ -2,6 +2,7 @@ using System.Globalization;
 using StormMachine.Application.Abstractions;
 using StormMachine.Application.Probes;
 using StormMachine.Domain.Presets;
+using StormMachine.Domain.Scenarios;
 using StormMachine.Domain.Targets;
 
 namespace StormMachine.Application.Presets;
@@ -34,7 +35,14 @@ public sealed class PresetService(IPresetStore store, IProbeRegistry registry)
     public Task<bool> DeleteAsync(Guid id, CancellationToken cancellationToken = default) =>
         _store.DeleteAsync(id, cancellationToken);
 
-    /// <summary>Проверяет пресет по объявлению пробы.</summary>
+    /// <summary>
+    /// Проверяет пресет.
+    /// </summary>
+    /// <remarks>
+    /// Проба проверяется по своему объявлению — тот же источник, из которого строятся
+    /// формы в интерфейсе и ключи командной строки. Сценарий проверяется по каталогу
+    /// шаблонов: его шаги и пороги заданы шаблоном, и параметров у пресета сценария нет.
+    /// </remarks>
     public IReadOnlyList<PresetValidationError> Validate(Preset preset)
     {
         ArgumentNullException.ThrowIfNull(preset);
@@ -46,11 +54,32 @@ public sealed class PresetService(IPresetStore store, IProbeRegistry registry)
             errors.Add(new PresetValidationError(nameof(preset.Name), "Имя пресета не может быть пустым."));
         }
 
-        if (!_registry.TryGet(preset.ProbeName, out var probe))
+        if (preset.Kind == PresetKind.Scenario)
+        {
+            if (!Scenarios.ScenarioTemplates.All.Any(t =>
+                    string.Equals(t.Key, preset.Subject, StringComparison.OrdinalIgnoreCase)))
+            {
+                errors.Add(new PresetValidationError(
+                    nameof(preset.Subject),
+                    $"Сценарий «{preset.Subject}» не найден. Доступные: "
+                    + string.Join(", ", Scenarios.ScenarioTemplates.All.Select(t => t.Key))));
+            }
+
+            if (preset.Parameters.Count > 0)
+            {
+                errors.Add(new PresetValidationError(
+                    nameof(preset.Parameters),
+                    "У пресета сценария параметров нет: шаги и пороги задаёт шаблон."));
+            }
+
+            return errors;
+        }
+
+        if (!_registry.TryGet(preset.Subject, out var probe))
         {
             errors.Add(new PresetValidationError(
-                nameof(preset.ProbeName),
-                $"Проба «{preset.ProbeName}» не найдена. Доступные: "
+                nameof(preset.Subject),
+                $"Проба «{preset.Subject}» не найдена. Доступные: "
                 + string.Join(", ", _registry.Descriptors.Select(d => d.Name))));
 
             return errors;
@@ -68,7 +97,7 @@ public sealed class PresetService(IPresetStore store, IProbeRegistry registry)
             {
                 errors.Add(new PresetValidationError(
                     name,
-                    $"Проба «{preset.ProbeName}» не знает параметра «{name}». "
+                    $"Проба «{preset.Subject}» не знает параметра «{name}». "
                     + $"Известные: {string.Join(", ", declared)}"));
             }
         }
@@ -117,10 +146,19 @@ public sealed class PresetService(IPresetStore store, IProbeRegistry registry)
         };
     }
 
+    /// <summary>Достаёт пробу пресета. Для пресета сценария всегда ложь: пробы у него нет.</summary>
     public bool TryGetProbe(Preset preset, out IProbe probe)
     {
         ArgumentNullException.ThrowIfNull(preset);
-        return _registry.TryGet(preset.ProbeName, out probe);
+
+        if (preset.Kind == PresetKind.Scenario)
+        {
+            probe = null!;
+
+            return false;
+        }
+
+        return _registry.TryGet(preset.Subject, out probe);
     }
 
     public Task RecordRunAsync(Guid id, CancellationToken cancellationToken = default) =>
@@ -151,7 +189,7 @@ public sealed class PresetService(IPresetStore store, IProbeRegistry registry)
             Id = Guid.NewGuid(),
             Name = name,
             Description = description,
-            ProbeName = probeName,
+            Subject = probeName,
             Target = request.Target,
             Parameters = parameters,
             Version = 1,
@@ -181,7 +219,8 @@ public sealed class PresetService(IPresetStore store, IProbeRegistry registry)
         {
             Name = preset.Name,
             Description = preset.Description,
-            ProbeName = preset.ProbeName,
+            Subject = preset.Subject,
+            Kind = preset.Kind == PresetKind.Scenario ? nameof(PresetKind.Scenario) : null,
             TargetKind = preset.Target.Kind.ToString(),
             TargetValue = preset.Target.Value,
             TargetLabel = preset.Target.Label,
@@ -288,7 +327,10 @@ public sealed class PresetService(IPresetStore store, IProbeRegistry registry)
             Id = Guid.NewGuid(),
             Name = portable.Name,
             Description = portable.Description,
-            ProbeName = portable.ProbeName,
+            Subject = portable.Subject,
+            Kind = string.Equals(portable.Kind, nameof(PresetKind.Scenario), StringComparison.OrdinalIgnoreCase)
+                ? PresetKind.Scenario
+                : PresetKind.Probe,
             Target = new Target
             {
                 Kind = kind,

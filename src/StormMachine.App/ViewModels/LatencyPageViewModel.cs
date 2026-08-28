@@ -27,7 +27,7 @@ namespace StormMachine.App.ViewModels;
 /// а пользы не приносят: человек не различает больше десятка обновлений в секунду.
 /// </para>
 /// </remarks>
-public sealed partial class LatencyPageViewModel : PageViewModel
+public sealed partial class LatencyPageViewModel : PageViewModel, ITargetAware
 {
     /// <summary>Сколько точек держим на графике. Дальше окно едет.</summary>
     private const int WindowSize = 600;
@@ -73,6 +73,9 @@ public sealed partial class LatencyPageViewModel : PageViewModel
     }
 
     // ------------------------------------------------------------------ параметры
+
+    /// <summary>Принимает цель из палитры команд.</summary>
+    public void UseTarget(string target) => TargetText = target;
 
     [ObservableProperty]
     private string _targetText = "gateway";

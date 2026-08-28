@@ -1,0 +1,130 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:StormMachine.App.ViewModels"
+             xmlns:monitors="using:StormMachine.Domain.Monitors"
+             xmlns:reports="using:StormMachine.Domain.Reports"
+             x:Class="StormMachine.App.Views.Pages.ReportsPage"
+             x:DataType="vm:ReportsPageViewModel">
+
+  <Grid RowDefinitions="Auto,*" Margin="24,20">
+
+    <StackPanel Grid.Row="0" Spacing="4" Margin="0,0,0,12">
+      <Grid ColumnDefinitions="*,Auto,Auto">
+        <TextBlock Grid.Column="0" Text="{Binding Title}" FontSize="24" FontWeight="SemiBold" />
+        <Button Grid.Column="1" Content="Обновить" Command="{Binding RefreshCommand}" Padding="12,5" Margin="0,0,8,0" />
+        <Button Grid.Column="2" Content="Сформировать" Command="{Binding BuildCommand}"
+                Padding="16,5" Background="{StaticResource AccentBrush}" Foreground="White" />
+      </Grid>
+
+      <TextBlock Text="{Binding Message}" FontSize="12" Foreground="#7DD3A0" TextWrapping="Wrap"
+                 IsVisible="{Binding Message, Converter={x:Static ObjectConverters.IsNotNull}}" />
+      <TextBlock Text="{Binding ErrorMessage}" FontSize="12" Foreground="{StaticResource DangerBrush}" TextWrapping="Wrap"
+                 IsVisible="{Binding ErrorMessage, Converter={x:Static ObjectConverters.IsNotNull}}" />
+    </StackPanel>
+
+    <Grid Grid.Row="1" ColumnDefinitions="360,*">
+
+      <!-- Что за документ -->
+      <Border Grid.Column="0" Background="{StaticResource PanelBrush}" CornerRadius="6" Padding="14">
+        <ScrollViewer>
+          <StackPanel Spacing="12">
+
+            <StackPanel Spacing="4">
+              <TextBlock Text="Шаблон" FontSize="11" Opacity="0.6" />
+              <ComboBox ItemsSource="{Binding Templates}" SelectedItem="{Binding Template}"
+                        HorizontalAlignment="Stretch" />
+              <TextBlock Text="{Binding Template.About}" FontSize="10" Opacity="0.5" TextWrapping="Wrap" />
+            </StackPanel>
+
+            <StackPanel Spacing="4">
+              <TextBlock Text="Период" FontSize="11" Opacity="0.6" />
+              <ComboBox ItemsSource="{Binding Periods}" SelectedItem="{Binding Period}"
+                        HorizontalAlignment="Stretch" />
+            </StackPanel>
+
+            <StackPanel Spacing="4" IsVisible="{Binding IsServiceLevel}">
+              <TextBlock Text="Монитор" FontSize="11" Opacity="0.6" />
+              <ComboBox ItemsSource="{Binding Monitors}" SelectedItem="{Binding Monitor}"
+                        HorizontalAlignment="Stretch">
+                <ComboBox.ItemTemplate>
+                  <DataTemplate x:DataType="monitors:Monitor">
+                    <TextBlock Text="{Binding Name}" />
+                  </DataTemplate>
+                </ComboBox.ItemTemplate>
+              </ComboBox>
+            </StackPanel>
+
+            <StackPanel Spacing="4">
+              <TextBlock Text="Сравнить с эталоном" FontSize="11" Opacity="0.6" />
+              <ComboBox ItemsSource="{Binding Baselines}" SelectedItem="{Binding Baseline}"
+                        HorizontalAlignment="Stretch" PlaceholderText="без сравнения">
+                <ComboBox.ItemTemplate>
+                  <DataTemplate x:DataType="reports:Baseline">
+                    <TextBlock Text="{Binding Name}" />
+                  </DataTemplate>
+                </ComboBox.ItemTemplate>
+              </ComboBox>
+              <TextBlock FontSize="10" Opacity="0.45" TextWrapping="Wrap"
+                         Text="Эталоны снимаются из консоли: storm baseline capture." />
+            </StackPanel>
+
+            <StackPanel Spacing="6">
+              <CheckBox Content="Вложить схему сети" IsChecked="{Binding IncludeTopology}" />
+              <CheckBox Content="Рисовать графики" IsChecked="{Binding IncludeCharts}" />
+            </StackPanel>
+
+            <!-- Реквизиты нужны только акту -->
+            <StackPanel Spacing="6" IsVisible="{Binding IsAcceptance}">
+              <TextBlock Text="Реквизиты акта" FontSize="12" FontWeight="SemiBold" Opacity="0.8" />
+
+              <TextBox PlaceholderText="Заказчик" Text="{Binding Customer}" />
+              <TextBox PlaceholderText="Объект: площадка, филиал" Text="{Binding Site}" />
+              <TextBox PlaceholderText="Кто выполнил проверку" Text="{Binding Author}" />
+
+              <TextBox PlaceholderText="Заключение — его пишет человек"
+                       Text="{Binding Conclusion}"
+                       AcceptsReturn="True" MinHeight="70" TextWrapping="Wrap" />
+
+              <TextBlock FontSize="10" Opacity="0.45" TextWrapping="Wrap"
+                         Text="Продукт заключение не составляет: он показывает измеренное и вердикты
+                               по заданным порогам, а оценку пригодности даёт подписавший." />
+            </StackPanel>
+
+          </StackPanel>
+        </ScrollViewer>
+      </Border>
+
+      <!-- Что войдёт -->
+      <Border Grid.Column="1" Margin="14,0,0,0" Background="{StaticResource PanelBrush}" CornerRadius="6" Padding="14">
+        <Grid RowDefinitions="Auto,Auto,*">
+
+          <TextBlock Grid.Row="0" Text="Измерения, которые войдут в документ"
+                     FontSize="12" FontWeight="SemiBold" Opacity="0.8" />
+
+          <Border Grid.Row="1" Margin="0,8" Padding="10,7" CornerRadius="4" Background="#3A2E12"
+                  IsVisible="{Binding SizeNotice, Converter={x:Static ObjectConverters.IsNotNull}}">
+            <TextBlock Text="{Binding SizeNotice}" FontSize="11" TextWrapping="Wrap" />
+          </Border>
+
+          <ScrollViewer Grid.Row="2">
+            <ItemsControl ItemsSource="{Binding Runs}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:RunChoice">
+                  <Grid ColumnDefinitions="Auto,150,*,Auto" Margin="0,3">
+                    <CheckBox Grid.Column="0" IsChecked="{Binding IsChosen}" />
+                    <TextBlock Grid.Column="1" Text="{Binding When}" FontSize="11" Opacity="0.6"
+                               VerticalAlignment="Center" FontFamily="Consolas,Menlo,monospace" />
+                    <TextBlock Grid.Column="2" Text="{Binding Title}" FontSize="12"
+                               VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                    <TextBlock Grid.Column="3" Text="{Binding Detail}" FontSize="11" Opacity="0.5"
+                               VerticalAlignment="Center" />
+                  </Grid>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </ScrollViewer>
+        </Grid>
+      </Border>
+    </Grid>
+  </Grid>
+</UserControl>

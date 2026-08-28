@@ -1,6 +1,8 @@
 using StormMachine.Application.Abstractions;
+using StormMachine.Application.Snmp;
 using StormMachine.Domain.Measurements;
 using StormMachine.Domain.Results;
+using StormMachine.Domain.Snmp;
 using StormMachine.Domain.Topology;
 
 namespace StormMachine.Application.Topology;
@@ -29,6 +31,36 @@ public sealed record TopologyOptions
     public int CollapseThreshold { get; init; } = 12;
 
     public IReadOnlyList<string> ExpandedSubnets { get; init; } = [];
+
+    /// <summary>
+    /// Учитывать правки оператора.
+    /// </summary>
+    /// <remarks>
+    /// Выключается только для проверки: полезно увидеть, что показывает сам инструмент,
+    /// прежде чем спорить с ним. В обычной работе правки применяются всегда.
+    /// </remarks>
+    public bool ApplyOperatorEdits { get; init; } = true;
+
+    /// <summary>
+    /// Опрашивать ли оборудование по SNMP.
+    /// </summary>
+    /// <remarks>
+    /// По умолчанию нет, и это не осторожность ради осторожности. Опрос идёт по чужой
+    /// сети и занимает секунды на устройство; делать его молча при каждом взгляде
+    /// на карту значило бы посылать трафик к оборудованию заказчика тогда, когда
+    /// человек об этом не просил.
+    /// </remarks>
+    public bool UseSnmp { get; init; }
+
+    /// <summary>
+    /// Кого опрашивать. Пусто — шлюзы.
+    /// </summary>
+    /// <remarks>
+    /// Шлюзы, потому что они наперечёт и почти всегда управляемы. Опрашивать всю
+    /// подсеть подряд продукт не станет: перебор адресов с учётными данными — это
+    /// уже не диагностика.
+    /// </remarks>
+    public IReadOnlyList<string> SnmpTargets { get; init; } = [];
 }
 
 /// <summary>
@@ -43,14 +75,21 @@ public sealed record TopologyOptions
 public sealed class TopologyService(
     IDeviceStore devices,
     IRunStore runs,
-    INetworkEnvironment environment)
+    INetworkEnvironment environment,
+    SnmpService? snmp = null)
 {
     private readonly IDeviceStore _devices = devices ?? throw new ArgumentNullException(nameof(devices));
     private readonly IRunStore _runs = runs ?? throw new ArgumentNullException(nameof(runs));
     private readonly INetworkEnvironment _environment = environment ?? throw new ArgumentNullException(nameof(environment));
+    private readonly SnmpService? _snmp = snmp;
 
+    /// <param name="note">
+    /// Куда сообщать о ходе опроса. Опрос идёт секундами на устройство, и молчащий
+    /// в это время инструмент выглядит зависшим.
+    /// </param>
     public async Task<TopologyGraph> BuildAsync(
         TopologyOptions? options = null,
+        Action<string>? note = null,
         CancellationToken cancellationToken = default)
     {
         options ??= new TopologyOptions();
@@ -58,17 +97,98 @@ public sealed class TopologyService(
         await _devices.InitializeAsync(cancellationToken).ConfigureAwait(false);
 
         var inventory = await _devices.ListDevicesAsync(cancellationToken).ConfigureAwait(false);
+        var subnets = ReadSubnets(options);
 
         return TopologyGraph.Build(new TopologyInput
         {
             Devices = inventory,
-            Subnets = ReadSubnets(options),
+            Subnets = subnets,
+            Switches = options.UseSnmp
+                ? await PollAsync(options, subnets, note, cancellationToken).ConfigureAwait(false)
+                : [],
             Paths = options.IncludeExternalPaths
                 ? await ReadPathsAsync(options.PathHistory, cancellationToken).ConfigureAwait(false)
                 : [],
             CollapseThreshold = options.CollapseThreshold,
             ExpandedSubnets = options.ExpandedSubnets,
+            Edits = options.ApplyOperatorEdits
+                ? await _devices.ListTopologyEditsAsync(cancellationToken).ConfigureAwait(false)
+                : [],
         });
+    }
+
+    /// <summary>Есть ли чем опрашивать — чтобы предложить это оператору, а не молчать.</summary>
+    public Task<bool> CanUseSnmpAsync(CancellationToken cancellationToken = default) =>
+        _snmp is null ? Task.FromResult(false) : _snmp.HasCredentialsAsync(cancellationToken);
+
+    /// <summary>
+    /// Опрашивает оборудование и складывает согласованные снимки.
+    /// </summary>
+    /// <remarks>
+    /// Устройство, которое не ответило, пропускается с пометкой, а не роняет
+    /// построение карты: SNMP выключен на половине оборудования, и карта без него
+    /// всё равно строится — просто с догадками вместо фактов.
+    /// </remarks>
+    private async Task<IReadOnlyList<SnmpDevice>> PollAsync(
+        TopologyOptions options,
+        IReadOnlyList<LocalSubnet> subnets,
+        Action<string>? note,
+        CancellationToken cancellationToken)
+    {
+        if (_snmp is null)
+        {
+            return [];
+        }
+
+        var targets = options.SnmpTargets.Count > 0
+            ? options.SnmpTargets
+            : [.. subnets.SelectMany(s => s.Gateways).Distinct(StringComparer.Ordinal)];
+
+        if (targets.Count == 0)
+        {
+            note?.Invoke("Опрашивать некого: шлюзов не найдено, адреса не заданы.");
+
+            return [];
+        }
+
+        var found = new List<SnmpDevice>();
+
+        foreach (var target in targets)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            note?.Invoke($"Опрашиваю {target}…");
+
+            try
+            {
+                var reach = await _snmp.ProbeAsync(target, cancellationToken).ConfigureAwait(false);
+
+                if (reach is null)
+                {
+                    note?.Invoke($"  {target}: не ответил ни одним из заведённых наборов.");
+
+                    continue;
+                }
+
+                var device = await _snmp
+                    .InspectAsync(target, reach.Credential, cancellationToken)
+                    .ConfigureAwait(false);
+
+                found.Add(device);
+
+                note?.Invoke(
+                    $"  {target}: {device.DisplayName}, портов "
+                    + $"{device.Interfaces.Count.ToString(System.Globalization.CultureInfo.InvariantCulture)}, "
+                    + $"соседей {device.Neighbors.Count.ToString(System.Globalization.CultureInfo.InvariantCulture)}, "
+                    + $"адресов в таблице {device.Forwarding.Count.ToString(System.Globalization.CultureInfo.InvariantCulture)}.");
+            }
+            catch (SnmpException ex)
+            {
+                note?.Invoke($"  {target}: {ex.Message}");
+            }
+        }
+
+        return found;
     }
 
     private List<LocalSubnet> ReadSubnets(TopologyOptions options)

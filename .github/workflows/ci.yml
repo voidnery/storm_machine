@@ -58,6 +58,7 @@ jobs:
         run: |
           dotnet publish src/StormMachine.Cli/StormMachine.Cli.csproj --configuration Release
           dotnet publish src/StormMachine.App/StormMachine.App.csproj --configuration Release
+          dotnet publish src/StormMachine.Agent/StormMachine.Agent.csproj --configuration Release
 
       - name: Публикация результатов тестов
         if: always() && steps.probe.outputs.found == 'true'

@@ -27,8 +27,15 @@ public sealed class RunnerService(RunOrchestrator orchestrator)
     private readonly RunOrchestrator _orchestrator = orchestrator
         ?? throw new ArgumentNullException(nameof(orchestrator));
 
-    /// <summary>Активные прогоны. Меняется только в потоке интерфейса.</summary>
-    public ObservableCollection<ActiveRunViewModel> Active { get; } = [];
+    /// <summary>
+    /// Активные операции. Меняется только в потоке интерфейса.
+    /// </summary>
+    /// <remarks>
+    /// Не только пробы: сценарий — самая длинная операция продукта, и до И-14
+    /// он шёл мимо этого списка. Оператор, ушедший с экрана, не знал, идёт ли
+    /// проверка, и не мог её остановить.
+    /// </remarks>
+    public ObservableCollection<ActiveOperationViewModel> Active { get; } = [];
 
     public bool HasActive => Active.Count > 0;
 
@@ -58,6 +65,36 @@ public sealed class RunnerService(RunOrchestrator orchestrator)
         _ = ExecuteAsync(run, probe, request, save, queue, cts, presetId, presetVersion);
 
         return run;
+    }
+
+    /// <summary>
+    /// Заводит операцию сценария и возвращает объект, за которым можно следить.
+    /// </summary>
+    /// <remarks>
+    /// В отличие от пробы, сценарий служба не выполняет: его гоняет страница,
+    /// потому что после каждой цели ей надо разложить результат по шагам.
+    /// Служба здесь отвечает только за то, чтобы операция была видна и отменяема
+    /// с любого экрана.
+    /// </remarks>
+    public ActiveScenarioViewModel StartScenario(string title, CancellationTokenSource cancellation)
+    {
+        ArgumentNullException.ThrowIfNull(cancellation);
+
+        var operation = new ActiveScenarioViewModel(title, cancellation);
+
+        Active.Add(operation);
+        ActiveChanged?.Invoke(this, EventArgs.Empty);
+
+        return operation;
+    }
+
+    /// <summary>Убирает операцию из списка. Вызывается из потока интерфейса.</summary>
+    public void Remove(ActiveOperationViewModel operation)
+    {
+        ArgumentNullException.ThrowIfNull(operation);
+
+        Active.Remove(operation);
+        ActiveChanged?.Invoke(this, EventArgs.Empty);
     }
 
     private async Task ExecuteAsync(

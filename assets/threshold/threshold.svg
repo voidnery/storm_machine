@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <title>Storm Machine — Порог</title>
+  <defs>
+    <linearGradient id="tile" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#232A38"/>
+      <stop offset="1" stop-color="#141922"/>
+    </linearGradient>
+  </defs>
+  <rect x="0" y="0" width="256" height="256" rx="57.6" fill="url(#tile)"/>
+  <rect x="1" y="1" width="254" height="254" rx="56.6" fill="none" stroke="#39435A" stroke-width="2"/>
+  <g transform="translate(48.64 48.64) scale(158.72)">
+    <line x1="0.02" y1="0.32" x2="0.98" y2="0.32" stroke="#5A6375" stroke-width="0.045" stroke-linecap="round" stroke-dasharray="0.09 0.075"/>
+  <path d="M 0.03 0.7 L 0.15 0.7 L 0.24 0.66 L 0.32 0.72 L 0.4 0.68 L 0.5 0.08 L 0.6 0.74 L 0.67 0.52 L 0.74 0.7 L 0.85 0.67 L 0.97 0.7" fill="none" stroke="#3B82F6" stroke-width="0.085" stroke-linecap="round" stroke-linejoin="round"/>
+  <clipPath id="above"><rect x="0" y="0" width="1" height="0.32"/></clipPath>
+<path d="M 0.03 0.7 L 0.15 0.7 L 0.24 0.66 L 0.32 0.72 L 0.4 0.68 L 0.5 0.08 L 0.6 0.74 L 0.67 0.52 L 0.74 0.7 L 0.85 0.67 L 0.97 0.7" fill="none" stroke="#EF4444" stroke-width="0.085" stroke-linecap="round" stroke-linejoin="round" clip-path="url(#above)"/>
+  </g>
+</svg>

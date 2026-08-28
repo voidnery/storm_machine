@@ -35,6 +35,62 @@ public sealed class SqlitePresetStoreTests : IDisposable
         ApplyRetentionOnStartup = false,
     }));
 
+    [Fact(DisplayName = "Пресет сценария переживает запись и чтение")]
+    public async Task ScenarioPresetRoundTrip()
+    {
+        var store = CreateStore();
+        var now = DateTimeOffset.UtcNow;
+
+        var preset = new Preset
+        {
+            Id = Guid.NewGuid(),
+            Name = "Наши сайты",
+            Kind = PresetKind.Scenario,
+            Subject = "web",
+            Target = Target.Host("наши", "внутренние сайты"),
+            Version = 1,
+            CreatedUtc = now,
+            UpdatedUtc = now,
+        };
+
+        await store.SaveAsync(preset);
+
+        var loaded = await store.GetAsync(preset.Id);
+
+        Assert.NotNull(loaded);
+        Assert.Equal(PresetKind.Scenario, loaded!.Kind);
+        Assert.Equal("web", loaded.Subject);
+        Assert.Equal("наши", loaded.Target.Value);
+    }
+
+    [Fact(DisplayName = "Старые пресеты после обновления схемы читаются как пробы")]
+    public async Task ExistingPresetsStayProbes()
+    {
+        var store = CreateStore();
+
+        await store.SaveAsync(Sample());
+
+        // Колонка вида добавлена девятой ступенью со значением по умолчанию.
+        // Библиотека, собранная до И-14, обязана открыться без потерь.
+        var loaded = await store.ListAsync(new PresetQuery());
+
+        Assert.All(loaded, p => Assert.Equal(PresetKind.Probe, p.Kind));
+    }
+
+    [Fact(DisplayName = "Проба и сценарий с одним именем — разные измерения")]
+    public async Task KindIsPartOfIdentity()
+    {
+        var store = CreateStore();
+        var probe = Sample("одинаково", "dns");
+        var scenario = probe with { Kind = PresetKind.Scenario, Subject = "dns" };
+
+        // Иначе смена вида не поднимала бы редакцию, и результаты пробы
+        // сравнивались бы с результатами сценария как полученные одним тестом.
+        Assert.False(probe.IsSameMeasurement(scenario));
+
+        await store.SaveAsync(probe);
+    }
+
     private static Preset Sample(string name = "Шлюз", string probe = "ping", int count = 4)
     {
         var now = DateTimeOffset.UtcNow;
@@ -44,7 +100,7 @@ public sealed class SqlitePresetStoreTests : IDisposable
             Id = Guid.NewGuid(),
             Name = name,
             Description = "проверка шлюза",
-            ProbeName = probe,
+            Subject = probe,
             Target = Target.Gateway("шлюз по умолчанию"),
             Parameters = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase)
             {
@@ -68,7 +124,7 @@ public sealed class SqlitePresetStoreTests : IDisposable
 
         Assert.NotNull(loaded);
         Assert.Equal("Шлюз", loaded.Name);
-        Assert.Equal("ping", loaded.ProbeName);
+        Assert.Equal("ping", loaded.Subject);
         Assert.Equal(TargetKind.DefaultGateway, loaded.Target.Kind);
         Assert.Equal("4", loaded.Parameters["count"]);
         Assert.Equal(["сеть", "быстро"], loaded.Tags);
@@ -184,7 +240,7 @@ public sealed class SqlitePresetStoreTests : IDisposable
         await store.SaveAsync(Sample("Шлюз", "ping"));
         await store.SaveAsync(Sample("Сайт компании", "http"));
 
-        var pings = await store.ListAsync(new PresetQuery { ProbeName = "ping" });
+        var pings = await store.ListAsync(new PresetQuery { Subject = "ping" });
         Assert.Single(pings);
 
         var search = await store.ListAsync(new PresetQuery { Search = "сайт" });

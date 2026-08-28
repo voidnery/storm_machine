@@ -41,7 +41,7 @@ public sealed class PresetServiceTests
         {
             Id = Guid.NewGuid(),
             Name = name,
-            ProbeName = probe,
+            Subject = probe,
             Target = Target.Gateway("шлюз"),
             Parameters = parameters ?? new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase)
             {
@@ -67,7 +67,7 @@ public sealed class PresetServiceTests
 
         var errors = service.Validate(Sample(probe: "телепатия"));
 
-        Assert.Contains(errors, e => e.Field == nameof(Preset.ProbeName));
+        Assert.Contains(errors, e => e.Field == nameof(Preset.Subject));
     }
 
     [Fact]
@@ -179,7 +179,7 @@ public sealed class PresetServiceTests
         var imported = await targetStore.FindByNameAsync("Шлюз — быстрая проверка");
 
         Assert.NotNull(imported);
-        Assert.Equal(original.ProbeName, imported.ProbeName);
+        Assert.Equal(original.Subject, imported.Subject);
         Assert.Equal(original.Target.Kind, imported.Target.Kind);
         Assert.Equal(original.Parameters["count"], imported.Parameters["count"]);
 

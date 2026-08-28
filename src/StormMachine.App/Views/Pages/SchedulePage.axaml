@@ -1,0 +1,76 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:StormMachine.App.ViewModels"
+             x:Class="StormMachine.App.Views.Pages.SchedulePage"
+             x:DataType="vm:SchedulePageViewModel">
+
+  <Grid RowDefinitions="Auto,*" Margin="24,20">
+
+    <StackPanel Grid.Row="0" Spacing="4" Margin="0,0,0,12">
+      <Grid ColumnDefinitions="*,Auto">
+        <TextBlock Grid.Column="0" Text="{Binding Title}" FontSize="24" FontWeight="SemiBold" />
+        <Button Grid.Column="1" Content="Обновить" Command="{Binding RefreshCommand}" Padding="12,5" />
+      </Grid>
+      <TextBlock Text="{Binding Summary}" FontSize="11" Opacity="0.55" TextWrapping="Wrap" />
+      <TextBlock Text="{Binding SchedulerState}" FontSize="11" Opacity="0.45" />
+      <TextBlock Text="{Binding ErrorMessage}" FontSize="12" Foreground="{StaticResource DangerBrush}" TextWrapping="Wrap"
+                 IsVisible="{Binding ErrorMessage, Converter={x:Static ObjectConverters.IsNotNull}}" />
+    </StackPanel>
+
+    <Grid Grid.Row="1" ColumnDefinitions="*,300">
+
+      <!-- Ближайшие запуски -->
+      <Border Grid.Column="0" Background="{StaticResource PanelBrush}" CornerRadius="6" Padding="14">
+        <ScrollViewer>
+          <StackPanel Spacing="6">
+            <Grid ColumnDefinitions="110,170,200,*">
+              <TextBlock Grid.Column="0" Text="когда" FontSize="10" Opacity="0.45" />
+              <TextBlock Grid.Column="1" Text="через сколько" FontSize="10" Opacity="0.45" />
+              <TextBlock Grid.Column="2" Text="монитор" FontSize="10" Opacity="0.45" />
+              <TextBlock Grid.Column="3" Text="что запустится" FontSize="10" Opacity="0.45" />
+            </Grid>
+
+            <ItemsControl ItemsSource="{Binding Upcoming}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:UpcomingRow">
+                  <Grid ColumnDefinitions="110,170,200,*" Margin="0,3">
+                    <TextBlock Grid.Column="0" Text="{Binding When}" FontSize="12"
+                               FontFamily="Consolas,Menlo,monospace" />
+                    <TextBlock Grid.Column="1" Text="{Binding Relative}" FontSize="11" Opacity="0.6" />
+                    <TextBlock Grid.Column="2" Text="{Binding Monitor}" FontSize="12"
+                               TextTrimming="CharacterEllipsis" />
+                    <TextBlock Grid.Column="3" Text="{Binding What}" FontSize="11" Opacity="0.6"
+                               TextTrimming="CharacterEllipsis" />
+                  </Grid>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </StackPanel>
+        </ScrollViewer>
+      </Border>
+
+      <!-- Окна обслуживания -->
+      <Border Grid.Column="1" Margin="14,0,0,0" Background="{StaticResource PanelBrush}" CornerRadius="6" Padding="14">
+        <StackPanel Spacing="10">
+          <TextBlock Text="Окна обслуживания" FontSize="13" FontWeight="SemiBold" />
+
+          <TextBlock FontSize="10" Opacity="0.5" TextWrapping="Wrap"
+                     Text="В окне проверки не идут, и это время исключается из расчёта доступности.
+                           Считать плановые работы простоем — завышать нарушение SLA, считать их
+                           работой — занижать." />
+
+          <ItemsControl ItemsSource="{Binding Maintenance}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:MaintenanceRow">
+                <StackPanel Spacing="1" Margin="0,0,0,8">
+                  <TextBlock Text="{Binding Monitor}" FontSize="12" />
+                  <TextBlock Text="{Binding Window}" FontSize="11" Opacity="0.6" TextWrapping="Wrap" />
+                </StackPanel>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </StackPanel>
+      </Border>
+    </Grid>
+  </Grid>
+</UserControl>

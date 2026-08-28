@@ -29,6 +29,7 @@ public sealed class ArchitectureRulesTests
         "StormMachine.Discovery",
         "StormMachine.Reporting",
         "StormMachine.Scheduling",
+        "StormMachine.Agents",
     ];
 
     [Fact(DisplayName = "Правило 1: Domain не зависит ни от чего")]
@@ -46,6 +47,36 @@ public sealed class ArchitectureRulesTests
             domain.PackageReferences.Count == 0,
             $"Domain ссылается на пакеты: {string.Join(", ", domain.PackageReferences)}. "
             + "Ноль внешних зависимостей — условие того, что модель переживёт смену любой библиотеки.");
+    }
+
+    [Fact(DisplayName = "Правило 1а: Protocol не зависит от проектов")]
+    public void Protocol_HasNoProjectDependencies()
+    {
+        var protocol = RepositoryLayout.FindProject("StormMachine.Protocol");
+        Assert.NotNull(protocol);
+
+        Assert.True(
+            protocol.ProjectReferences.Count == 0,
+            $"Protocol ссылается на проекты: {string.Join(", ", protocol.ProjectReferences)}. "
+            + "Формат провода обязан пережить любую перестройку доменной модели, "
+            + "а агент — собираться в маленький самостоятельный бинарь.");
+    }
+
+    [Fact(DisplayName = "Правило 1б: агент знает только протокол")]
+    public void Agent_ReferencesOnlyProtocol()
+    {
+        var agent = RepositoryLayout.FindProject("StormMachine.Agent");
+        Assert.NotNull(agent);
+
+        var unexpected = agent.ProjectReferences
+            .Where(r => r != "StormMachine.Protocol")
+            .ToList();
+
+        Assert.True(
+            unexpected.Count == 0,
+            $"Агент ссылается на посторонние проекты: {string.Join(", ", unexpected)}. "
+            + "Он живёт на чужой машине и обязан оставаться портативным: продукт целиком "
+            + "туда не поедет.");
     }
 
     [Fact(DisplayName = "Правило 2: Application ссылается только на Domain")]
@@ -71,6 +102,23 @@ public sealed class ArchitectureRulesTests
             forbiddenPackages.Count == 0,
             $"Application ссылается на пакеты вне списка разрешённых: {string.Join(", ", forbiddenPackages)}. "
             + $"Разрешены только абстракции: {string.Join(", ", ApplicationAllowedPackages)}.");
+    }
+
+    [Fact(DisplayName = "Правило 2а: каналы оповещения — обычная инфраструктура")]
+    public void Alerting_ReferencesOnlyApplication()
+    {
+        var alerting = RepositoryLayout.FindProject("StormMachine.Alerting");
+        Assert.NotNull(alerting);
+
+        var unexpected = alerting.ProjectReferences
+            .Where(r => r != "StormMachine.Application")
+            .ToList();
+
+        Assert.True(
+            unexpected.Count == 0,
+            $"Alerting ссылается на посторонние проекты: {string.Join(", ", unexpected)}. "
+            + "Каналы — реализация порта IAlertChannel и знают ровно столько же, "
+            + "сколько хранилище или пробы.");
     }
 
     [Fact(DisplayName = "Правило 3: представление не знает об инфраструктуре")]
@@ -215,6 +263,9 @@ public sealed class ArchitectureRulesTests
                      "StormMachine.Application",
                      "StormMachine.Cli",
                      "StormMachine.App",
+                     "StormMachine.Protocol",
+                     "StormMachine.Agent",
+                     "StormMachine.Alerting",
                  })
         {
             Assert.True(

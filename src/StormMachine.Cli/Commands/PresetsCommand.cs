@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using StormMachine.Application.Abstractions;
 using StormMachine.Application.Presets;
 using StormMachine.Application.Runs;
+using StormMachine.Application.Scenarios;
 using StormMachine.Cli.Rendering;
 using StormMachine.Domain.Presets;
 
@@ -46,7 +47,7 @@ internal static class PresetsCommand
             var found = await presets.ListAsync(
                 new PresetQuery
                 {
-                    ProbeName = Nullify(parseResult.GetValue(probeOption)),
+                    Subject = Nullify(parseResult.GetValue(probeOption)),
                     Tag = Nullify(parseResult.GetValue(tagOption)),
                     Search = Nullify(parseResult.GetValue(searchOption)),
                 },
@@ -136,9 +137,18 @@ internal static class PresetsCommand
                 return 2;
             }
 
+            // Пресет сценария идёт другим путём: у него нет пробы и нет параметров,
+            // зато есть цепочка шагов с порогами. Запуск при этом остаётся тем же —
+            // тот же ScenarioRunner, что и у «storm scenario run».
+            if (preset.Kind == PresetKind.Scenario)
+            {
+                return await RunScenarioPresetAsync(services, preset, parseResult, saveOption, cancellationToken)
+                    .ConfigureAwait(false);
+            }
+
             if (!presets.TryGetProbe(preset, out var probe))
             {
-                Console.Error.WriteLine($"Проба «{preset.ProbeName}» не зарегистрирована.");
+                Console.Error.WriteLine($"Проба «{preset.Subject}» не зарегистрирована.");
                 return 1;
             }
 
@@ -324,6 +334,85 @@ internal static class PresetsCommand
     }
 
     /// <summary>Находит пресет по имени или идентификатору.</summary>
+    /// <summary>
+    /// Запуск пресета сценария.
+    /// </summary>
+    /// <remarks>
+    /// Цель хранится исходной строкой, а не разрешённым списком: если это было имя
+    /// набора, повторный запуск возьмёт набор заново. Пресет «проверить все наши
+    /// сайты» обязан переживать появление девятого сайта — иначе он превращается
+    /// в снимок прошлого года, выдающий себя за проверку.
+    /// </remarks>
+    private static async Task<int> RunScenarioPresetAsync(
+        IServiceProvider services,
+        Preset preset,
+        ParseResult parseResult,
+        Option<bool> saveOption,
+        CancellationToken cancellationToken)
+    {
+        var runner = services.GetRequiredService<ScenarioRunner>();
+        var clock = services.GetRequiredService<IHighResolutionClock>();
+        var environment = services.GetRequiredService<INetworkEnvironment>();
+        var store = services.GetRequiredService<IRunStore>();
+        var presets = services.GetRequiredService<PresetService>();
+
+        var save = parseResult.GetValue(saveOption);
+
+        TargetSet set;
+
+        try
+        {
+            set = TargetSets.Resolve(preset.Target.Value, environment);
+        }
+        catch (ArgumentException ex)
+        {
+            Console.Error.WriteLine(ex.Message);
+
+            return 2;
+        }
+
+        if (set.Targets.Count == 0)
+        {
+            Console.Error.WriteLine($"Набор «{set.Key}» пуст: {set.Origin}.");
+
+            return 2;
+        }
+
+        if (save)
+        {
+            await store.InitializeAsync(cancellationToken).ConfigureAwait(false);
+        }
+
+        await clock.CalibrateAsync(cancellationToken).ConfigureAwait(false);
+
+        Console.WriteLine($"Пресет    : {preset.Name} (редакция {preset.Version})");
+
+        var runs = new List<(string Target, Domain.Scenarios.ScenarioRun Run)>(set.Targets.Count);
+
+        foreach (var target in set.Targets)
+        {
+            var scenario = ScenarioTemplates.Create(preset.Subject, target);
+
+            ScenarioRenderer.WriteHeader(scenario, environment.GetPrimaryAdapter(), clock, set);
+
+            var run = await runner
+                .RunAsync(scenario, save, ScenarioRenderer.CreateProgressWriter(), cancellationToken)
+                .ConfigureAwait(false);
+
+            ScenarioRenderer.WriteRun(run, clock.CalibrationBaselineMs);
+            runs.Add((target, run));
+        }
+
+        if (runs.Count > 1)
+        {
+            ScenarioRenderer.WriteSetSummary(set, runs);
+        }
+
+        await presets.RecordRunAsync(preset.Id, cancellationToken).ConfigureAwait(false);
+
+        return runs.Any(r => r.Run.Level == Domain.Results.VerdictLevel.Fail) ? 1 : 0;
+    }
+
     private static async Task<Preset?> ResolveAsync(PresetService presets, string raw, CancellationToken cancellationToken)
     {
         if (Guid.TryParse(raw, out var id))
@@ -363,14 +452,14 @@ internal static class PresetRenderer
             return;
         }
 
-        Console.WriteLine($"  {"имя",-28} {"проба",-6} {"цель",-24} {"ред.",5} {"запусков",9}  теги");
+        Console.WriteLine($"  {"имя",-28} {"что",-10} {"цель",-24} {"ред.",5} {"запусков",9}  теги");
 
         foreach (var preset in presets)
         {
             var tags = preset.Tags.Count == 0 ? string.Empty : string.Join(", ", preset.Tags);
 
             Console.WriteLine(
-                $"  {Shorten(preset.Name, 28),-28} {preset.ProbeName,-6} {Shorten(preset.Target.DisplayName, 24),-24} "
+                $"  {Shorten(preset.Name, 28),-28} {Subject(preset),-10} {Shorten(preset.Target.DisplayName, 24),-24} "
                 + $"{preset.Version,5} {preset.RunCount,9}  {tags}");
         }
 
@@ -389,7 +478,9 @@ internal static class PresetRenderer
             Console.WriteLine($"Описание  : {preset.Description}");
         }
 
-        Console.WriteLine($"Проба     : {preset.ProbeName}");
+        Console.WriteLine(preset.Kind == PresetKind.Scenario
+            ? $"Сценарий  : {preset.Subject}"
+            : $"Проба     : {preset.Subject}");
         Console.WriteLine($"Цель      : {preset.Target.DisplayName}");
         Console.WriteLine($"Редакция  : {preset.Version}");
         Console.WriteLine($"Создан    : {preset.CreatedUtc.ToLocalTime():dd.MM.yyyy HH:mm}");
@@ -415,6 +506,16 @@ internal static class PresetRenderer
         Console.WriteLine();
         Console.WriteLine($"Идентификатор: {preset.Id.ToString()[..8]}");
     }
+
+    /// <summary>
+    /// Что запускает пресет, одной колонкой.
+    /// </summary>
+    /// <remarks>
+    /// Сценарий помечен явно: «web» в колонке проб читалось бы как проба с таким
+    /// именем, а её не существует, и оператор искал бы её в «storm probes».
+    /// </remarks>
+    private static string Subject(Preset preset) =>
+        preset.Kind == PresetKind.Scenario ? $"сцен. {preset.Subject}" : preset.Subject;
 
     private static string Shorten(string value, int limit) =>
         value.Length <= limit ? value : value[..(limit - 1)] + "…";

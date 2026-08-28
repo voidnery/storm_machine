@@ -1,3 +1,4 @@
+using Avalonia;
 using Avalonia.Controls;
 using StormMachine.App.Services;
 
@@ -5,7 +6,21 @@ namespace StormMachine.App.Views;
 
 public partial class MainWindow : Window
 {
-    public MainWindow() => InitializeComponent();
+    public MainWindow()
+    {
+        InitializeComponent();
+
+        // Палитра, открывшаяся без фокуса в поле, бесполезна: сочетание клавиш
+        // экономит одно движение мышью только затем, чтобы потребовать другое.
+        PaletteOverlay.PropertyChanged += (_, args) =>
+        {
+            if (args.Property == IsVisibleProperty && args.NewValue is true)
+            {
+                PaletteBox.Focus();
+                PaletteBox.SelectAll();
+            }
+        };
+    }
 
     /// <summary>
     /// Подставляет окно службе выбора файлов.

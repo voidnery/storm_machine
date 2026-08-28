@@ -23,3 +23,22 @@ public sealed class OpacityConverter : IValueConverter
     public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) =>
         throw new NotSupportedException("Свойство только для показа.");
 }
+
+/// <summary>
+/// Приглушает строку, которая не была наблюдением.
+/// </summary>
+/// <remarks>
+/// Обратный к <see cref="OpacityConverter"/> по смыслу: там истина означает «жив
+/// и отвечает», здесь — «проверки не было». Пропуск и обслуживание видны в истории
+/// наравне с измерениями, но не должны читаться как измерения.
+/// </remarks>
+public sealed class GapOpacityConverter : IValueConverter
+{
+    public static readonly GapOpacityConverter Instance = new();
+
+    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture) =>
+        value is true ? 0.45 : 1.0;
+
+    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) =>
+        throw new NotSupportedException("Свойство только для показа.");
+}

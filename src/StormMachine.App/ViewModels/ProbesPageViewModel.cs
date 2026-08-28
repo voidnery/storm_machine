@@ -1,0 +1,310 @@
+using System.Collections.ObjectModel;
+using System.Globalization;
+using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
+using StormMachine.App.Services;
+using StormMachine.Application.Abstractions;
+using StormMachine.Application.Scenarios;
+using StormMachine.Domain.Results;
+using StormMachine.Domain.Scenarios;
+
+namespace StormMachine.App.ViewModels;
+
+/// <summary>Итог одной цели в наборе.</summary>
+public sealed record ScenarioTargetRow(string Target, string Mark, string Verdict, string Where);
+
+/// <summary>Шаблон сценария в выпадающем списке.</summary>
+public sealed record ScenarioTemplateOption(string Key, string Title, string About)
+{
+    public override string ToString() => $"{Title} — {About}";
+}
+
+/// <summary>
+/// Экран внешних проб: сценарии из цепочки шагов.
+/// </summary>
+/// <remarks>
+/// Отвечает на вопрос, на который одиночная проба ответить не может: «работает ли это
+/// целиком, и если нет — где именно сломалось». Одно число «страница открылась за 460 мс»
+/// не говорит, медленно в разрешении имени, в соединении, в рукопожатии TLS или на сервере.
+/// <para>
+/// Несколько целей — второй вопрос: «дело в нас или в них». Пока проверена одна цель,
+/// отличить поломку канала от поломки конкретного сервера нечем.
+/// </para>
+/// </remarks>
+public sealed partial class ProbesPageViewModel : PageViewModel, ITargetAware, IDisposable
+{
+    private readonly ScenarioRunner _runner;
+    private readonly IHighResolutionClock _clock;
+    private readonly INetworkEnvironment _environment;
+    private readonly IRunStore _store;
+    private readonly RunnerService _operations;
+
+    private CancellationTokenSource? _cts;
+    private ActiveScenarioViewModel? _operation;
+
+    [ObservableProperty]
+    private ScenarioTemplateOption? _template;
+
+    /// <summary>Принимает цель из палитры команд.</summary>
+    public void UseTarget(string target) => Target = target;
+
+    [ObservableProperty]
+    private string _target = "example.com";
+
+    [ObservableProperty]
+    private bool _save = true;
+
+    [ObservableProperty]
+    private bool _isRunning;
+
+    [ObservableProperty]
+    private string? _error;
+
+    [ObservableProperty]
+    private string _progress = string.Empty;
+
+    [ObservableProperty]
+    private string _conclusion = string.Empty;
+
+    [ObservableProperty]
+    private string _caption = string.Empty;
+
+    [ObservableProperty]
+    private string _note = string.Empty;
+
+    public ProbesPageViewModel(
+        NavigationSection section,
+        ScenarioRunner runner,
+        IHighResolutionClock clock,
+        INetworkEnvironment environment,
+        IRunStore store,
+        RunnerService operations)
+        : base(section)
+    {
+        _runner = runner ?? throw new ArgumentNullException(nameof(runner));
+        _operations = operations ?? throw new ArgumentNullException(nameof(operations));
+        _clock = clock ?? throw new ArgumentNullException(nameof(clock));
+        _environment = environment ?? throw new ArgumentNullException(nameof(environment));
+        _store = store ?? throw new ArgumentNullException(nameof(store));
+
+        Templates = [.. ScenarioTemplates.All.Select(t => new ScenarioTemplateOption(t.Key, t.Title, t.About))];
+        Template = Templates[0];
+
+        Sets = [.. TargetSets.All.Select(t => t.Key)];
+    }
+
+    public IReadOnlyList<ScenarioTemplateOption> Templates { get; }
+
+    /// <summary>Имена готовых наборов — подставляются в поле цели одним нажатием.</summary>
+    public IReadOnlyList<string> Sets { get; }
+
+    public ObservableCollection<ScenarioStepRowViewModel> Steps { get; } = [];
+
+    public ObservableCollection<ScenarioTargetRow> Targets { get; } = [];
+
+    public bool HasSteps => Steps.Count > 0;
+
+    public bool HasTargets => Targets.Count > 1;
+
+    public bool CanStart => !IsRunning;
+
+    partial void OnIsRunningChanged(bool value)
+    {
+        OnPropertyChanged(nameof(CanStart));
+        RunCommand.NotifyCanExecuteChanged();
+        StopCommand.NotifyCanExecuteChanged();
+    }
+
+    [RelayCommand(CanExecute = nameof(CanStart))]
+    private async Task RunAsync()
+    {
+        if (Template is null)
+        {
+            return;
+        }
+
+        Error = null;
+        Steps.Clear();
+        Targets.Clear();
+        Conclusion = string.Empty;
+        Note = string.Empty;
+        OnPropertyChanged(nameof(HasSteps));
+        OnPropertyChanged(nameof(HasTargets));
+
+        TargetSet set;
+
+        try
+        {
+            set = TargetSets.Resolve(Target, _environment);
+        }
+        catch (ArgumentException ex)
+        {
+            Error = ex.Message;
+            return;
+        }
+
+        if (set.Targets.Count == 0)
+        {
+            Error = $"Набор «{set.Key}» пуст: {set.Origin}.";
+            return;
+        }
+
+        IsRunning = true;
+        _cts = new CancellationTokenSource();
+
+        // Сценарий попадает в список длительных операций: он идёт минутами,
+        // а оператор не обязан сидеть на экране, с которого его запустил.
+        _operation = _operations.StartScenario(
+            set.Targets.Count > 1 ? $"{Template.Title} — целей {set.Targets.Count}" : $"{Template.Title} — {set.Targets[0]}",
+            _cts);
+
+        try
+        {
+            if (Save)
+            {
+                await _store.InitializeAsync(_cts.Token).ConfigureAwait(true);
+            }
+
+            // Калибровка одна на весь набор: часы за время прогона не меняются,
+            // а её результат нужен, чтобы отличить измеренное от собственного шума.
+            await _clock.CalibrateAsync(_cts.Token).ConfigureAwait(true);
+
+            Caption = set.Targets.Count > 1
+                ? $"{set.Title} — {set.Origin}, целей {set.Targets.Count}"
+                : set.Targets[0];
+
+            foreach (var target in set.Targets)
+            {
+                _operation.SetTarget(set.Targets.Count > 1 ? target : null);
+
+                var scenario = ScenarioTemplates.Create(Template.Key, target);
+                var run = await RunOneAsync(scenario, set.Targets.Count > 1 ? target : null).ConfigureAwait(true);
+
+                Targets.Add(new ScenarioTargetRow(
+                    target,
+                    Mark(run.Level),
+                    Word(run.Level),
+                    run.FirstFailure?.Name ?? "—"));
+            }
+
+            OnPropertyChanged(nameof(HasTargets));
+            Conclusion = Describe(set);
+        }
+        catch (OperationCanceledException)
+        {
+            Conclusion = "Сценарий прерван.";
+        }
+        catch (ArgumentException ex)
+        {
+            Error = ex.Message;
+        }
+        finally
+        {
+            Progress = string.Empty;
+
+            if (_operation is { } operation)
+            {
+                operation.Finish();
+                _operations.Remove(operation);
+                _operation = null;
+            }
+
+            _cts?.Dispose();
+            _cts = null;
+            IsRunning = false;
+        }
+    }
+
+    private async Task<ScenarioRun> RunOneAsync(Scenario scenario, string? targetLabel)
+    {
+        var run = await _runner
+            .RunAsync(scenario, Save, OnProgress, _cts!.Token)
+            .ConfigureAwait(true);
+
+        // Полоски сравниваются в пределах одной цели: у соседней цели свой масштаб,
+        // и общий сделал бы быструю цель невидимой рядом с медленной.
+        var longest = run.Steps.Select(s => s.PhaseMs ?? 0).DefaultIfEmpty(0).Max();
+
+        if (targetLabel is not null)
+        {
+            Steps.Add(ScenarioStepRowViewModel.Separator(targetLabel));
+        }
+
+        foreach (var step in run.Steps)
+        {
+            Steps.Add(new ScenarioStepRowViewModel(step, longest, _clock.CalibrationBaselineMs));
+        }
+
+        OnPropertyChanged(nameof(HasSteps));
+
+        Note = "Шаги измеряют пересекающиеся отрезки: «Страница» включает в себя и разрешение имени, "
+               + "и соединение, и рукопожатие. Столбики сравнимы между собой, но не складываются — "
+               + "доля считается только внутри шага.";
+
+        return run;
+    }
+
+    private void OnProgress(ScenarioProgress progress)
+    {
+        Progress = progress.Finished is null
+            ? $"{progress.StepIndex + 1}/{progress.StepCount} {progress.StepName}…"
+            : string.Empty;
+
+        _operation?.Report(progress);
+    }
+
+    private string Describe(TargetSet set)
+    {
+        if (Targets.Count <= 1)
+        {
+            return Targets.Count == 1 ? $"Итог: {Targets[0].Verdict}." : string.Empty;
+        }
+
+        var failed = Targets.Count(t => string.Equals(t.Verdict, Word(VerdictLevel.Fail), StringComparison.Ordinal));
+
+        return failed switch
+        {
+            0 => $"Итог по набору «{set.Title}»: ни одна цель не упала.",
+            var f when f == Targets.Count =>
+                $"Итог по набору «{set.Title}»: упали все {Targets.Count} целей. Общая часть пути — "
+                + "своя сеть или канал наверх; отдельные серверы столько раз одновременно не ломаются.",
+            _ => $"Итог по набору «{set.Title}»: упало {failed} из {Targets.Count}. Остальные цели прошли "
+                 + "тем же путём, значит дело в упавших, а не в канале.",
+        };
+    }
+
+    [RelayCommand(CanExecute = nameof(IsRunning))]
+    private void Stop() => _cts?.Cancel();
+
+    public override void Deactivate() => _cts?.Cancel();
+
+    public void Dispose()
+    {
+        _cts?.Cancel();
+        _cts?.Dispose();
+        _cts = null;
+    }
+
+    private static string Mark(VerdictLevel level) => level switch
+    {
+        VerdictLevel.Pass => "✓",
+        VerdictLevel.Warn => "!",
+        VerdictLevel.Fail => "✗",
+        _ => "·",
+    };
+
+    private static string Word(VerdictLevel level) => level switch
+    {
+        VerdictLevel.Pass => "в норме",
+        VerdictLevel.Warn => "предупреждение",
+        VerdictLevel.Fail => "не прошло",
+        _ => "не оценено",
+    };
+
+    /// <summary>Подпись набора целей для поля ввода.</summary>
+    [RelayCommand]
+    private void UseSet(string key) => Target = key;
+
+    public string BaselineCaption =>
+        $"Порог достоверности {_clock.CalibrationBaselineMs.ToString("0.000", CultureInfo.InvariantCulture)} мс";
+}

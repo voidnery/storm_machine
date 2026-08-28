@@ -33,16 +33,21 @@ internal static class ProbeCommandFactory
 
         var descriptor = probe.Descriptor;
 
+        // Проба без цели не просит её у оператора: спрашивать то, чем не воспользуешься,
+        // значит заставить человека выдумать ответ.
         var targetArgument = new Argument<string>("цель")
         {
             Description = TargetHint(descriptor),
+            Arity = descriptor.RequiresTarget ? ArgumentArity.ExactlyOne : ArgumentArity.ZeroOrOne,
         };
 
         var readers = new List<(string Name, Func<ParseResult, object?> Read)>();
-        var command = new Command(descriptor.Name, descriptor.Description)
+        var command = new Command(descriptor.Name, descriptor.Description);
+
+        if (descriptor.RequiresTarget)
         {
-            targetArgument,
-        };
+            command.Arguments.Add(targetArgument);
+        }
 
         foreach (var parameter in descriptor.Parameters)
         {
@@ -84,7 +89,9 @@ internal static class ProbeCommandFactory
 
             var request = new ProbeRequest
             {
-                Target = ParseTarget(parseResult.GetValue(targetArgument)!),
+                Target = descriptor.RequiresTarget
+                    ? ParseTarget(parseResult.GetValue(targetArgument)!)
+                    : Target.Parse(descriptor.Title),
                 Parameters = parameters,
             };
 

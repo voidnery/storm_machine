@@ -25,10 +25,10 @@ public sealed class SqlitePresetStore(SqliteRunStore runStore) : IPresetStore
 
         var filters = new List<string>();
 
-        if (!string.IsNullOrWhiteSpace(query.ProbeName))
+        if (!string.IsNullOrWhiteSpace(query.Subject))
         {
             filters.Add("probe_name = $probe");
-            command.Parameters.AddWithValue("$probe", query.ProbeName);
+            command.Parameters.AddWithValue("$probe", query.Subject);
         }
 
         // Поиск по имени, описанию и тегам делается в памяти, а не в SQL.
@@ -40,7 +40,7 @@ public sealed class SqlitePresetStore(SqliteRunStore runStore) : IPresetStore
         command.CommandText = $"""
             SELECT id, name, description, probe_name, target_kind, target_value, target_label,
                    parameters_json, tags_json, version, created_ticks, updated_ticks,
-                   run_count, last_run_ticks
+                   run_count, last_run_ticks, kind
               FROM presets
               {where}
              ORDER BY name_key
@@ -123,15 +123,17 @@ public sealed class SqlitePresetStore(SqliteRunStore runStore) : IPresetStore
         command.CommandText = """
             INSERT INTO presets
                 (id, name, name_key, description, probe_name, target_kind, target_value, target_label,
-                 parameters_json, tags_json, version, created_ticks, updated_ticks, run_count, last_run_ticks)
+                 parameters_json, tags_json, version, created_ticks, updated_ticks, run_count,
+                 last_run_ticks, kind)
             VALUES
                 ($id, $name, $key, $description, $probe, $targetKind, $targetValue, $targetLabel,
-                 $parameters, $tags, $version, $created, $updated, $runCount, $lastRun)
+                 $parameters, $tags, $version, $created, $updated, $runCount, $lastRun, $kind)
             ON CONFLICT(id) DO UPDATE SET
                 name = excluded.name,
                 name_key = excluded.name_key,
                 description = excluded.description,
                 probe_name = excluded.probe_name,
+                kind = excluded.kind,
                 target_kind = excluded.target_kind,
                 target_value = excluded.target_value,
                 target_label = excluded.target_label,
@@ -145,7 +147,8 @@ public sealed class SqlitePresetStore(SqliteRunStore runStore) : IPresetStore
         command.Parameters.AddWithValue("$name", stored.Name);
         command.Parameters.AddWithValue("$key", NameKey(stored.Name));
         command.Parameters.AddWithValue("$description", (object?)stored.Description ?? DBNull.Value);
-        command.Parameters.AddWithValue("$probe", stored.ProbeName);
+        command.Parameters.AddWithValue("$probe", stored.Subject);
+        command.Parameters.AddWithValue("$kind", (int)stored.Kind);
         command.Parameters.AddWithValue("$targetKind", (int)stored.Target.Kind);
         command.Parameters.AddWithValue("$targetValue", stored.Target.Value);
         command.Parameters.AddWithValue("$targetLabel", (object?)stored.Target.Label ?? DBNull.Value);
@@ -235,7 +238,7 @@ public sealed class SqlitePresetStore(SqliteRunStore runStore) : IPresetStore
         command.CommandText = $"""
             SELECT id, name, description, probe_name, target_kind, target_value, target_label,
                    parameters_json, tags_json, version, created_ticks, updated_ticks,
-                   run_count, last_run_ticks
+                   run_count, last_run_ticks, kind
               FROM presets
              WHERE {where};
             """;
@@ -263,7 +266,7 @@ public sealed class SqlitePresetStore(SqliteRunStore runStore) : IPresetStore
         Id = Guid.Parse(reader.GetString(0)),
         Name = reader.GetString(1),
         Description = reader.IsDBNull(2) ? null : reader.GetString(2),
-        ProbeName = reader.GetString(3),
+        Subject = reader.GetString(3),
         Target = new Target
         {
             Kind = (TargetKind)reader.GetInt32(4),
@@ -277,6 +280,7 @@ public sealed class SqlitePresetStore(SqliteRunStore runStore) : IPresetStore
         UpdatedUtc = new DateTimeOffset(reader.GetInt64(11), TimeSpan.Zero),
         RunCount = reader.GetInt32(12),
         LastRunUtc = reader.IsDBNull(13) ? null : new DateTimeOffset(reader.GetInt64(13), TimeSpan.Zero),
+        Kind = (PresetKind)reader.GetInt32(14),
     };
 
     private static string NameKey(string name) => name.Trim().ToLowerInvariant();

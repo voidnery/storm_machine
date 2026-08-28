@@ -56,15 +56,17 @@ internal static class Describe
     {
         ArgumentNullException.ThrowIfNull(fact);
 
-        return fact.Unit switch
-        {
-            MeasurementUnit.Milliseconds => " мс",
-            MeasurementUnit.MegabitsPerSecond => " Мбит/с",
-            MeasurementUnit.Percent => " %",
-            MeasurementUnit.Bytes => " байт",
-            _ => string.Empty,
-        };
+        return UnitSuffix(fact.Unit);
     }
+
+    public static string UnitSuffix(MeasurementUnit? unit) => unit switch
+    {
+        MeasurementUnit.Milliseconds => " мс",
+        MeasurementUnit.MegabitsPerSecond => " Мбит/с",
+        MeasurementUnit.Percent => " %",
+        MeasurementUnit.Bytes => " байт",
+        _ => string.Empty,
+    };
 
     /// <summary>Показывает факты, сгруппированные по категориям.</summary>
     public static void WriteFacts(IReadOnlyList<ProbeFact> facts)

@@ -58,6 +58,14 @@ internal static class RunRenderer
         Console.WriteLine($"Интерфейс : {run.Context.InterfaceName} ({Describe.AdapterKind(run.Context.AdapterKind)})");
         Console.WriteLine($"Методика  : {run.Context.Methodology}");
         Console.WriteLine($"Порог     : {F(run.Context.CalibrationBaselineMs)} мс");
+
+        // Профиль окружения — часть условий: измерения из разных мест несопоставимы,
+        // и через полгода отличить замер у заказчика от замера в офисе будет нечем.
+        if (run.Context.Profile is { } profile)
+        {
+            Console.WriteLine($"Профиль   : {profile}");
+        }
+
         Console.WriteLine($"Версия    : {run.Context.ProductVersion}");
 
         if (run.Context.TimingWarning is { } warning)

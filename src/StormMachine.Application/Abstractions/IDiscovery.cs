@@ -1,5 +1,6 @@
 using System.Net;
 using StormMachine.Domain.Discovery;
+using StormMachine.Domain.Topology;
 
 namespace StormMachine.Application.Abstractions;
 
@@ -99,6 +100,29 @@ public interface IDeviceStore
 
     /// <summary>Добавляет свидетельство от оператора — оно перекрывает наблюдения.</summary>
     Task PinAsync(string identity, Evidence evidence, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Объявляет два тождества одним устройством.
+    /// </summary>
+    /// <remarks>
+    /// Ноутбук с проводом и Wi-Fi даёт два MAC, гипервизор — свой адрес и адрес
+    /// виртуального коммутатора. Инструмент не может знать, что это одно устройство:
+    /// наблюдения у него разные и одинаково достоверные. Знает оператор.
+    /// </remarks>
+    Task MergeAsync(string primary, string duplicate, string author, CancellationToken cancellationToken = default);
+
+    /// <summary>Разъединяет ранее объединённые записи.</summary>
+    Task UnmergeAsync(string duplicate, CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<DeviceAlias>> ListAliasesAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>Правки карты: связи, добавленные и убранные оператором.</summary>
+    Task<IReadOnlyList<TopologyEdit>> ListTopologyEditsAsync(CancellationToken cancellationToken = default);
+
+    Task SaveTopologyEditAsync(TopologyEdit edit, CancellationToken cancellationToken = default);
+
+    /// <summary>Отменяет правку. Наблюдения при этом не трогаются.</summary>
+    Task RemoveTopologyEditAsync(Guid id, CancellationToken cancellationToken = default);
 
     Task RecordAsync(AuditEntry entry, CancellationToken cancellationToken = default);
 

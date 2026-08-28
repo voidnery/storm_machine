@@ -1,0 +1,216 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:StormMachine.App.ViewModels"
+             x:Class="StormMachine.App.Views.Pages.SettingsPage"
+             x:DataType="vm:SettingsPageViewModel">
+
+  <Grid RowDefinitions="Auto,*" Margin="24,20">
+
+    <StackPanel Grid.Row="0" Spacing="4" Margin="0,0,0,12">
+      <Grid ColumnDefinitions="*,Auto">
+        <TextBlock Grid.Column="0" Text="{Binding Title}" FontSize="24" FontWeight="SemiBold" />
+        <Button Grid.Column="1" Content="Обновить" Command="{Binding RefreshCommand}" Padding="12,5" />
+      </Grid>
+
+      <TextBlock Text="{Binding Message}" FontSize="12" Foreground="#7DD3A0" TextWrapping="Wrap"
+                 IsVisible="{Binding Message, Converter={x:Static ObjectConverters.IsNotNull}}" />
+      <TextBlock Text="{Binding ErrorMessage}" FontSize="12" Foreground="{StaticResource DangerBrush}"
+                 TextWrapping="Wrap"
+                 IsVisible="{Binding ErrorMessage, Converter={x:Static ObjectConverters.IsNotNull}}" />
+    </StackPanel>
+
+    <Grid Grid.Row="1" ColumnDefinitions="*,420">
+
+      <!-- Возможности и уровни -->
+      <Border Grid.Column="0" Background="{StaticResource PanelBrush}" CornerRadius="6" Padding="16">
+        <ScrollViewer>
+          <StackPanel Spacing="14" Margin="0,0,10,0">
+
+            <StackPanel Spacing="3">
+              <TextBlock Text="Что продукт может на этой машине" FontSize="13" FontWeight="SemiBold" />
+              <TextBlock Text="{Binding Summary}" FontSize="11" Opacity="0.6" TextWrapping="Wrap" />
+
+              <!-- UX-принцип 6: недоступное не прячется, а объясняется -->
+              <TextBlock FontSize="11" Opacity="0.5" TextWrapping="Wrap" LineHeight="17"
+                         Text="Сводка считается по фактам этой машины: правам процесса, наличию драйвера,
+                               сопряжённым агентам. Один и тот же выпуск на двух машинах умеет разное." />
+            </StackPanel>
+
+            <ItemsControl ItemsSource="{Binding Levels}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:CapabilityGroup">
+                  <StackPanel Spacing="6" Margin="0,0,0,16" IsVisible="{Binding HasItems}">
+
+                    <Grid ColumnDefinitions="*,Auto">
+                      <TextBlock Grid.Column="0" Text="{Binding Title}" FontSize="12" FontWeight="SemiBold"
+                                 Opacity="0.85" />
+                      <TextBlock Grid.Column="1" Text="{Binding StateText}" FontSize="11" Opacity="0.6" />
+                    </Grid>
+
+                    <TextBlock Text="{Binding About}" FontSize="10" Opacity="0.5" TextWrapping="Wrap"
+                               LineHeight="15" />
+
+                    <ItemsControl ItemsSource="{Binding Items}">
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:CapabilityRow">
+                          <Border Padding="10,8" CornerRadius="4" Background="#232B3B" Margin="0,3">
+                            <Grid ColumnDefinitions="Auto,*">
+
+                              <Border Grid.Column="0" Width="8" Height="8" CornerRadius="4"
+                                      VerticalAlignment="Top" Margin="0,5,0,0"
+                                      Background="{Binding Level, Converter={x:Static vm:VerdictBrushConverter.Instance}}" />
+
+                              <StackPanel Grid.Column="1" Spacing="2" Margin="10,0,0,0">
+                                <Grid ColumnDefinitions="*,Auto">
+                                  <TextBlock Grid.Column="0" Text="{Binding Title}" FontSize="12"
+                                             TextWrapping="Wrap" />
+                                  <TextBlock Grid.Column="1" Text="{Binding StateText}" FontSize="10"
+                                             Opacity="0.6" VerticalAlignment="Center" Margin="8,0,0,0" />
+                                </Grid>
+
+                                <TextBlock Text="{Binding About}" FontSize="10" Opacity="0.55"
+                                           TextWrapping="Wrap" LineHeight="15" />
+
+                                <TextBlock Text="{Binding Detail}" FontSize="10" Opacity="0.5"
+                                           TextWrapping="Wrap" LineHeight="15"
+                                           IsVisible="{Binding Detail, Converter={x:Static ObjectConverters.IsNotNull}}" />
+
+                                <!-- Что сделать, чтобы заработало: недоступное — это задача,
+                                     а не приговор -->
+                                <TextBlock Text="{Binding HowToEnable}" FontSize="10" TextWrapping="Wrap"
+                                           LineHeight="15" Foreground="{StaticResource WarningBrush}"
+                                           IsVisible="{Binding HowToEnable, Converter={x:Static ObjectConverters.IsNotNull}}" />
+
+                                <TextBlock Text="{Binding Where}" FontSize="10" Opacity="0.6"
+                                           FontFamily="Consolas,Menlo,monospace"
+                                           IsVisible="{Binding Where, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                              </StackPanel>
+                            </Grid>
+                          </Border>
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                  </StackPanel>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+          </StackPanel>
+        </ScrollViewer>
+      </Border>
+
+      <!-- Профили окружения, хранилище, о продукте -->
+      <Border Grid.Column="1" Margin="14,0,0,0" Background="{StaticResource PanelBrush}" CornerRadius="6"
+              Padding="16">
+        <ScrollViewer>
+          <StackPanel Spacing="10" Margin="0,0,10,0">
+
+            <TextBlock Text="Профили окружения" FontSize="13" FontWeight="SemiBold" />
+
+            <TextBlock FontSize="10" Opacity="0.5" TextWrapping="Wrap" LineHeight="15"
+                       Text="Порог 50 мс, разумный в офисе, бессмыслен для канала до филиала через VPN.
+                             Активный профиль пишется в условия каждого измерения — иначе через полгода
+                             отличить замер у заказчика от замера в офисе будет нечем." />
+
+            <StackPanel Spacing="2">
+              <TextBlock Text="Приметы текущей сети" FontSize="10" Opacity="0.6" />
+              <TextBlock Text="{Binding CurrentSignature}" FontSize="11" TextWrapping="Wrap" />
+            </StackPanel>
+
+            <Button Content="Узнать, где мы" Command="{Binding DetectCommand}" Padding="12,5"
+                    HorizontalAlignment="Left" />
+
+            <Border Padding="10,8" CornerRadius="4" Background="#232B3B"
+                    IsVisible="{Binding Guess, Converter={x:Static ObjectConverters.IsNotNull}}">
+              <TextBlock Text="{Binding Guess}" FontSize="11" TextWrapping="Wrap" LineHeight="16" />
+            </Border>
+
+            <ListBox ItemsSource="{Binding Profiles}" SelectedItem="{Binding SelectedProfile}"
+                     Background="Transparent" BorderThickness="0" MaxHeight="220">
+              <ListBox.ItemTemplate>
+                <DataTemplate x:DataType="vm:ProfileRow">
+                  <Grid ColumnDefinitions="*,Auto" Margin="0,3">
+                    <StackPanel Grid.Column="0" Spacing="1">
+                      <TextBlock Text="{Binding Name}" FontSize="12" TextTrimming="CharacterEllipsis" />
+                      <TextBlock Text="{Binding Signature}" FontSize="10" Opacity="0.5"
+                                 TextTrimming="CharacterEllipsis" />
+                      <TextBlock Text="{Binding Extras}" FontSize="10" Opacity="0.45" />
+                    </StackPanel>
+                    <TextBlock Grid.Column="1" Text="активен" FontSize="10" VerticalAlignment="Center"
+                               Foreground="#7DD3A0" IsVisible="{Binding IsActive}" />
+                  </Grid>
+                </DataTemplate>
+              </ListBox.ItemTemplate>
+            </ListBox>
+
+            <Grid ColumnDefinitions="*,Auto,Auto">
+              <Button Grid.Column="0" Content="Сделать активным" Command="{Binding ActivateProfileCommand}"
+                      Padding="12,5" HorizontalAlignment="Left"
+                      Background="{StaticResource AccentBrush}" Foreground="White" />
+              <Button Grid.Column="1" Content="Снять" Command="{Binding ClearProfileCommand}"
+                      Padding="10,5" Margin="0,0,6,0" />
+              <Button Grid.Column="2" Content="Удалить" Command="{Binding DeleteProfileCommand}" Padding="10,5" />
+            </Grid>
+
+            <Grid ColumnDefinitions="*,Auto" Margin="0,4,0,0">
+              <TextBox Grid.Column="0" PlaceholderText="имя нового профиля" Text="{Binding NewProfileName}" />
+              <Button Grid.Column="1" Content="Запомнить это место" Command="{Binding CaptureHereCommand}"
+                      Padding="12,5" Margin="6,0,0,0" />
+            </Grid>
+
+            <TextBlock FontSize="10" Opacity="0.5" TextWrapping="Wrap" LineHeight="15"
+                       Text="Продукт узнаёт сеть, но не переключает профиль сам: смена профиля меняет пороги
+                             и состав работающих мониторов, а делать это молча значит поменять смысл измерений
+                             за спиной оператора." />
+
+            <Border Height="1" Background="#2E3746" Margin="0,6" />
+
+            <TextBlock Text="Хранилище" FontSize="13" FontWeight="SemiBold" />
+
+            <SelectableTextBlock Text="{Binding DatabasePath}" FontSize="11" TextWrapping="Wrap"
+                                 FontFamily="Consolas,Menlo,monospace" />
+
+            <TextBlock Text="{x:Static vm:SettingsPageViewModel.StorageHint}" FontSize="10" Opacity="0.5"
+                       TextWrapping="Wrap" LineHeight="15" />
+
+            <Border Height="1" Background="#2E3746" Margin="0,6" />
+
+            <TextBlock Text="О продукте" FontSize="13" FontWeight="SemiBold" />
+
+            <StackPanel Spacing="2">
+              <TextBlock Text="Версия" FontSize="10" Opacity="0.6" />
+              <SelectableTextBlock Text="{x:Static vm:SettingsPageViewModel.Version}" FontSize="11"
+                                   FontFamily="Consolas,Menlo,monospace" />
+            </StackPanel>
+
+            <StackPanel Spacing="5">
+              <TextBlock Text="Обновление" FontSize="10" Opacity="0.6" />
+              <TextBlock Text="{Binding Updates.StateText}" FontSize="11" TextWrapping="Wrap" LineHeight="16" />
+
+              <TextBlock Text="{Binding Updates.Hold}" FontSize="10" TextWrapping="Wrap" LineHeight="15"
+                         Foreground="{StaticResource WarningBrush}"
+                         IsVisible="{Binding Updates.Hold, Converter={x:Static ObjectConverters.IsNotNull}}" />
+
+              <Grid ColumnDefinitions="Auto,Auto,Auto">
+                <Button Grid.Column="0" Content="Проверить" Padding="12,5" Margin="0,0,6,0"
+                        Command="{Binding CheckUpdateCommand}" IsEnabled="{Binding Updates.CanCheck}" />
+                <Button Grid.Column="1" Content="Скачать" Padding="12,5" Margin="0,0,6,0"
+                        Command="{Binding DownloadUpdateCommand}" IsEnabled="{Binding Updates.CanDownload}" />
+                <Button Grid.Column="2" Content="Установить и перезапустить" Padding="12,5"
+                        Command="{Binding ApplyUpdateCommand}" IsEnabled="{Binding Updates.CanApply}"
+                        Background="{StaticResource AccentBrush}" Foreground="White" />
+              </Grid>
+
+              <TextBlock Text="{x:Static vm:SettingsPageViewModel.UpdateNote}" FontSize="10" Opacity="0.5"
+                         TextWrapping="Wrap" LineHeight="15" />
+            </StackPanel>
+
+            <TextBlock Text="{x:Static vm:SettingsPageViewModel.LicenceNote}" FontSize="10" Opacity="0.5"
+                       TextWrapping="Wrap" LineHeight="15" />
+
+          </StackPanel>
+        </ScrollViewer>
+      </Border>
+    </Grid>
+  </Grid>
+</UserControl>

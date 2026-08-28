@@ -44,6 +44,13 @@ public sealed record Methodology
         Url = "https://www.itu.int/rec/T-REC-G.107",
     };
 
+    public static readonly Methodology Ndt7 = new()
+    {
+        Name = "NDT7 (M-Lab)",
+        Reference = "открытый протокол поверх WebSocket/TLS; измеряется прикладной уровень",
+        Url = "https://www.measurementlab.net/tests/ndt/ndt7/",
+    };
+
     public static readonly Methodology PathMtuDiscovery = new()
     {
         Name = "Path MTU Discovery",

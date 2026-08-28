@@ -5,6 +5,7 @@ using System.Globalization;
 using StormMachine.App.Services;
 using StormMachine.Application.Abstractions;
 using StormMachine.Application.Presets;
+using StormMachine.Application.Scenarios;
 using StormMachine.Domain.Presets;
 using StormMachine.Domain.Results;
 
@@ -25,12 +26,18 @@ public sealed partial class PresetsPageViewModel(
     PresetService presets,
     RunnerService runner,
     IRunStore store,
-    IFilePicker filePicker) : PageViewModel(section)
+    IFilePicker filePicker,
+    ScenarioRunner scenarios,
+    IHighResolutionClock clock,
+    INetworkEnvironment environment) : PageViewModel(section)
 {
     private readonly PresetService _presets = presets ?? throw new ArgumentNullException(nameof(presets));
-    private readonly RunnerService _runner = runner ?? throw new ArgumentNullException(nameof(runner));
+    private readonly RunnerService _operations = runner ?? throw new ArgumentNullException(nameof(runner));
     private readonly IRunStore _store = store ?? throw new ArgumentNullException(nameof(store));
     private readonly IFilePicker _filePicker = filePicker ?? throw new ArgumentNullException(nameof(filePicker));
+    private readonly ScenarioRunner _scenarios = scenarios ?? throw new ArgumentNullException(nameof(scenarios));
+    private readonly IHighResolutionClock _clock = clock ?? throw new ArgumentNullException(nameof(clock));
+    private readonly INetworkEnvironment _environment = environment ?? throw new ArgumentNullException(nameof(environment));
 
     public ObservableCollection<Preset> Presets { get; } = [];
 
@@ -137,15 +144,25 @@ public sealed partial class PresetsPageViewModel(
             return;
         }
 
+        // Пресет сценария идёт своим путём: у него нет пробы, зато есть цепочка
+        // шагов с порогами. В список длительных операций он попадает так же —
+        // это самая долгая операция продукта, и следить за ней надо с любого экрана.
+        if (Selected.Kind == PresetKind.Scenario)
+        {
+            await RunScenarioAsync(Selected).ConfigureAwait(true);
+
+            return;
+        }
+
         if (!_presets.TryGetProbe(Selected, out var probe))
         {
-            ErrorMessage = $"Проба «{Selected.ProbeName}» не зарегистрирована.";
+            ErrorMessage = $"Проба «{Selected.Subject}» не зарегистрирована.";
             return;
         }
 
         var preset = Selected;
 
-        var run = _runner.Start(
+        var run = _operations.Start(
             probe,
             PresetService.ToRequest(preset),
             save: true,
@@ -163,6 +180,95 @@ public sealed partial class PresetsPageViewModel(
         Message = $"Запущен «{preset.Name}» — идёт измерение.";
 
         await RefreshAsync().ConfigureAwait(true);
+    }
+
+    /// <summary>
+    /// Запуск пресета сценария.
+    /// </summary>
+    /// <remarks>
+    /// Цель хранится исходной строкой и разрешается заново при каждом запуске:
+    /// пресет «проверить все наши сайты» обязан переживать появление девятого сайта.
+    /// </remarks>
+    private async Task RunScenarioAsync(Preset preset)
+    {
+        TargetSet set;
+
+        try
+        {
+            set = TargetSets.Resolve(preset.Target.Value, _environment);
+        }
+        catch (ArgumentException ex)
+        {
+            ErrorMessage = ex.Message;
+
+            return;
+        }
+
+        if (set.Targets.Count == 0)
+        {
+            ErrorMessage = $"Набор «{set.Key}» пуст: {set.Origin}.";
+
+            return;
+        }
+
+        var cts = new CancellationTokenSource();
+        var operation = _operations.StartScenario(preset.Name, cts);
+
+        Message = $"Запущен «{preset.Name}» — проверяю {set.Targets.Count} "
+                  + (set.Targets.Count == 1 ? "цель." : "целей.");
+
+        await _presets.RecordRunAsync(preset.Id).ConfigureAwait(true);
+        await RefreshAsync().ConfigureAwait(true);
+
+        _ = ExecuteScenarioAsync(preset, set, operation, cts);
+    }
+
+    private async Task ExecuteScenarioAsync(
+        Preset preset,
+        TargetSet set,
+        ActiveScenarioViewModel operation,
+        CancellationTokenSource cts)
+    {
+        var failed = 0;
+
+        try
+        {
+            await _clock.CalibrateAsync(cts.Token).ConfigureAwait(true);
+
+            foreach (var target in set.Targets)
+            {
+                operation.SetTarget(set.Targets.Count > 1 ? target : null);
+
+                var scenario = ScenarioTemplates.Create(preset.Subject, target);
+                var run = await _scenarios
+                    .RunAsync(scenario, save: true, operation.Report, cts.Token)
+                    .ConfigureAwait(true);
+
+                if (run.Level == VerdictLevel.Fail)
+                {
+                    failed++;
+                }
+            }
+
+            Message = failed == 0
+                ? $"«{preset.Name}»: все цели прошли ({set.Targets.Count})."
+                : $"«{preset.Name}»: не прошло целей {failed} из {set.Targets.Count}. "
+                  + "Разбор — на экране внешних проб и в журнале.";
+        }
+        catch (OperationCanceledException)
+        {
+            Message = $"«{preset.Name}» — прервано.";
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = ex.Message;
+        }
+        finally
+        {
+            operation.Finish();
+            _operations.Remove(operation);
+            cts.Dispose();
+        }
     }
 
     [RelayCommand]
@@ -316,7 +422,7 @@ public sealed partial class PresetsPageViewModel(
         Details =
             $"{preset.Name}"
             + (string.IsNullOrWhiteSpace(preset.Description) ? string.Empty : $"\n{preset.Description}")
-            + $"\n\nПроба: {preset.ProbeName} · Цель: {preset.Target.DisplayName}"
+            + $"\n\nПроба: {preset.Subject} · Цель: {preset.Target.DisplayName}"
             + $"\nРедакция {preset.Version} · запусков {preset.RunCount}"
             + (preset.LastRunUtc is { } last ? $", последний {last.ToLocalTime():dd.MM.yyyy HH:mm}" : string.Empty)
             + $"\nИзменён {preset.UpdatedUtc.ToLocalTime():dd.MM.yyyy HH:mm}";

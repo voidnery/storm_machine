@@ -3,6 +3,10 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using StormMachine.Domain.Discovery;
 using StormMachine.Domain.Measurements;
+using StormMachine.Domain.Monitors;
+using StormMachine.Domain.Profiles;
+using StormMachine.Domain.Reports;
+using StormMachine.Domain.Scenarios;
 
 namespace StormMachine.Storage;
 
@@ -72,6 +76,52 @@ internal static class StorageJson
             ? []
             : JsonSerializer.Deserialize(json, Context.EvidenceArray) ?? [];
 
+    public static string SerializeSchedule(Schedule value) =>
+        JsonSerializer.Serialize(value, Context.Schedule);
+
+    public static Schedule? DeserializeSchedule(string? json) =>
+        string.IsNullOrEmpty(json) ? null : JsonSerializer.Deserialize(json, Context.Schedule);
+
+    public static string SerializeThresholds(Threshold[] value) =>
+        JsonSerializer.Serialize(value, Context.ThresholdArray);
+
+    public static Threshold[] DeserializeThresholds(string? json) =>
+        string.IsNullOrEmpty(json) ? [] : JsonSerializer.Deserialize(json, Context.ThresholdArray) ?? [];
+
+    public static string? SerializeAlertRule(AlertRule? value) =>
+        value is null ? null : JsonSerializer.Serialize(value, Context.AlertRule);
+
+    public static AlertRule? DeserializeAlertRule(string? json) =>
+        string.IsNullOrEmpty(json) ? null : JsonSerializer.Deserialize(json, Context.AlertRule);
+
+    public static string? SerializeObjective(ServiceLevelObjective? value) =>
+        value is null ? null : JsonSerializer.Serialize(value, Context.ServiceLevelObjective);
+
+    public static ServiceLevelObjective? DeserializeObjective(string? json) =>
+        string.IsNullOrEmpty(json) ? null : JsonSerializer.Deserialize(json, Context.ServiceLevelObjective);
+
+    public static string SerializeAlertState(AlertState value) =>
+        JsonSerializer.Serialize(value, Context.AlertState);
+
+    public static AlertState DeserializeAlertState(string? json) =>
+        string.IsNullOrEmpty(json)
+            ? AlertState.Clear
+            : JsonSerializer.Deserialize(json, Context.AlertState) ?? AlertState.Clear;
+
+    public static string SerializeBaselineMetrics(BaselineMetric[] value) =>
+        JsonSerializer.Serialize(value, Context.BaselineMetricArray);
+
+    public static BaselineMetric[] DeserializeBaselineMetrics(string? json) =>
+        string.IsNullOrEmpty(json) ? [] : JsonSerializer.Deserialize(json, Context.BaselineMetricArray) ?? [];
+
+    public static string SerializeSignature(NetworkSignature value) =>
+        JsonSerializer.Serialize(value, Context.NetworkSignature);
+
+    public static NetworkSignature DeserializeSignature(string? json) =>
+        string.IsNullOrEmpty(json)
+            ? new NetworkSignature()
+            : JsonSerializer.Deserialize(json, Context.NetworkSignature) ?? new NetworkSignature();
+
     public static string SerializeParameters(Dictionary<string, string?> value) =>
         JsonSerializer.Serialize(value, Context.DictionaryStringString);
 
@@ -89,6 +139,13 @@ internal static class StorageJson
 [JsonSerializable(typeof(Evidence[]))]
 [JsonSerializable(typeof(Dictionary<string, string?>))]
 [JsonSerializable(typeof(string[]))]
+[JsonSerializable(typeof(Schedule))]
+[JsonSerializable(typeof(Threshold[]))]
+[JsonSerializable(typeof(AlertRule))]
+[JsonSerializable(typeof(AlertState))]
+[JsonSerializable(typeof(ServiceLevelObjective))]
+[JsonSerializable(typeof(BaselineMetric[]))]
+[JsonSerializable(typeof(NetworkSignature))]
 internal sealed partial class StorageJsonContext : JsonSerializerContext
 {
 }

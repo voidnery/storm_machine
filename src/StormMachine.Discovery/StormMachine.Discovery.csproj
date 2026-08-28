@@ -11,6 +11,12 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.11" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.11" />
+
+    <!-- Движок раскладки графа (MSAGL, лицензия MIT). Берётся только геометрия:
+         рисуем сами, потому что достоверность связи должна быть видна видом линии.
+         Живёт здесь, а не в клиенте: раскладка нужна и полотну на экране, и схеме
+         в отчёте, а две раскладки дали бы две разные картины одной сети. -->
+    <PackageReference Include="AutomaticGraphLayout" Version="1.1.12" />
   </ItemGroup>
 
   <ItemGroup>

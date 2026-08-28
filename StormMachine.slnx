@@ -1,6 +1,9 @@
 <Solution>
   <Folder Name="/src/">
+    <Project Path="src/StormMachine.Agent/StormMachine.Agent.csproj" />
     <Project Path="src/StormMachine.App/StormMachine.App.csproj" />
+    <Project Path="src/StormMachine.Agents/StormMachine.Agents.csproj" />
+    <Project Path="src/StormMachine.Alerting/StormMachine.Alerting.csproj" />
     <Project Path="src/StormMachine.Application/StormMachine.Application.csproj" />
     <Project Path="src/StormMachine.Cli/StormMachine.Cli.csproj" />
     <Project Path="src/StormMachine.Composition/StormMachine.Composition.csproj" />
@@ -8,16 +11,19 @@
     <Project Path="src/StormMachine.Domain/StormMachine.Domain.csproj" />
     <Project Path="src/StormMachine.Platform/StormMachine.Platform.csproj" />
     <Project Path="src/StormMachine.Probes/StormMachine.Probes.csproj" />
+    <Project Path="src/StormMachine.Protocol/StormMachine.Protocol.csproj" />
     <Project Path="src/StormMachine.Reporting/StormMachine.Reporting.csproj" />
     <Project Path="src/StormMachine.Storage/StormMachine.Storage.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/StormMachine.ArchTests/StormMachine.ArchTests.csproj" />
+    <Project Path="tests/StormMachine.Application.UnitTests/StormMachine.Application.UnitTests.csproj" />
     <Project Path="tests/StormMachine.Discovery.UnitTests/StormMachine.Discovery.UnitTests.csproj" />
     <Project Path="tests/StormMachine.Domain.UnitTests/StormMachine.Domain.UnitTests.csproj" />
     <Project Path="tests/StormMachine.MeasurementTests/StormMachine.MeasurementTests.csproj" />
     <Project Path="tests/StormMachine.Platform.UnitTests/StormMachine.Platform.UnitTests.csproj" />
     <Project Path="tests/StormMachine.Probes.UnitTests/StormMachine.Probes.UnitTests.csproj" />
+    <Project Path="tests/StormMachine.Protocol.UnitTests/StormMachine.Protocol.UnitTests.csproj" />
     <Project Path="tests/StormMachine.Reporting.UnitTests/StormMachine.Reporting.UnitTests.csproj" />
     <Project Path="tests/StormMachine.Storage.UnitTests/StormMachine.Storage.UnitTests.csproj" />
   </Folder>

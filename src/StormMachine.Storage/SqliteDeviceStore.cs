@@ -1,6 +1,7 @@
 using Microsoft.Data.Sqlite;
 using StormMachine.Application.Abstractions;
 using StormMachine.Domain.Discovery;
+using StormMachine.Domain.Topology;
 
 namespace StormMachine.Storage;
 
@@ -199,7 +200,10 @@ public sealed class SqliteDeviceStore : IDeviceStore
             INSERT INTO devices (identity, address, first_seen_ticks, last_seen_ticks, is_online)
             VALUES ($identity, $address, $seen, $seen, $online)
             ON CONFLICT (identity) DO UPDATE SET
-                address         = MIN(devices.address, excluded.address),
+                -- Колонка держит последний увиденный адрес; основной выбирается
+                -- при чтении числовым сравнением. Класть сюда строковый минимум
+                -- значило бы записать в базу заведомо неверный ответ.
+                address         = excluded.address,
                 last_seen_ticks = MAX(devices.last_seen_ticks, excluded.last_seen_ticks),
                 is_online       = excluded.is_online;
             """;
@@ -369,6 +373,7 @@ public sealed class SqliteDeviceStore : IDeviceStore
     {
         await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
 
+        var aliases = await ReadAliasesAsync(connection, cancellationToken).ConfigureAwait(false);
         var evidence = new Dictionary<string, List<Evidence>>(StringComparer.Ordinal);
 
         await using (var command = connection.CreateCommand())
@@ -379,7 +384,9 @@ public sealed class SqliteDeviceStore : IDeviceStore
 
             while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
             {
-                var identity = reader.GetString(0);
+                // Свидетельства присоединённой записи достаются основной: объединив
+                // дубли, оператор не должен потерять то, что о них было известно.
+                var identity = Resolve(aliases, reader.GetString(0));
 
                 if (!evidence.TryGetValue(identity, out var bucket))
                 {
@@ -407,7 +414,7 @@ public sealed class SqliteDeviceStore : IDeviceStore
 
             while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
             {
-                var identity = reader.GetString(0);
+                var identity = Resolve(aliases, reader.GetString(0));
 
                 if (!addresses.TryGetValue(identity, out var bucket))
                 {
@@ -415,7 +422,12 @@ public sealed class SqliteDeviceStore : IDeviceStore
                     addresses[identity] = bucket;
                 }
 
-                bucket.Add(reader.GetString(1));
+                var address = reader.GetString(1);
+
+                if (!bucket.Contains(address, StringComparer.Ordinal))
+                {
+                    bucket.Add(address);
+                }
             }
         }
 
@@ -426,26 +438,259 @@ public sealed class SqliteDeviceStore : IDeviceStore
              ORDER BY last_seen_ticks DESC;
             """;
 
-        var result = new List<Device>();
+        var merged = new Dictionary<string, Row>(StringComparer.Ordinal);
+        var order = new List<string>();
+
         await using var deviceReader = await devices.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
 
         while (await deviceReader.ReadAsync(cancellationToken).ConfigureAwait(false))
         {
-            var identity = deviceReader.GetString(0);
+            var identity = Resolve(aliases, deviceReader.GetString(0));
+
+            var row = new Row(
+                deviceReader.GetString(1),
+                new DateTimeOffset(deviceReader.GetInt64(2), TimeSpan.Zero),
+                new DateTimeOffset(deviceReader.GetInt64(3), TimeSpan.Zero),
+                deviceReader.GetInt32(4) == 1);
+
+            if (!merged.TryGetValue(identity, out var existing))
+            {
+                merged[identity] = row;
+                order.Add(identity);
+                continue;
+            }
+
+            // Объединённое устройство живо, если жива хоть одна его половина,
+            // и известно с тех пор, как увидели раннюю из них.
+            merged[identity] = new Row(
+                IpAddressOrder.Lowest([row.Address, existing.Address]) ?? existing.Address,
+                row.FirstSeen < existing.FirstSeen ? row.FirstSeen : existing.FirstSeen,
+                row.LastSeen > existing.LastSeen ? row.LastSeen : existing.LastSeen,
+                row.IsOnline || existing.IsOnline);
+        }
+
+        var result = new List<Device>(order.Count);
+
+        foreach (var identity in order)
+        {
+            var row = merged[identity];
+            // Порядок адресов числовой: строковый ставит .254 раньше .3,
+            // и список адресов устройства читался бы как случайный.
+            var known = addresses.TryGetValue(identity, out var list)
+                ? list.OrderBy(IpAddressOrder.Of).ThenBy(a => a, StringComparer.Ordinal).ToList()
+                : [row.Address];
 
             var device = Device.FromEvidence(
-                deviceReader.GetString(1),
+                // Основной адрес — наименьший из известных, и сравнение числовое:
+                // строковое поставило бы .254 раньше .3, потому что знак «2» меньше «3».
+                (known.Count > 0 ? IpAddressOrder.Lowest(known) : null) ?? row.Address,
                 evidence.TryGetValue(identity, out var bucket) ? bucket : [],
-                firstSeenUtc: new DateTimeOffset(deviceReader.GetInt64(2), TimeSpan.Zero),
-                lastSeenUtc: new DateTimeOffset(deviceReader.GetInt64(3), TimeSpan.Zero),
-                isOnline: deviceReader.GetInt32(4) == 1);
+                firstSeenUtc: row.FirstSeen,
+                lastSeenUtc: row.LastSeen,
+                isOnline: row.IsOnline);
 
-            result.Add(addresses.TryGetValue(identity, out var known)
-                ? device with { Addresses = known }
-                : device);
+            result.Add(device with { Addresses = known });
         }
 
         return result;
+    }
+
+    /// <summary>Строка таблицы устройств до слияния псевдонимов.</summary>
+    private sealed record Row(string Address, DateTimeOffset FirstSeen, DateTimeOffset LastSeen, bool IsOnline);
+
+    /// <summary>
+    /// Куда ведёт цепочка объединений.
+    /// </summary>
+    /// <remarks>
+    /// Цепочки возможны: A присоединили к B, потом B к C. Проход по ссылкам ограничен,
+    /// чтобы кольцо — если оно как-то возникнет — не подвесило чтение инвентаря.
+    /// </remarks>
+    private static string Resolve(Dictionary<string, string> aliases, string identity)
+    {
+        const int MaxDepth = 8;
+
+        var current = identity;
+
+        for (var i = 0; i < MaxDepth && aliases.TryGetValue(current, out var next); i++)
+        {
+            if (string.Equals(next, current, StringComparison.Ordinal))
+            {
+                break;
+            }
+
+            current = next;
+        }
+
+        return current;
+    }
+
+    private static async Task<Dictionary<string, string>> ReadAliasesAsync(
+        SqliteConnection connection,
+        CancellationToken cancellationToken)
+    {
+        var aliases = new Dictionary<string, string>(StringComparer.Ordinal);
+
+        await using var command = connection.CreateCommand();
+        command.CommandText = "SELECT alias, primary_id FROM device_aliases;";
+
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+
+        while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+        {
+            aliases[reader.GetString(0)] = reader.GetString(1);
+        }
+
+        return aliases;
+    }
+
+    public async Task MergeAsync(
+        string primary,
+        string duplicate,
+        string author,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(primary);
+        ArgumentException.ThrowIfNullOrWhiteSpace(duplicate);
+
+        if (string.Equals(primary, duplicate, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException("Устройство нельзя объединить само с собой.");
+        }
+
+        await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
+
+        // Цепочка не должна замкнуться: если основное само присоединено к дубликату,
+        // объединение оставило бы кольцо, из которого инвентарь не выберется.
+        var aliases = await ReadAliasesAsync(connection, cancellationToken).ConfigureAwait(false);
+
+        if (string.Equals(Resolve(aliases, primary), duplicate, StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException(
+                $"Устройство {primary} уже присоединено к {duplicate} — объединение замкнулось бы в кольцо.");
+        }
+
+        await using var command = connection.CreateCommand();
+        command.CommandText = """
+            INSERT INTO device_aliases (alias, primary_id, at_ticks, operator_name)
+            VALUES ($alias, $primary, $at, $operator)
+            ON CONFLICT (alias) DO UPDATE SET
+                primary_id    = excluded.primary_id,
+                at_ticks      = excluded.at_ticks,
+                operator_name = excluded.operator_name;
+            """;
+
+        command.Parameters.AddWithValue("$alias", duplicate);
+        command.Parameters.AddWithValue("$primary", primary);
+        command.Parameters.AddWithValue("$at", DateTimeOffset.UtcNow.UtcTicks);
+        command.Parameters.AddWithValue("$operator", author);
+
+        await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task UnmergeAsync(string duplicate, CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(duplicate);
+
+        await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using var command = connection.CreateCommand();
+
+        command.CommandText = "DELETE FROM device_aliases WHERE alias = $alias;";
+        command.Parameters.AddWithValue("$alias", duplicate);
+
+        await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task<IReadOnlyList<DeviceAlias>> ListAliasesAsync(CancellationToken cancellationToken = default)
+    {
+        await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using var command = connection.CreateCommand();
+
+        command.CommandText = """
+            SELECT alias, primary_id, at_ticks, operator_name
+              FROM device_aliases
+             ORDER BY at_ticks DESC;
+            """;
+
+        var result = new List<DeviceAlias>();
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+
+        while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+        {
+            result.Add(new DeviceAlias
+            {
+                Alias = reader.GetString(0),
+                Primary = reader.GetString(1),
+                AtUtc = new DateTimeOffset(reader.GetInt64(2), TimeSpan.Zero),
+                Operator = reader.GetString(3),
+            });
+        }
+
+        return result;
+    }
+
+    public async Task<IReadOnlyList<TopologyEdit>> ListTopologyEditsAsync(CancellationToken cancellationToken = default)
+    {
+        await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using var command = connection.CreateCommand();
+
+        command.CommandText = """
+            SELECT id, kind, subject, target, at_ticks, operator_name, note
+              FROM topology_edits
+             ORDER BY at_ticks;
+            """;
+
+        var result = new List<TopologyEdit>();
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
+
+        while (await reader.ReadAsync(cancellationToken).ConfigureAwait(false))
+        {
+            result.Add(new TopologyEdit
+            {
+                Id = Guid.Parse(reader.GetString(0)),
+                Kind = (TopologyEditKind)reader.GetInt32(1),
+                Subject = reader.GetString(2),
+                Target = reader.IsDBNull(3) ? null : reader.GetString(3),
+                AtUtc = new DateTimeOffset(reader.GetInt64(4), TimeSpan.Zero),
+                Operator = reader.GetString(5),
+                Note = reader.IsDBNull(6) ? null : reader.GetString(6),
+            });
+        }
+
+        return result;
+    }
+
+    public async Task SaveTopologyEditAsync(TopologyEdit edit, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(edit);
+
+        await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using var command = connection.CreateCommand();
+
+        command.CommandText = """
+            INSERT INTO topology_edits (id, kind, subject, target, at_ticks, operator_name, note)
+            VALUES ($id, $kind, $subject, $target, $at, $operator, $note);
+            """;
+
+        command.Parameters.AddWithValue("$id", edit.Id.ToString());
+        command.Parameters.AddWithValue("$kind", (int)edit.Kind);
+        command.Parameters.AddWithValue("$subject", edit.Subject);
+        command.Parameters.AddWithValue("$target", (object?)edit.Target ?? DBNull.Value);
+        command.Parameters.AddWithValue("$at", edit.AtUtc.UtcTicks);
+        command.Parameters.AddWithValue("$operator", edit.Operator);
+        command.Parameters.AddWithValue("$note", (object?)edit.Note ?? DBNull.Value);
+
+        await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task RemoveTopologyEditAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using var command = connection.CreateCommand();
+
+        command.CommandText = "DELETE FROM topology_edits WHERE id = $id;";
+        command.Parameters.AddWithValue("$id", id.ToString());
+
+        await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
     }
 
     public async Task PinAsync(string identity, Evidence evidence, CancellationToken cancellationToken = default)

@@ -6,6 +6,10 @@
        (docs/01-analysis.md §8.2) по построению, а не по декларации. -->
 
   <PropertyGroup>
+    <ApplicationIcon>..\StormMachine.App\Assets\storm.ico</ApplicationIcon>
+  </PropertyGroup>
+
+  <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>net10.0-windows</TargetFramework>
     <AssemblyName>storm</AssemblyName>
@@ -18,6 +22,10 @@
     <SelfContained>true</SelfContained>
     <PublishSingleFile>true</PublishSingleFile>
     <PublishTrimmed>true</PublishTrimmed>
+
+    <!-- Клиент несёт ядро продукта целиком, а с ним движок раскладки графа.
+         Что из этого следует для обрезки — в Directory.Build.targets. -->
+    <HostsProductCore>true</HostsProductCore>
   </PropertyGroup>
 
   <!-- Только слой приложения и корень композиции. Ссылок на инфраструктуру нет

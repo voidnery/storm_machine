@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <Description>Каналы доставки алертов, не зависящие от интерфейса: webhook и почта.</Description>
+  </PropertyGroup>
+
+  <!-- Здесь только те каналы, которые работают без человека у экрана. Звук и значок
+       в трее живут в графическом клиенте: без окна они не имеют смысла, а тащить
+       сюда графическую подсистему ради двух вызовов было бы дороже, чем разделить. -->
+  <ItemGroup>
+    <ProjectReference Include="..\StormMachine.Application\StormMachine.Application.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.11" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.11" />
+  </ItemGroup>
+
+</Project>

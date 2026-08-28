@@ -4,24 +4,31 @@ using QuestPDF.Helpers;
 using QuestPDF.Infrastructure;
 using StormMachine.Application;
 using StormMachine.Application.Abstractions;
-using StormMachine.Domain.Measurements;
 using StormMachine.Domain.Results;
 
 namespace StormMachine.Reporting;
 
 /// <summary>
-/// Отчёт об измерении в PDF.
+/// Отчёт в PDF: четыре шаблона поверх одних и тех же измерений.
 /// </summary>
 /// <remarks>
-/// Документ обязан отвечать на два вопроса, без которых цифры бесполезны:
-/// <b>по какой методике</b> измеряли и <b>в каких условиях</b>. Отчёт со ссылкой на RFC —
-/// аргумент в разговоре с провайдером; отчёт без методики — просто картинка
-/// (требование C-08a, docs/01-analysis.md §6).
+/// Шаблонов четыре, потому что читателей четыре, и они спрашивают разное. Технический
+/// отвечает «что именно измерено»; сводка — «что это значит для дела»; акт — «работа
+/// принята, вот основания»; SLA — «выполнено ли обещание за период».
+/// <para>
+/// Общее у всех — то, без чего цифры бесполезны: <b>методика</b> и <b>условия
+/// измерения</b>. Отчёт со ссылкой на RFC — аргумент в разговоре с провайдером;
+/// отчёт без методики — просто картинка (требование C-08a, docs/01-analysis.md §6).
+/// </para>
+/// <para>
+/// Ни один шаблон не пишет вывод за оператора. Продукт показывает измеренное и вердикты
+/// по заданным порогам; «сеть пригодна для эксплуатации» — утверждение, за которое
+/// отвечает подписавший.
+/// </para>
 /// </remarks>
-public sealed class PdfReportRenderer : IReportRenderer
+public sealed class PdfReportRenderer(ITopologyLayout layout) : IReportRenderer
 {
-    private static readonly string[] SeriesHeaders =
-        ["ряд", "проб", "потери", "мин", "медиана", "макс", "джиттер"];
+    private readonly ITopologyLayout _layout = layout ?? throw new ArgumentNullException(nameof(layout));
 
     static PdfReportRenderer()
     {
@@ -38,19 +45,14 @@ public sealed class PdfReportRenderer : IReportRenderer
         ArgumentNullException.ThrowIfNull(request);
         cancellationToken.ThrowIfCancellationRequested();
 
-        var run = request.Run;
+        if (request.Runs.Count == 0 && request.ServiceLevel is null)
+        {
+            throw new InvalidOperationException(
+                "Отчёт не из чего строить: нет ни прогонов, ни данных о доступности.");
+        }
 
-        // Трассировка разбирается отдельно: у неё и таблица, и график другие.
-        // Разбор берётся из сырых сэмплов, а когда их уже удалила политика хранения —
-        // из сохранённых агрегатов, чтобы старый отчёт не терял вывод.
-        var route = run.Summary.Shape == ProbeResultShape.PathTrace
-            ? run.Samples.Count > 0
-                ? PathAnalysis.Compute(run.Samples, run.Summary.ResolvedAddress)
-                : PathAnalysis.FromSeries(run.Series, run.Summary.ResolvedAddress)
-            : null;
-
-        var chart = request.IncludeChart
-            ? route is not null ? RouteChartImage.TryRender(route) : LatencyChartImage.TryRender(run)
+        var diagram = request.Topology is { IsEmpty: false } topology
+            ? TopologyDiagramImage.TryRender(_layout.Arrange(topology))
             : null;
 
         var document = Document.Create(container =>
@@ -62,20 +64,16 @@ public sealed class PdfReportRenderer : IReportRenderer
                 page.DefaultTextStyle(x => x.FontSize(9).FontFamily(Fonts.Calibri));
 
                 page.Header().Element(header => ComposeHeader(header, request));
-                page.Content().Element(content => ComposeContent(content, run, chart, route));
+                page.Content().Element(content => ComposeContent(content, request, diagram));
                 page.Footer().Element(footer => ComposeFooter(footer, request));
             });
         });
 
-        var bytes = document.GeneratePdf();
-
-        var name = $"storm-{run.Summary.ProbeName}-{run.Summary.StartedUtc.ToLocalTime():yyyyMMdd-HHmmss}.pdf";
-
         return Task.FromResult(new RenderedReport
         {
-            Content = bytes,
+            Content = document.GeneratePdf(),
             FileExtension = "pdf",
-            SuggestedFileName = name,
+            SuggestedFileName = FileName(request),
         });
     }
 
@@ -83,8 +81,9 @@ public sealed class PdfReportRenderer : IReportRenderer
 
     private static void ComposeHeader(IContainer container, ReportRequest request)
     {
-        var run = request.Run;
-        var title = request.Title ?? "Отчёт об измерении";
+        var title = request.Title ?? DefaultTitle(request.Template);
+        var subject = Subject(request);
+        var version = (request.Runs.Count > 0 ? request.Runs[0].Context.ProductVersion : null) ?? ProductInfo.Version;
 
         container.Column(column =>
         {
@@ -93,14 +92,17 @@ public sealed class PdfReportRenderer : IReportRenderer
                 row.RelativeItem().Column(left =>
                 {
                     left.Item().Text(title).FontSize(17).SemiBold();
-                    left.Item().Text($"{run.Summary.ProbeName} → {run.Summary.TargetDisplay}")
-                        .FontSize(11).FontColor(Colors.Grey.Darken2);
+
+                    if (subject is not null)
+                    {
+                        left.Item().Text(subject).FontSize(11).FontColor(Colors.Grey.Darken2);
+                    }
                 });
 
                 row.ConstantItem(150).AlignRight().Column(right =>
                 {
                     right.Item().AlignRight().Text(ProductInfo.Name).FontSize(11).SemiBold();
-                    right.Item().AlignRight().Text($"версия {run.Context.ProductVersion}")
+                    right.Item().AlignRight().Text($"версия {version}")
                         .FontSize(8).FontColor(Colors.Grey.Darken1);
                 });
             });
@@ -111,475 +113,105 @@ public sealed class PdfReportRenderer : IReportRenderer
 
     // --------------------------------------------------------------- содержимое
 
-    private static void ComposeContent(IContainer container, StoredRun run, byte[]? chart, PathAnalysis? route)
+    private static void ComposeContent(IContainer container, ReportRequest request, byte[]? diagram)
     {
         container.PaddingVertical(12).Column(column =>
         {
             column.Spacing(14);
 
-            column.Item().Element(x => ComposeSummary(x, run));
-
-            if (run.Context.TimingWarning is { } warning)
+            if (request.Template == ReportTemplate.Acceptance)
             {
-                column.Item().Element(x => ComposeWarning(x, warning));
+                column.Item().Element(x => AcceptanceSection.ComposeRequisites(x, request));
             }
 
-            if (chart is not null)
+            if (request.Template is ReportTemplate.Executive or ReportTemplate.Acceptance)
             {
-                column.Item().Image(chart).FitWidth();
-            }
-            else if (run.Summary.HasRawSamples)
-            {
-                column.Item().Text(route is not null
-                        ? "График не построен: маршрут пуст."
-                        : "График не построен: для линии нужно хотя бы два измерения.")
-                    .FontSize(8).Italic().FontColor(Colors.Grey.Darken1);
-            }
-            else
-            {
-                // «Подробности состарились» и «измерений не было» — разные вещи,
-                // и отчёт обязан их различать.
-                column.Item().Text(
-                        "Сырые измерения удалены политикой хранения — график не строится. "
-                        + "Агрегаты ниже сохранены полностью.")
-                    .FontSize(8).Italic().FontColor(Colors.Grey.Darken1);
+                column.Item().Element(x => AcceptanceSection.ComposeOverview(x, request));
             }
 
-            if (route is not null)
+            if (request.ServiceLevel is { } level)
             {
-                column.Item().Element(x => ComposeRoute(x, route, RouteAnnotations(run.Facts)));
-            }
-            else if (run.Series.Count > 0)
-            {
-                column.Item().Element(x => ComposeSeries(x, run));
+                column.Item().Element(x => ServiceLevelSectionRenderer.Compose(x, level));
             }
 
-            var facts = VisibleFacts(run.Facts, route is not null);
-
-            if (facts.Count > 0)
+            if (request.Baselines.Count > 0)
             {
-                column.Item().Element(x => ComposeFacts(x, facts));
+                column.Item().Element(x => BaselineSection.Compose(x, request.Baselines));
             }
 
-            column.Item().Element(x => ComposeConditions(x, run));
+            if (diagram is not null)
+            {
+                column.Item().Element(x => ComposeTopology(x, diagram));
+            }
+
+            ComposeRuns(column, request);
+
+            if (request.Template is ReportTemplate.Acceptance)
+            {
+                column.Item().Element(x => AcceptanceSection.ComposeConclusion(x, request));
+            }
         });
     }
-
-    private static void ComposeSummary(IContainer container, StoredRun run)
-    {
-        var summary = run.Summary;
-
-        container.Background(Colors.Grey.Lighten4).Padding(10).Row(row =>
-        {
-            row.RelativeItem().Column(left =>
-            {
-                left.Spacing(2);
-                Field(left, "Начало", summary.StartedUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm:ss", CultureInfo.InvariantCulture));
-
-                if (summary.Duration is { } duration)
-                {
-                    Field(left, "Длительность", $"{duration.TotalSeconds.ToString("0.0", CultureInfo.InvariantCulture)} с");
-                }
-
-                Field(left, "Состояние", DescribeState(summary.State, summary.LostCount));
-
-                if (summary.ResolvedAddress is { } resolved)
-                {
-                    Field(left, "Адрес", resolved);
-                }
-            });
-
-            row.RelativeItem().Column(right =>
-            {
-                right.Spacing(2);
-                Field(right, "Отправлено", summary.SentCount.ToString(CultureInfo.InvariantCulture));
-                Field(right, "Получено", summary.SuccessCount.ToString(CultureInfo.InvariantCulture));
-                Field(right, "Потери", $"{summary.LossPercent.ToString("0.0", CultureInfo.InvariantCulture)} %");
-
-                if (summary.MedianMs is { } median)
-                {
-                    Field(right, "Медиана", $"{median.ToString("0.000", CultureInfo.InvariantCulture)} мс");
-                }
-            });
-        });
-    }
-
-    private static void ComposeWarning(IContainer container, string warning)
-    {
-        container
-            .Background("#FFF7E6")
-            .BorderLeft(3)
-            .BorderColor("#D97706")
-            .Padding(8)
-            .Text(warning)
-            .FontSize(8.5f)
-            .FontColor("#92400E");
-    }
-
-    private static void ComposeSeries(IContainer container, StoredRun run)
-    {
-        container.Column(column =>
-        {
-            column.Item().PaddingBottom(4).Text("Измерения").FontSize(11).SemiBold();
-
-            column.Item().Table(table =>
-            {
-                table.ColumnsDefinition(columns =>
-                {
-                    columns.RelativeColumn(3);
-                    columns.RelativeColumn();
-                    columns.RelativeColumn();
-                    columns.RelativeColumn();
-                    columns.RelativeColumn();
-                    columns.RelativeColumn();
-                    columns.RelativeColumn();
-                });
-
-                table.Header(header =>
-                {
-                    foreach (var caption in SeriesHeaders)
-                    {
-                        header.Cell().Element(HeaderCell).Text(caption).FontSize(8).SemiBold();
-                    }
-                });
-
-                foreach (var series in run.Series)
-                {
-                    var stats = series.Statistics;
-                    var empty = stats.SampleCount == 0;
-
-                    table.Cell().Element(BodyCell).Text(series.Label).FontSize(8.5f);
-                    table.Cell().Element(BodyCell).Text(series.SentCount.ToString(CultureInfo.InvariantCulture)).FontSize(8.5f);
-                    table.Cell().Element(BodyCell).Text($"{series.LossPercent.ToString("0", CultureInfo.InvariantCulture)} %").FontSize(8.5f);
-                    table.Cell().Element(BodyCell).Text(empty ? "—" : F(stats.MinMs)).FontSize(8.5f);
-                    table.Cell().Element(BodyCell).Text(empty ? "—" : F(stats.P50Ms)).FontSize(8.5f);
-                    table.Cell().Element(BodyCell).Text(empty ? "—" : F(stats.MaxMs)).FontSize(8.5f);
-                    table.Cell().Element(BodyCell).Text(empty ? "—" : F(stats.JitterRfc3550Ms)).FontSize(8.5f);
-                }
-            });
-
-            column.Item().PaddingTop(3).Text(
-                    "Джиттер вычисляется по RFC 3550 §6.4.1 и не является стандартным отклонением.")
-                .FontSize(7.5f).Italic().FontColor(Colors.Grey.Darken1);
-        });
-    }
-
-    // ------------------------------------------------------------------ маршрут
-
-    private static readonly string[] RouteHeaders =
-        ["хоп", "узел", "проб", "потери", "мин", "медиана", "макс", "джиттер", "MOS"];
 
     /// <summary>
-    /// Маршрут: таблица хопов и вывод о том, где начинаются потери.
+    /// Разделы про измерения.
     /// </summary>
     /// <remarks>
-    /// Ради последнего абзаца отчёт и открывают. Таблица показывает, что измерено,
-    /// а вывод отвечает на вопрос, с которым идут к провайдеру: на каком узле и в чьей
-    /// сети рвётся.
+    /// Разворачивает каждый прогон целиком — с графиками, рядами, фактами и условиями —
+    /// только технический отчёт. Он для инженера, который разбирается.
+    /// <para>
+    /// Сводка, акт и SLA получают сжатую таблицу. Это не экономия места: акт со ста
+    /// восемью развёрнутыми измерениями занимает сто двадцать девять страниц, и такой
+    /// документ не подписывают, а подшивают не читая. Подробности при этом не теряются —
+    /// каждый прогон назван, и технический отчёт по нему строится отдельной командой.
+    /// </para>
     /// </remarks>
-    private static void ComposeRoute(
-        IContainer container,
-        PathAnalysis route,
-        IReadOnlyDictionary<string, string> annotations)
+    private static void ComposeRuns(ColumnDescriptor column, ReportRequest request)
     {
-        container.Column(column =>
-        {
-            column.Item().PaddingBottom(4).Text("Маршрут").FontSize(11).SemiBold();
-
-            column.Item().Table(table =>
-            {
-                table.ColumnsDefinition(columns =>
-                {
-                    columns.ConstantColumn(26);
-                    columns.RelativeColumn(4);
-                    columns.RelativeColumn();
-                    columns.RelativeColumn();
-                    columns.RelativeColumn();
-                    columns.RelativeColumn();
-                    columns.RelativeColumn();
-                    columns.RelativeColumn();
-                    columns.RelativeColumn();
-                });
-
-                table.Header(header =>
-                {
-                    foreach (var caption in RouteHeaders)
-                    {
-                        header.Cell().Element(HeaderCell).Text(caption).FontSize(8).SemiBold();
-                    }
-                });
-
-                foreach (var hop in route.Hops)
-                {
-                    ComposeHopRow(table, hop, annotations);
-                }
-            });
-
-            column.Item().PaddingTop(3).Text(
-                    "MOS на транзитных хопах считается по задержке и дрожанию, без потерь: "
-                    + "потери на транзитном узле означают ограничение его собственных ответов, "
-                    + "а не потерю проходящего трафика. Оценка — упрощённая E-модель ITU-T G.107.")
-                .FontSize(7.5f).Italic().FontColor(Colors.Grey.Darken1);
-
-            ComposeRouteChanges(column, route, annotations);
-            ComposeRouteVerdict(column, route, annotations);
-        });
-    }
-
-    private static void ComposeHopRow(
-        TableDescriptor table,
-        HopStatistics hop,
-        IReadOnlyDictionary<string, string> annotations)
-    {
-        var stats = hop.Statistics;
-        var silent = hop.IsSilent;
-        var address = hop.Address ?? "*";
-
-        table.Cell().Element(BodyCell).Text(hop.Hop.ToString(CultureInfo.InvariantCulture)).FontSize(8.5f);
-
-        table.Cell().Element(BodyCell).Column(cell =>
-        {
-            cell.Item().Text(address).FontSize(8.5f);
-
-            if (hop.IsEarlyDestination)
-            {
-                cell.Item().Text("цель коротким путём").FontSize(7).FontColor(Colors.Grey.Darken1);
-            }
-
-            if (Annotation(annotations, address) is { } text)
-            {
-                cell.Item().Text(text).FontSize(7).FontColor(Colors.Grey.Darken1);
-            }
-
-            if (hop.Addresses.Count > 1)
-            {
-                var others = hop.Addresses.Where(a => !string.Equals(a, address, StringComparison.Ordinal));
-                cell.Item().Text($"также отвечали: {string.Join(", ", others)}")
-                    .FontSize(7).FontColor(Colors.Grey.Darken1);
-            }
-        });
-
-        table.Cell().Element(BodyCell).Text(hop.Sent.ToString(CultureInfo.InvariantCulture)).FontSize(8.5f);
-
-        // У хопа с ранним ответом цели в колонке потерь стоит прочерк: доля пакетов,
-        // ушедших длинным путём, — не потери, и цифра здесь читалась бы как авария.
-        var loss = table.Cell().Element(BodyCell)
-            .Text(hop.IsEarlyDestination
-                ? "—"
-                : $"{hop.LossPercent.ToString("0", CultureInfo.InvariantCulture)} %")
-            .FontSize(8.5f);
-
-        if (!silent && !hop.IsEarlyDestination && hop.LossPercent >= PathAnalysis.SignificantLossPercent)
-        {
-            loss.FontColor("#B91C1C").SemiBold();
-        }
-
-        table.Cell().Element(BodyCell).Text(silent ? "—" : F(stats.MinMs)).FontSize(8.5f);
-        table.Cell().Element(BodyCell).Text(silent ? "—" : F(stats.P50Ms)).FontSize(8.5f);
-        table.Cell().Element(BodyCell).Text(silent ? "—" : F(stats.MaxMs)).FontSize(8.5f);
-        table.Cell().Element(BodyCell).Text(silent ? "—" : F(stats.JitterRfc3550Ms)).FontSize(8.5f);
-        table.Cell().Element(BodyCell).Text(
-                silent || double.IsNaN(hop.Voice.Mos)
-                    ? "—"
-                    : hop.Voice.Mos.ToString("0.0", CultureInfo.InvariantCulture))
-            .FontSize(8.5f);
-    }
-
-    private static void ComposeRouteChanges(
-        ColumnDescriptor column,
-        PathAnalysis route,
-        IReadOnlyDictionary<string, string> annotations)
-    {
-        const int MaxShown = 12;
-
-        if (route.RouteChanges.Count == 0)
+        if (request.Runs.Count == 0)
         {
             return;
         }
 
-        column.Item().PaddingTop(8).Text($"Смены маршрута: {route.RouteChanges.Count}")
-            .FontSize(10).SemiBold();
-
-        foreach (var change in route.RouteChanges.Take(MaxShown))
+        if (request.Template != ReportTemplate.Technical)
         {
-            var to = Annotation(annotations, change.To) is { } text ? $"{change.To} ({text})" : change.To;
-            column.Item().Text($"хоп {change.Hop}: {change.From} → {to}").FontSize(8.5f);
-        }
+            column.Item().Element(x => AcceptanceSection.ComposeRunTable(x, request.Runs));
 
-        if (route.RouteChanges.Count > MaxShown)
-        {
-            column.Item().Text($"…и ещё {route.RouteChanges.Count - MaxShown}")
-                .FontSize(8.5f).FontColor(Colors.Grey.Darken1);
-        }
-    }
-
-    private static void ComposeRouteVerdict(
-        ColumnDescriptor column,
-        PathAnalysis route,
-        IReadOnlyDictionary<string, string> annotations)
-    {
-        var lines = new List<string>(3);
-
-        if (route.DestinationReached && !double.IsNaN(route.DestinationVoice.Mos))
-        {
-            var voice = route.DestinationVoice;
-            lines.Add($"Качество до цели: {voice.Grade} "
-                      + $"(MOS {voice.Mos.ToString("0.00", CultureInfo.InvariantCulture)}, "
-                      + $"R {voice.RFactor.ToString("0.0", CultureInfo.InvariantCulture)}).");
-        }
-
-        if (route.DegradationPoint is { } point)
-        {
-            var address = point.Address ?? "неизвестный узел";
-            var where = Annotation(annotations, address) is { } text ? $"{address} ({text})" : address;
-
-            lines.Add($"Деградация начинается на хопе {point.Hop}: {where}. Потери "
-                      + $"{point.LossPercent.ToString("0.0", CultureInfo.InvariantCulture)} % "
-                      + "и держатся до конца маршрута.");
-        }
-        else if (route.DestinationReached)
-        {
-            lines.Add("Устойчивых потерь по маршруту нет: до цели пакеты доходят.");
-        }
-
-        if (route.SilentHops > 0)
-        {
-            lines.Add($"Молчащих хопов: {route.SilentHops}. Это не потери — узел может "
-                      + "не отвечать на ICMP, но исправно передавать транзитный трафик.");
-        }
-
-        if (route.EarlyDestinationHops.Count > 0)
-        {
-            var shares = route.Hops
-                .Where(h => h.IsEarlyDestination)
-                .Select(h => $"{h.Hop} ({h.ShortPathPercent.ToString("0.#", CultureInfo.InvariantCulture)} %)");
-
-            lines.Add($"Цель отвечала также с хопов {string.Join(", ", shares)} — в скобках доля пакетов, "
-                      + "дошедших коротким путём. Длина пути непостоянна: обычное дело для туннелей MPLS "
-                      + "без переноса TTL и балансировки по каналам. Остальные пакеты не потеряны — "
-                      + "они дошли длинным путём, до конечной точки.");
-        }
-
-        if (lines.Count == 0)
-        {
             return;
         }
 
-        column.Item().PaddingTop(8).Background("#F1F5F9").Padding(8).Column(box =>
+        foreach (var run in request.Runs)
         {
-            box.Spacing(2);
-            box.Item().Text("Вывод").FontSize(10).SemiBold();
+            var route = RunSection.RouteOf(run);
+            var chart = request.IncludeCharts
+                ? route is not null ? RouteChartImage.TryRender(route) : LatencyChartImage.TryRender(run)
+                : null;
 
-            foreach (var line in lines)
+            if (request.Runs.Count > 1)
             {
-                box.Item().Text(line).FontSize(8.5f);
+                column.Item().PaddingTop(6).Text($"{run.Summary.ProbeName} → {run.Summary.TargetDisplay}")
+                    .FontSize(12).SemiBold();
             }
-        });
-    }
 
-    /// <summary>Таблица «адрес → чем известен», собранная пробой в фактах категории route.</summary>
-    private static Dictionary<string, string> RouteAnnotations(IReadOnlyList<ProbeFact> facts)
-    {
-        var map = new Dictionary<string, string>(StringComparer.Ordinal);
-
-        foreach (var fact in facts)
-        {
-            if (string.Equals(fact.Category, HopAnnotation.FactCategory, StringComparison.OrdinalIgnoreCase))
-            {
-                map[fact.Name] = fact.Value;
-            }
+            column.Item().Element(x => RunSection.Compose(x, run, chart, route));
         }
-
-        return map;
     }
 
-    private static string? Annotation(IReadOnlyDictionary<string, string> annotations, string address) =>
-        annotations.TryGetValue(address, out var text) && text != HopAnnotation.PrivateLabel
-            ? text
-            : null;
-
-    /// <summary>
-    /// Факты, которые нужно показать списком.
-    /// </summary>
-    /// <remarks>
-    /// Для трассировки категория route уже разошлась подписями под адресами хопов.
-    /// Повторить её списком значило бы напечатать три десятка строк второй раз.
-    /// </remarks>
-    private static IReadOnlyList<ProbeFact> VisibleFacts(IReadOnlyList<ProbeFact> facts, bool isRoute) =>
-        isRoute
-            ? [.. facts.Where(f => !string.Equals(f.Category, HopAnnotation.FactCategory, StringComparison.OrdinalIgnoreCase))]
-            : facts;
-
-    private static void ComposeFacts(IContainer container, IReadOnlyList<ProbeFact> facts)
+    private static void ComposeTopology(IContainer container, byte[] diagram)
     {
         container.Column(column =>
         {
-            column.Item().PaddingBottom(4).Text("Установленные факты").FontSize(11).SemiBold();
+            column.Item().Text("Схема сети").FontSize(12).SemiBold();
 
-            foreach (var fact in facts)
-            {
-                column.Item().Row(row =>
-                {
-                    row.ConstantItem(150).Text(fact.Name).FontSize(8.5f).FontColor(Colors.Grey.Darken2);
+            column.Item().PaddingTop(4).Image(diagram).FitWidth();
 
-                    var value = row.RelativeItem().Text(fact.Value).FontSize(8.5f);
-
-                    if (fact.IsWarning)
-                    {
-                        value.FontColor("#92400E").SemiBold();
-                    }
-                });
-            }
-        });
-    }
-
-    /// <summary>
-    /// Методика и условия измерения.
-    /// </summary>
-    /// <remarks>
-    /// Обязательная часть документа. Без указания интерфейса, порога достоверности
-    /// и версии продукта два отчёта, снятых в разное время, несопоставимы — а сравнение
-    /// с прошлым и есть то, ради чего отчёт делается.
-    /// </remarks>
-    private static void ComposeConditions(IContainer container, StoredRun run)
-    {
-        var context = run.Context;
-
-        container.Column(column =>
-        {
-            column.Item().PaddingBottom(4).Text("Методика и условия измерения").FontSize(11).SemiBold();
-
-            column.Item().Background(Colors.Grey.Lighten4).Padding(10).Column(inner =>
-            {
-                inner.Spacing(2);
-
-                Field(inner, "Методика", context.Methodology.ToString());
-
-                if (context.Methodology.Url is { } url)
-                {
-                    Field(inner, "Источник", url);
-                }
-
-                Field(inner, "Интерфейс", $"{context.InterfaceName} ({DescribeAdapter(context.AdapterKind)})");
-
-                if (context.InterfaceAddress is { } address)
-                {
-                    Field(inner, "Адрес интерфейса", address);
-                }
-
-                Field(inner, "Порог достоверности",
-                    $"{context.CalibrationBaselineMs.ToString("0.000", CultureInfo.InvariantCulture)} мс — "
-                    + "значения ниже неотличимы от собственной работы измерительного стека");
-
-                Field(inner, "Версия продукта", context.ProductVersion);
-
-                if (run.Parameters.Count > 0)
-                {
-                    Field(inner, "Параметры пробы", string.Join(", ",
-                        run.Parameters.OrderBy(p => p.Key, StringComparer.Ordinal)
-                            .Select(p => $"{p.Key}={p.Value ?? "—"}")));
-                }
-            });
+            // Легенда обязательна: различие достоверности — главное, что карта
+            // сообщает, и без объяснения три вида линий читаются как оформление.
+            column.Item().PaddingTop(4).Text(
+                    "Линии: сплошная — связь подтверждена измерением; штриховая — выведена "
+                    + "из наблюдений; точечная — допущение. Схема показывает то, что продукт "
+                    + "увидел с этой машины, а не паспортную схему сети.")
+                .FontSize(7.5f).Italic().FontColor(Colors.Grey.Darken1);
         });
     }
 
@@ -610,40 +242,43 @@ public sealed class PdfReportRenderer : IReportRenderer
 
     // ------------------------------------------------------------------ мелочи
 
-    private static void Field(ColumnDescriptor column, string name, string value)
+    private static string DefaultTitle(ReportTemplate template) => template switch
     {
-        column.Item().Row(row =>
+        ReportTemplate.Executive => "Сводка по результатам проверки",
+        ReportTemplate.Acceptance => "Акт тестирования сети",
+        ReportTemplate.ServiceLevel => "Отчёт о доступности",
+        _ => "Отчёт об измерении",
+    };
+
+    private static string? Subject(ReportRequest request)
+    {
+        if (request.ServiceLevel is { } level)
         {
-            row.ConstantItem(120).Text(name).FontSize(8.5f).FontColor(Colors.Grey.Darken2);
-            row.RelativeItem().Text(value).FontSize(8.5f);
-        });
+            return $"{level.Monitor.Name} → {level.Monitor.Target.DisplayName}";
+        }
+
+        return request.Runs.Count switch
+        {
+            0 => null,
+            1 => $"{request.Runs[0].Summary.ProbeName} → {request.Runs[0].Summary.TargetDisplay}",
+            var count => $"измерений: {count.ToString(CultureInfo.InvariantCulture)}",
+        };
     }
 
-    private static IContainer HeaderCell(IContainer container) =>
-        container.BorderBottom(1).BorderColor(Colors.Grey.Medium).PaddingVertical(3);
-
-    private static IContainer BodyCell(IContainer container) =>
-        container.BorderBottom(0.5f).BorderColor(Colors.Grey.Lighten2).PaddingVertical(3);
-
-    private static string F(double value) => value.ToString("0.000", CultureInfo.InvariantCulture);
-
-    private static string DescribeState(RunState state, int lost) => state switch
+    private static string FileName(ReportRequest request)
     {
-        RunState.Completed when lost == 0 => "завершён без потерь",
-        RunState.Completed => "завершён, есть потери",
-        RunState.Cancelled => "прерван оператором",
-        RunState.Abandoned => "оборван сбоем; измеренное сохранено",
-        _ => "выполняется",
-    };
+        var kind = request.Template switch
+        {
+            ReportTemplate.Executive => "сводка",
+            ReportTemplate.Acceptance => "акт",
+            ReportTemplate.ServiceLevel => "sla",
+            _ => request.Runs.Count == 1 ? request.Runs[0].Summary.ProbeName : "отчёт",
+        };
 
-    private static string DescribeAdapter(AdapterKind kind) => kind switch
-    {
-        AdapterKind.Physical => "физический",
-        AdapterKind.Wireless => "беспроводной",
-        AdapterKind.Virtual => "виртуальный коммутатор",
-        AdapterKind.Vpn => "VPN",
-        AdapterKind.Tunnel => "туннель",
-        AdapterKind.Loopback => "loopback",
-        _ => "тип не определён",
-    };
+        var moment = request.Runs.Count == 1
+            ? request.Runs[0].Summary.StartedUtc.ToLocalTime()
+            : DateTimeOffset.Now;
+
+        return $"storm-{kind}-{moment:yyyyMMdd-HHmmss}.pdf";
+    }
 }

@@ -4,6 +4,7 @@ using System.Text.RegularExpressions;
 using StormMachine.Application.Abstractions;
 using StormMachine.Domain.Measurements;
 using StormMachine.Domain.Results;
+using StormMachine.Domain.Topology;
 using StormMachine.Domain.Targets;
 using Xunit.Abstractions;
 
@@ -107,16 +108,24 @@ public sealed class PdfReportRendererTests(ITestOutputHelper output)
         };
     }
 
+    /// <summary>
+    /// Раскладка карты для отчёта.
+    /// </summary>
+    /// <remarks>
+    /// В этих проверках схемы сети нет, и настоящая раскладка не нужна. Подставлять
+    /// сюда движок MSAGL значило бы тащить в тест отчёта чужой алгоритм и его время.
+    /// </remarks>
+    private sealed class NoLayout : ITopologyLayout
+    {
+        public PlacedGraph Arrange(TopologyGraph graph) => PlacedGraph.Empty;
+    }
+
     private static async Task<byte[]> RenderAsync(StoredRun run, bool includeChart = true)
     {
-        var renderer = new PdfReportRenderer();
+        var renderer = new PdfReportRenderer(new NoLayout());
 
-        var report = await renderer.RenderAsync(new ReportRequest
-        {
-            Run = run,
-            Author = "тест",
-            IncludeChart = includeChart,
-        });
+        var report = await renderer.RenderAsync(
+            ReportRequest.ForRun(run, author: "тест", includeChart: includeChart));
 
         return report.Content;
     }
@@ -135,8 +144,8 @@ public sealed class PdfReportRendererTests(ITestOutputHelper output)
     [Fact]
     public async Task Render_SuggestsFileNameWithProbeAndDate()
     {
-        var renderer = new PdfReportRenderer();
-        var report = await renderer.RenderAsync(new ReportRequest { Run = BuildRun() });
+        var renderer = new PdfReportRenderer(new NoLayout());
+        var report = await renderer.RenderAsync(ReportRequest.ForRun(BuildRun()));
 
         Assert.Equal("pdf", report.FileExtension);
         Assert.StartsWith("storm-ping-", report.SuggestedFileName, StringComparison.Ordinal);

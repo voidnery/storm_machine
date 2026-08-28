@@ -9,11 +9,18 @@ on:
 
 permissions:
   contents: write
+  actions: read          # SignPath читает сведения о сборке и скачивает артефакт
 
 jobs:
   release:
     runs-on: windows-latest
-    timeout-minutes: 30
+    timeout-minutes: 40
+
+    env:
+      # Подпись включается сама, как только у репозитория появится токен SignPath.
+      # До одобрения заявки шаги подписи пропускаются, а выпуск собирается неподписанным
+      # и честно об этом сообщает — см. docs/ARCHITECTURE.md, раздел о подписи.
+      HAS_SIGNING: ${{ secrets.SIGNPATH_API_TOKEN != '' }}
 
     steps:
       - name: Checkout
@@ -25,6 +32,9 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.x'
+
+      - name: Восстановление локальных инструментов
+        run: dotnet tool restore
 
       - name: Есть ли что публиковать
         id: probe
@@ -52,15 +62,112 @@ jobs:
             dotnet publish $proj.FullName --configuration Release --output "artifacts/$name"
           }
 
+      # ------------------------------------------------------------------ подпись
+      #
+      # SignPath Foundation подписывает выпуски открытых проектов бесплатно.
+      # Порядок подачи заявки — docs/SIGNPATH.md. Условия со стороны продукта
+      # выполнены: лицензия MIT, воспроизводимая сборка (Deterministic +
+      # ContinuousIntegrationBuild), выпуск собирается только из CI по подписанному тегу.
+      #
+      # Подпись идёт в два приёма, и порядок здесь существенный. Сначала бинарники,
+      # потом установщик: Velopack считает контрольные суммы содержимого при упаковке,
+      # и подпись внутренних файлов после неё их бы сломала. Подписать только установщик
+      # тоже мало — SmartScreen успокоится, а Defender будет ругаться на неподписанный
+      # StormMachine.exe при каждом запуске.
+      - name: Бинарники на подпись
+        id: unsigned-app
+        if: steps.probe.outputs.found == 'true' && env.HAS_SIGNING == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: unsigned-app
+          path: artifacts/StormMachine.App
+
+      - name: Подпись бинарников
+        if: steps.probe.outputs.found == 'true' && env.HAS_SIGNING == 'true'
+        uses: signpath/github-action-submit-signing-request@v2
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: storm-machine
+          signing-policy-slug: release-signing
+          artifact-configuration-slug: app-files
+          github-artifact-id: ${{ steps.unsigned-app.outputs.artifact-id }}
+          wait-for-completion: true
+          output-artifact-directory: artifacts/StormMachine.App
+
+      # Установщик и лента обновлений. Velopack проверен спайком-07 на совместимость
+      # с обрезкой — разбор ленты и разностные пакеты её переживают, в отличие от Quartz.
+      - name: Установщик Velopack
+        if: steps.probe.outputs.found == 'true'
+        shell: pwsh
+        run: |
+          $version = "${{ github.ref_name }}" -replace '^v', ''
+
+          # Консоль и агент кладутся рядом с клиентом: продукт один, и ставить его
+          # тремя установщиками значило бы заставить оператора собирать его руками.
+          Copy-Item artifacts/StormMachine.Cli/* artifacts/StormMachine.App/ -Force -ErrorAction SilentlyContinue
+          Copy-Item artifacts/StormMachine.Agent/* artifacts/StormMachine.App/ -Force -ErrorAction SilentlyContinue
+
+          # Лента прошлых выпусков нужна для разностных пакетов: без неё каждое
+          # обновление весило бы как полная установка.
+          New-Item -ItemType Directory -Force -Path releases | Out-Null
+          dotnet vpk download github --repoUrl "https://github.com/${{ github.repository }}" --outputDir releases 2>&1 | Out-Host
+          if ($LASTEXITCODE -ne 0) { Write-Host "::notice::Прошлых выпусков нет — собираю первый" }
+
+          dotnet vpk pack `
+            --packId StormMachine `
+            --packVersion $version `
+            --packTitle "Storm Machine" `
+            --packAuthors "Storm Machine contributors" `
+            --packDir artifacts/StormMachine.App `
+            --mainExe StormMachine.exe `
+            --icon src/StormMachine.App/Assets/storm.ico `
+            --outputDir releases
+
+
+      - name: Установщик на подпись
+        id: unsigned-setup
+        if: steps.probe.outputs.found == 'true' && env.HAS_SIGNING == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: unsigned-installer
+          path: releases/StormMachine-win-Setup.exe
+
+      - name: Подпись установщика
+        if: steps.probe.outputs.found == 'true' && env.HAS_SIGNING == 'true'
+        uses: signpath/github-action-submit-signing-request@v2
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: storm-machine
+          signing-policy-slug: release-signing
+          artifact-configuration-slug: installer
+          github-artifact-id: ${{ steps.unsigned-setup.outputs.artifact-id }}
+          wait-for-completion: true
+          output-artifact-directory: releases
+
       - name: Упаковка и контрольные суммы
         if: steps.probe.outputs.found == 'true'
         shell: pwsh
         run: |
           $tag = "${{ github.ref_name }}"
           Compress-Archive -Path artifacts/* -DestinationPath "storm-machine-$tag-win-x64.zip" -Force
-          $hash = (Get-FileHash "storm-machine-$tag-win-x64.zip" -Algorithm SHA256).Hash
-          "$hash  storm-machine-$tag-win-x64.zip" | Set-Content "SHA256SUMS.txt" -Encoding ascii
-          Write-Host "SHA256: $hash"
+
+          # Суммы считаются по всему, что уходит человеку: и по архиву, и по установщику.
+          # Неподписанный установщик — единственный способ убедиться, что скачано то самое.
+          $files = @("storm-machine-$tag-win-x64.zip") + (Get-ChildItem releases -Filter '*.exe' | ForEach-Object { $_.FullName })
+          $lines = foreach ($f in $files) {
+            $h = (Get-FileHash $f -Algorithm SHA256).Hash
+            "$h  $(Split-Path $f -Leaf)"
+          }
+          $lines | Set-Content "SHA256SUMS.txt" -Encoding ascii
+          $lines | Write-Host
+
+      - name: Предупреждение о неподписанном выпуске
+        if: steps.probe.outputs.found == 'true' && env.HAS_SIGNING != 'true'
+        shell: pwsh
+        run: |
+          Write-Host "::warning::Выпуск не подписан: токен SignPath не задан. SmartScreen покажет предупреждение при установке. Проверять скачанное — по SHA256SUMS.txt."
 
       - name: Создание релиза
         uses: softprops/action-gh-release@v2
@@ -72,3 +179,7 @@ jobs:
           files: |
             storm-machine-*.zip
             SHA256SUMS.txt
+            releases/*.exe
+            releases/*.nupkg
+            releases/*.json
+            releases/RELEASES

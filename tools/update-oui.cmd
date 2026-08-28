@@ -9,7 +9,7 @@ if not exist "%GITBASH%" set "GITBASH=%ProgramFiles(x86)%\Git\bin\bash.exe"
 if not exist "%GITBASH%" set "GITBASH=%LocalAppData%\Programs\Git\bin\bash.exe"
 
 if not exist "%GITBASH%" (
-    echo Git Bash не найден. Установите Git for Windows.
+    echo Git Bash not found. Install Git for Windows.
     exit /b 1
 )
 

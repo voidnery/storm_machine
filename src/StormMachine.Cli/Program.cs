@@ -3,8 +3,11 @@ using System.Runtime;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using StormMachine.Application;
+using StormMachine.Application.Abstractions;
 using StormMachine.Application.Probes;
+using StormMachine.Application.Capabilities;
 using StormMachine.Cli.Commands;
+using StormMachine.Cli.Rendering;
 using StormMachine.Composition;
 
 namespace StormMachine.Cli;
@@ -18,7 +21,17 @@ namespace StormMachine.Cli;
 /// </remarks>
 internal static class Program
 {
-    private static int Main(string[] args)
+    /// <summary>
+    /// Точка входа.
+    /// </summary>
+    /// <remarks>
+    /// Асинхронная не для красоты: планировщик мониторов освобождается только
+    /// асинхронно — он останавливает свой цикл и дожидается идущих проверок.
+    /// Синхронное закрытие контейнера на таком типе падает с прямым указанием
+    /// использовать DisposeAsync, и это правильно: обрывать проверку на полуслове
+    /// значило бы потерять уже измеренное.
+    /// </remarks>
+    private static async Task<int> Main(string[] args)
     {
         Console.OutputEncoding = System.Text.Encoding.UTF8;
 
@@ -30,10 +43,41 @@ internal static class Program
         // их не случилось ни одной.
         GCSettings.LatencyMode = GCLatencyMode.SustainedLowLatency;
 
-        using var services = BuildServiceProvider();
+        // Путь к базе разбирается до сборки служб: хранилище нужно уже собранным,
+        // а System.CommandLine разбирает строку позже. Предварительный просмотр
+        // аргументов — цена за то, чтобы ключ работал, а не только значился в справке.
+        ApplyDatabaseOverride(args);
+
+        await using var services = BuildServiceProvider();
         var root = BuildRootCommand(services);
 
-        return root.Parse(args).Invoke();
+        // Ответные файлы System.CommandLine выключены: разбор @файла у нас свой —
+        // это список целей, а не список аргументов. Со встроенным разбором строка
+        // «storm scenario run voice @цели.txt» превращалась в подстановку аргументов
+        // из файла и падала с непонятной ошибкой разбора.
+        var parsing = new ParserConfiguration { ResponseFileTokenReplacer = null };
+
+        return await root.Parse(args, parsing).InvokeAsync().ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Переносит «--база» в переменную окружения до сборки служб.
+    /// </summary>
+    /// <remarks>
+    /// Явный ключ побеждает переменную окружения: то, что человек написал в этой
+    /// команде, весомее того, что осталось в окружении с прошлого раза.
+    /// </remarks>
+    private static void ApplyDatabaseOverride(string[] args)
+    {
+        for (var i = 0; i < args.Length - 1; i++)
+        {
+            if (args[i] is "--база" or "--db")
+            {
+                Environment.SetEnvironmentVariable(StorageEnvironment.PathVariable, args[i + 1]);
+
+                return;
+            }
+        }
     }
 
     private static ServiceProvider BuildServiceProvider()
@@ -52,12 +96,27 @@ internal static class Program
 
         services.AddStormMachine();
 
+        // Канал терминала регистрируется клиентом, а не корнем композиции: писать
+        // в консоль имеет смысл только там, где она есть. У графического клиента
+        // по той же причине свои каналы — звук и значок в трее.
+        services.AddSingleton<IAlertChannel, ConsoleAlertChannel>();
+
         return services.BuildServiceProvider();
     }
 
     private static RootCommand BuildRootCommand(IServiceProvider services)
     {
         var root = new RootCommand($"{ProductInfo.Name} — станция тестирования и диагностики сетей.");
+
+        // Объявлена, чтобы попасть в справку и не считаться неизвестным ключом.
+        // Значение уже прочитано до сборки служб — см. DatabaseOverride.
+        root.Options.Add(new Option<string?>("--база", "--db")
+        {
+            Description = "Работать с другим файлом базы. То же самое делает переменная "
+                          + "окружения STORM_DB. Полезно для копии из поддержки и для проверок, "
+                          + "которые не должны подмешиваться в рабочую историю.",
+            Recursive = true,
+        });
 
         // Команды не перечисляются вручную: каждая проба объявляет своё имя и параметры,
         // и команда строится по объявлению. Новая проба появляется в CLI сама.
@@ -69,13 +128,56 @@ internal static class Program
         root.Subcommands.Add(DiscoverCommand.CreateDiscover(services));
         root.Subcommands.Add(DevicesCommand.Create(services));
         root.Subcommands.Add(TopologyCommand.Create(services));
+        root.Subcommands.Add(ScenarioCommand.Create(services));
+        root.Subcommands.Add(OutsideCommand.Create(services));
+        root.Subcommands.Add(AgentsCommand.Create(services));
         root.Subcommands.Add(PresetsCommand.Create(services));
+        root.Subcommands.Add(MonitorsCommand.Create(services));
+        root.Subcommands.Add(AlertsCommand.Create(services));
         root.Subcommands.Add(RunsCommand.Create(services));
+        root.Subcommands.Add(ReportCommand.Create(services));
+        root.Subcommands.Add(BaselineCommand.Create(services));
         root.Subcommands.Add(EnvCommand.Create(services));
+        root.Subcommands.Add(ProfilesCommand.Create(services));
+        root.Subcommands.Add(SnmpCommand.Create(services));
         root.Subcommands.Add(BuildProbesCommand(services));
-        root.Subcommands.Add(BuildAboutCommand());
+        root.Subcommands.Add(BuildCapabilitiesCommand(services));
+        root.Subcommands.Add(BuildAboutCommand(services));
 
         return root;
+    }
+
+    /// <summary>
+    /// Что продукт может на этой машине: <c>storm capabilities</c>.
+    /// </summary>
+    /// <remarks>
+    /// Первый вопрос при знакомстве с инструментом — «что заработает сразу, а за что
+    /// придётся платить установкой драйверов и выпрашиванием паролей у сетевиков».
+    /// Ответ на него продукт обязан давать сам, а не оставлять читателю документации.
+    /// </remarks>
+    private static Command BuildCapabilitiesCommand(IServiceProvider services)
+    {
+        var verbose = new Option<bool>("--подробно", "--verbose")
+        {
+            Description = "Показать пояснение к каждой возможности, а не только к проблемным.",
+        };
+
+        var command = new Command("capabilities", "Что продукт может на этой машине и чего не может.")
+        {
+            verbose,
+        };
+
+        command.SetAction(async (parse, cancellationToken) =>
+        {
+            var inspector = services.GetRequiredService<CapabilityInspector>();
+            var report = await inspector.InspectAsync(cancellationToken).ConfigureAwait(false);
+
+            CapabilityRenderer.Write(report, parse.GetValue(verbose));
+
+            return 0;
+        });
+
+        return command;
     }
 
     private static Command BuildProbesCommand(IServiceProvider services)
@@ -108,9 +210,9 @@ internal static class Program
         return command;
     }
 
-    private static Command BuildAboutCommand()
+    private static Command BuildAboutCommand(IServiceProvider services)
     {
-        var command = new Command("about", "Версия, лицензия и ссылки.");
+        var command = new Command("about", "Версия, лицензия, ссылки и где лежат данные.");
 
         command.SetAction(_ =>
         {
@@ -119,6 +221,19 @@ internal static class Program
             Console.WriteLine("Репозиторий: https://github.com/voidnery/storm_machine");
             Console.WriteLine();
             Console.WriteLine("Данные ASN и геолокации — DB-IP (CC BY-SA 4.0).");
+
+            // Путь к базе — не справочная мелочь. Когда сопряжение пропало или журнал
+            // пуст, первый вопрос всегда один: с каким файлом продукт разговаривает.
+            // Без ответа человек разбирается догадками.
+            Console.WriteLine();
+            Console.WriteLine($"База данных: {services.GetRequiredService<IStorageLocation>().DatabasePath}");
+            Console.WriteLine("В ней журнал прогонов, пресеты, инвентарь, карта, сопряжения с агентами,");
+            Console.WriteLine("личность клиента, мониторы с историей проверок, лента алертов и настройки.");
+            Console.WriteLine("Резервная копия этого файла возвращает установку целиком.");
+            Console.WriteLine();
+            Console.WriteLine("Пароли каналов оповещения зашифрованы средствами Windows и привязаны");
+            Console.WriteLine("к учётной записи: на другой машине их придётся задать заново.");
+
             return 0;
         });
 

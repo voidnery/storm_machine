@@ -40,11 +40,22 @@ public sealed record RunOutcome
 public sealed class RunOrchestrator(
     IRunStore store,
     IHighResolutionClock clock,
-    INetworkEnvironment environment)
+    INetworkEnvironment environment,
+    IProfileStore? profiles = null)
 {
     private readonly IRunStore _store = store ?? throw new ArgumentNullException(nameof(store));
     private readonly IHighResolutionClock _clock = clock ?? throw new ArgumentNullException(nameof(clock));
     private readonly INetworkEnvironment _environment = environment ?? throw new ArgumentNullException(nameof(environment));
+
+    /// <summary>
+    /// Профили. Необязательны: продукт полностью работоспособен и без них.
+    /// </summary>
+    /// <remarks>
+    /// Нужны здесь ради одной строки в условиях измерения — имени активного профиля.
+    /// Через полгода отличить замер у заказчика от замера в офисе иначе будет нечем,
+    /// а сравнивать их между собой нельзя.
+    /// </remarks>
+    private readonly IProfileStore? _profiles = profiles;
 
     public async Task<RunOutcome> RunAsync(
         IProbe probe,
@@ -61,7 +72,7 @@ public sealed class RunOrchestrator(
         await _clock.CalibrateAsync(cancellationToken).ConfigureAwait(false);
 
         var adapter = _environment.GetPrimaryAdapter();
-        var context = BuildContext(adapter, descriptor.Methodology);
+        var context = BuildContext(adapter, descriptor.Methodology, await ProfileAsync(cancellationToken).ConfigureAwait(false));
         var collector = new ProbeCollector();
         var samples = new List<Sample>();
 
@@ -145,7 +156,28 @@ public sealed class RunOrchestrator(
         }
     }
 
-    private MeasurementContext BuildContext(NetworkAdapter? adapter, Methodology methodology) => new()
+    /// <summary>Имя активного профиля. Сбой чтения не должен срывать измерение.</summary>
+    private async Task<string?> ProfileAsync(CancellationToken cancellationToken)
+    {
+        if (_profiles is null)
+        {
+            return null;
+        }
+
+        try
+        {
+            return (await _profiles.GetActiveAsync(cancellationToken).ConfigureAwait(false))?.Name;
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or IOException)
+        {
+            return null;
+        }
+    }
+
+    private MeasurementContext BuildContext(
+        NetworkAdapter? adapter,
+        Methodology methodology,
+        string? profile) => new()
     {
         InterfaceName = adapter?.Name ?? "неизвестен",
         AdapterKind = adapter?.Kind ?? AdapterKind.Unknown,
@@ -153,6 +185,7 @@ public sealed class RunOrchestrator(
         CalibrationBaselineMs = _clock.CalibrationBaselineMs,
         ProductVersion = ProductInfo.Version,
         Methodology = methodology,
+        Profile = profile,
         StartedUtc = DateTimeOffset.UtcNow,
     };
 }

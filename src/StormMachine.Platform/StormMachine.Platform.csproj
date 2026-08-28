@@ -12,6 +12,11 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.11" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.11" />
+
+    <!-- DPAPI. В базовую библиотеку .NET не входит: отдельный пакет, только Windows.
+         Нужен для паролей каналов оповещения — держать их в базе открытым текстом
+         нельзя, базу копируют и присылают. -->
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="10.0.0" />
   </ItemGroup>
 
 </Project>

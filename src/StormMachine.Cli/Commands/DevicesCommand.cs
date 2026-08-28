@@ -27,6 +27,11 @@ internal static class DevicesCommand
         command.Subcommands.Add(BuildDiff(services));
         command.Subcommands.Add(BuildName(services));
         command.Subcommands.Add(BuildAudit(services));
+        command.Subcommands.Add(TopologyEditCommands.BuildRole(services));
+
+        // Объединение дублей живёт здесь, а не в карте: устройство одно во всём
+        // продукте, и объединять его дважды в разных местах оператор не должен.
+        TopologyEditCommands.AddMergeTo(command, services);
 
         // Без подкоманды показывается список: самый частый вопрос не должен
         // требовать лишнего слова.

@@ -25,6 +25,13 @@ public sealed class ViewLocator : IDataTemplate
         PresetsPageViewModel => new PresetsPage(),
         TopologyPageViewModel => new TopologyPage(),
         RunsPageViewModel => new RunsPage(),
+        ProbesPageViewModel => new ProbesPage(),
+        InspectPageViewModel => new InspectPage(),
+        MonitorsPageViewModel => new MonitorsPage(),
+        SchedulePageViewModel => new SchedulePage(),
+        AlertsPageViewModel => new AlertsPage(),
+        ReportsPageViewModel => new ReportsPage(),
+        SettingsPageViewModel => new SettingsPage(),
         PlaceholderPageViewModel => new PlaceholderPage(),
         _ => new TextBlock { Text = $"Нет представления для {param?.GetType().Name ?? "null"}" },
     };

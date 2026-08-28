@@ -28,7 +28,7 @@ public sealed record StorageOptions
 /// достаточно при двух условиях — обязательной политике хранения и агрегатах, посчитанных
 /// при записи. Оба условия выполнены здесь, а не отложены «на когда понадобится».
 /// </remarks>
-public sealed class SqliteRunStore : IRunStore
+public sealed class SqliteRunStore : IRunStore, IStorageLocation
 {
     private readonly string _connectionString;
     private readonly StorageOptions _options;
@@ -69,6 +69,9 @@ public sealed class SqliteRunStore : IRunStore
     /// </remarks>
     internal string ConnectionString => _connectionString;
 
+    /// <summary>Полный путь к файлу базы — тот, который открывает этот экземпляр.</summary>
+    public string DatabasePath => Location;
+
     /// <summary>
     /// Через сколько молчания прогон считается брошенным.
     /// </summary>
@@ -80,10 +83,27 @@ public sealed class SqliteRunStore : IRunStore
     /// </remarks>
     private static readonly TimeSpan HeartbeatTimeout = TimeSpan.FromMinutes(5);
 
-    public static string DefaultDatabasePath() => Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "StormMachine",
-        "storm.db");
+    /// <summary>
+    /// Где лежит база, если путь не задан явно.
+    /// </summary>
+    /// <remarks>
+    /// Переменная окружения <c>STORM_DB</c> перекрывает умолчание. Нужна не для
+    /// красоты: с ней можно работать с копией, присланной в поддержку, держать
+    /// отдельную базу под стенд и — главное — прогонять проверки, не подмешивая
+    /// тестовые измерения в рабочую историю. Без такой возможности единственный
+    /// способ ничего не испортить — не запускать продукт, а это плохой способ.
+    /// </remarks>
+    public static string DefaultDatabasePath()
+    {
+        var chosen = Environment.GetEnvironmentVariable(StorageEnvironment.PathVariable);
+
+        return string.IsNullOrWhiteSpace(chosen)
+            ? Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "StormMachine",
+                "storm.db")
+            : Path.GetFullPath(chosen.Trim());
+    }
 
     public async Task InitializeAsync(CancellationToken cancellationToken = default)
     {

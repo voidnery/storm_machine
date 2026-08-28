@@ -27,14 +27,20 @@ public sealed partial class MainWindowViewModel : ObservableObject
         RunnerService runner,
         INetworkEnvironment environment,
         IHighResolutionClock clock,
+        NotificationCenter notifications,
         Func<NavigationSection, PageViewModel> pageFactory)
     {
         Runner = runner ?? throw new ArgumentNullException(nameof(runner));
+        Notifications = notifications ?? throw new ArgumentNullException(nameof(notifications));
         _environment = environment ?? throw new ArgumentNullException(nameof(environment));
         _clock = clock ?? throw new ArgumentNullException(nameof(clock));
         _pageFactory = pageFactory ?? throw new ArgumentNullException(nameof(pageFactory));
 
         Sections = NavigationMap.Sections;
+
+        // Палитра создаётся оболочкой, потому что переход — её дело. Палитра знает
+        // только, что у неё есть способ куда-то отправить, и ничего о навигации.
+        Palette = new CommandPaletteViewModel(Sections, GoToWithTarget);
 
         Runner.ActiveChanged += (_, _) =>
         {
@@ -48,9 +54,21 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     public RunnerService Runner { get; }
 
+    /// <summary>
+    /// Центр уведомлений: полоса и лента пропущенного.
+    /// </summary>
+    /// <remarks>
+    /// Живёт в оболочке, а не на экране мониторов: алерт приходит, когда оператор
+    /// смотрит на что угодно другое, — иначе он и не был бы нужен.
+    /// </remarks>
+    public NotificationCenter Notifications { get; }
+
     public IReadOnlyList<NavigationSection> Sections { get; }
 
-    public ObservableCollection<ActiveRunViewModel> ActiveRuns => Runner.Active;
+    /// <summary>Палитра команд: Ctrl+K.</summary>
+    public CommandPaletteViewModel Palette { get; }
+
+    public ObservableCollection<ActiveOperationViewModel> ActiveRuns => Runner.Active;
 
     public bool HasActiveRuns => Runner.Active.Count > 0;
 
@@ -69,6 +87,9 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     [ObservableProperty]
     private bool _isDrawerOpen;
+
+    [ObservableProperty]
+    private bool _isNotificationsOpen;
 
     // ------------------------------------------------------------- строка состояния
 
@@ -96,6 +117,25 @@ public sealed partial class MainWindowViewModel : ObservableObject
     [RelayCommand]
     private void ToggleDrawer() => IsDrawerOpen = !IsDrawerOpen;
 
+    /// <summary>Убирает полосу оповещения. Событие при этом остаётся в ленте.</summary>
+    [RelayCommand]
+    private void DismissAlert() => Notifications.Dismiss();
+
+    /// <summary>Открывает ленту уведомлений. Открытие считается прочтением.</summary>
+    [RelayCommand]
+    private void ToggleNotifications()
+    {
+        IsNotificationsOpen = !IsNotificationsOpen;
+
+        if (IsNotificationsOpen)
+        {
+            Notifications.MarkRead();
+        }
+    }
+
+    [RelayCommand]
+    private void ClearNotifications() => Notifications.Clear();
+
     /// <summary>Переход в раздел из содержимого страницы, а не из бокового меню.</summary>
     [RelayCommand]
     public void GoTo(string? route)
@@ -105,6 +145,23 @@ public sealed partial class MainWindowViewModel : ObservableObject
         if (section is not null)
         {
             SelectedSection = section;
+        }
+    }
+
+    /// <summary>
+    /// Переход с подстановкой цели.
+    /// </summary>
+    /// <remarks>
+    /// Страница, умеющая принять цель, получает её после перехода. Не умеющая —
+    /// просто открывается: набранный адрес не повод отказать в переходе.
+    /// </remarks>
+    private void GoToWithTarget(string route, string? target)
+    {
+        GoTo(route);
+
+        if (target is { Length: > 0 } && CurrentPage is ITargetAware aware)
+        {
+            aware.UseTarget(target);
         }
     }
 

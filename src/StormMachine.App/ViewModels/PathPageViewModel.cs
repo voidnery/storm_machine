@@ -26,7 +26,7 @@ namespace StormMachine.App.ViewModels;
 /// с той же частотой, и чаще обновлять нечего.
 /// </para>
 /// </remarks>
-public sealed partial class PathPageViewModel : PageViewModel
+public sealed partial class PathPageViewModel : PageViewModel, ITargetAware
 {
     private const double RefreshHz = 1;
 
@@ -70,6 +70,9 @@ public sealed partial class PathPageViewModel : PageViewModel
     }
 
     // ------------------------------------------------------------------ параметры
+
+    /// <summary>Принимает цель из палитры команд.</summary>
+    public void UseTarget(string target) => TargetText = target;
 
     [ObservableProperty]
     private string _targetText = "1.1.1.1";

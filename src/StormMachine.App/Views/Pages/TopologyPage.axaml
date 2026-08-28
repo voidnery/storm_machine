@@ -52,6 +52,7 @@
         <Grid RowDefinitions="*,Auto">
           <controls:TopologyCanvas Grid.Row="0" Name="Canvas"
                                    Graph="{Binding Graph}"
+                                   Layout="{Binding Layout}"
                                    SelectedNode="{Binding SelectedNode, Mode=TwoWay}" />
 
           <!-- Легенда лежит прямо на карте: различие достоверности — главное,
@@ -81,7 +82,7 @@
 
       <Border Grid.Column="1" Margin="14,0,0,0" CornerRadius="6"
               Background="{StaticResource PanelBrush}" Padding="12">
-        <Grid RowDefinitions="Auto,Auto,*,Auto">
+        <Grid RowDefinitions="Auto,Auto,*,Auto" MinWidth="300">
           <StackPanel Grid.Row="0" Spacing="2" Margin="0,0,0,8">
             <TextBlock Text="Выбранный узел" FontWeight="SemiBold" FontSize="13" />
             <TextBlock Text="Щёлкните узел на карте — покажу его связи и то, откуда они взялись."
@@ -127,9 +128,68 @@
             </ItemsControl>
           </ScrollViewer>
 
-          <StackPanel Grid.Row="3" Orientation="Horizontal" Spacing="8" Margin="0,8,0,0">
-            <Button Content="Обновить" Command="{Binding RefreshCommand}" FontSize="12" Padding="10,4" />
-            <Button Content="Свернуть всё" Command="{Binding CollapseAllCommand}" FontSize="12" Padding="10,4" />
+          <StackPanel Grid.Row="3" Spacing="8" Margin="0,8,0,0">
+            <!-- Правка карты. Связь рисуется в два приёма: сначала запоминается один
+                 узел, потом выбирается второй. Перетаскивание было бы естественнее,
+                 но случайное движение мышью создавало бы связи, которых никто
+                 не рисовал. -->
+            <Border Background="#1A2130" CornerRadius="4" Padding="10,8">
+              <StackPanel Spacing="6">
+                <TextBlock Text="Поправить карту" FontWeight="SemiBold" FontSize="12" />
+                <TextBlock Text="{Binding PinnedCaption}" FontSize="11" Opacity="0.6"
+                           TextTrimming="CharacterEllipsis" />
+
+                <TextBox Text="{Binding LinkNote}" FontSize="11"
+                         PlaceholderText="откуда известно — попадёт в подпись связи" />
+
+                <WrapPanel>
+                  <Button Content="Запомнить" Command="{Binding PinCommand}"
+                          FontSize="11" Padding="9,4" Margin="0,0,6,6"
+                          ToolTip.Tip="Запомнить выбранный узел как первый конец связи" />
+                  <Button Content="Соединить" Command="{Binding LinkCommand}"
+                          FontSize="11" Padding="9,4" Margin="0,0,6,6" />
+                  <Button Content="Разъединить" Command="{Binding UnlinkCommand}"
+                          FontSize="11" Padding="9,4" Margin="0,0,6,6"
+                          ToolTip.Tip="Убрать связь, которую инструмент вывел ошибочно" />
+                  <Button Content="Скрыть" Command="{Binding HideCommand}"
+                          FontSize="11" Padding="9,4" Margin="0,0,6,6"
+                          ToolTip.Tip="Убрать узел с карты. В инвентаре он остаётся" />
+                  <Button Content="Это одно устройство" Command="{Binding MergeCommand}"
+                          FontSize="11" Padding="9,4" Margin="0,0,6,6"
+                          ToolTip.Tip="Объединить запомненный узел и выбранный — например, провод и Wi-Fi одного ноутбука" />
+                </WrapPanel>
+              </StackPanel>
+            </Border>
+
+            <!-- Правки видны списком и отменяются поштучно: догадка инструмента
+                 объясняет себя, и правка человека тоже должна. -->
+            <StackPanel Spacing="4" IsVisible="{Binding Edits.Count}">
+              <TextBlock Text="Правки оператора" FontWeight="SemiBold" FontSize="12" />
+
+              <ItemsControl ItemsSource="{Binding Edits}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="vm:EditRow">
+                    <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,4">
+                      <StackPanel Grid.Column="0" Spacing="1">
+                        <TextBlock Text="{Binding Text}" FontSize="11" TextWrapping="Wrap" />
+                        <TextBlock Text="{Binding Note}" FontSize="10" Opacity="0.5" TextWrapping="Wrap"
+                                   IsVisible="{Binding Note, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                        <TextBlock Text="{Binding When}" FontSize="10" Opacity="0.4" />
+                      </StackPanel>
+                      <Button Grid.Column="1" Content="отменить" FontSize="10" Padding="7,3"
+                              VerticalAlignment="Top"
+                              Command="{Binding $parent[ItemsControl].((vm:TopologyPageViewModel)DataContext).ForgetCommand}"
+                              CommandParameter="{Binding}" />
+                    </Grid>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </StackPanel>
+
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <Button Content="Обновить" Command="{Binding RefreshCommand}" FontSize="12" Padding="10,4" />
+              <Button Content="Свернуть всё" Command="{Binding CollapseAllCommand}" FontSize="12" Padding="10,4" />
+            </StackPanel>
           </StackPanel>
         </Grid>
       </Border>

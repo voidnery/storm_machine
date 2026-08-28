@@ -191,25 +191,29 @@ public sealed class TlsProbe(IHighResolutionClock clock) : IProbe
         var daysLeft = (certificate.NotAfter - DateTime.Now).TotalDays;
         var validUntil = certificate.NotAfter.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
 
-        if (daysLeft < 0)
+        observer.OnFact(daysLeft switch
         {
-            observer.OnFact(ProbeFact.Warning("tls", "Годен до", $"{validUntil} — ИСТЁК {Math.Abs(daysLeft):0} дней назад"));
-        }
-        else if (daysLeft < ExpiryWarningDays)
+            < 0 => ProbeFact.Warning("tls", "Годен до", $"{validUntil} — ИСТЁК {Math.Abs(daysLeft):0} дней назад"),
+            < ExpiryWarningDays => ProbeFact.Warning("tls", "Годен до", $"{validUntil} — осталось {daysLeft:0} дней"),
+            _ => ProbeFact.Text("tls", "Годен до", $"{validUntil} — осталось {daysLeft:0} дней"),
+        });
+
+        // Число днями отдельным фактом, и в любом состоянии сертификата.
+        // Раньше оно попадало в результат только когда с сертификатом всё хорошо:
+        // у истекающего Numeric оставался пустым — то есть ровно тогда, когда порог
+        // «осталось меньше двух недель» и должен был сработать, срабатывать было нечему.
+        // Это же причина, по которой факт для чтения и факт для порога разделены:
+        // текст «2026-10-28 — осталось 62 дней» человеку понятнее, а сравнивать
+        // с порогом нужно число.
+        observer.OnFact(new ProbeFact
         {
-            observer.OnFact(ProbeFact.Warning("tls", "Годен до", $"{validUntil} — осталось {daysLeft:0} дней"));
-        }
-        else
-        {
-            observer.OnFact(new ProbeFact
-            {
-                Category = "tls",
-                Name = "Годен до",
-                Value = $"{validUntil} — осталось {daysLeft:0} дней",
-                Numeric = daysLeft,
-                Unit = MeasurementUnit.Count,
-            });
-        }
+            Category = "tls",
+            Name = "Осталось дней",
+            Value = daysLeft.ToString("0", CultureInfo.InvariantCulture),
+            Numeric = Math.Floor(daysLeft),
+            Unit = MeasurementUnit.Count,
+            IsWarning = daysLeft < ExpiryWarningDays,
+        });
 
         observer.OnFact(ProbeFact.Text("tls", "Алгоритм ключа", certificate.PublicKey.Oid.FriendlyName ?? "неизвестен"));
 

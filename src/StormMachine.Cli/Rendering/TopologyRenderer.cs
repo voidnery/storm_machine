@@ -1,4 +1,5 @@
 using System.Globalization;
+using StormMachine.Domain.Discovery;
 using StormMachine.Domain.Topology;
 
 namespace StormMachine.Cli.Rendering;
@@ -53,10 +54,12 @@ internal static class TopologyRenderer
         Console.WriteLine();
 
         var visited = new HashSet<string>(StringComparer.Ordinal);
+        var drawn = new HashSet<(string, string)>();
 
-        Walk(TopologyGraph.ThisMachineId, string.Empty, isLast: true, byId, outgoing, visited, isRoot: true);
+        Walk(TopologyGraph.ThisMachineId, string.Empty, isLast: true, byId, outgoing, visited, drawn, isRoot: true);
 
-        WriteOrphans(graph, byId, outgoing, visited);
+        WriteOrphans(graph, byId, outgoing, visited, drawn);
+        WriteExtraLinks(graph, byId, drawn);
         WriteLegend(graph);
     }
 
@@ -72,7 +75,8 @@ internal static class TopologyRenderer
         TopologyGraph graph,
         IReadOnlyDictionary<string, TopologyNode> byId,
         IReadOnlyDictionary<string, List<TopologyLink>> outgoing,
-        HashSet<string> visited)
+        HashSet<string> visited,
+        HashSet<(string, string)> drawn)
     {
         var remaining = graph.Nodes.Where(n => !visited.Contains(n.Id)).Select(n => n.Id).ToHashSet(StringComparer.Ordinal);
 
@@ -104,7 +108,7 @@ internal static class TopologyRenderer
 
         foreach (var root in roots)
         {
-            Walk(root, string.Empty, isLast: true, byId, outgoing, visited, isRoot: true);
+            Walk(root, string.Empty, isLast: true, byId, outgoing, visited, drawn, isRoot: true);
         }
     }
 
@@ -115,6 +119,7 @@ internal static class TopologyRenderer
         IReadOnlyDictionary<string, TopologyNode> byId,
         IReadOnlyDictionary<string, List<TopologyLink>> outgoing,
         HashSet<string> visited,
+        HashSet<(string, string)> drawn,
         bool isRoot = false,
         LinkConfidence confidence = LinkConfidence.Confirmed,
         string? because = null)
@@ -152,13 +157,15 @@ internal static class TopologyRenderer
         var next = children
             .Where(l => !visited.Contains(l.To))
             .OrderBy(l => byId.TryGetValue(l.To, out var target) ? (int)target.Kind : int.MaxValue)
-            .ThenBy(l => byId.TryGetValue(l.To, out var target) ? AddressOrder(target.Address) : uint.MaxValue)
+            .ThenBy(l => byId.TryGetValue(l.To, out var target) ? IpAddressOrder.Of(target.Address) : uint.MaxValue)
             .ThenBy(l => l.To, StringComparer.Ordinal)
             .ToList();
         var childPrefix = isRoot ? string.Empty : prefix + (isLast ? "     " : "│    ");
 
         for (var i = 0; i < next.Count; i++)
         {
+            drawn.Add((next[i].From, next[i].To));
+
             Walk(
                 next[i].To,
                 childPrefix,
@@ -166,6 +173,7 @@ internal static class TopologyRenderer
                 byId,
                 outgoing,
                 visited,
+                drawn,
                 isRoot: false,
                 next[i].Confidence,
                 next[i].Because);
@@ -200,19 +208,40 @@ internal static class TopologyRenderer
         return node.IsOnline ? text : text + " · не отвечает";
     }
 
-    /// <summary>Числовой порядок адреса — чтобы узлы шли как в сети, а не как в словаре.</summary>
-    private static uint AddressOrder(string? address)
+    /// <summary>
+    /// Показывает связи, не ставшие рёбрами дерева.
+    /// </summary>
+    /// <remarks>
+    /// Сеть — граф, а не дерево: у узла бывает несколько соседей, и второе ребро
+    /// в дерево не помещается. Именно так выглядит связь, нарисованная оператором
+    /// между двумя устройствами одной подсети, — и промолчать о ней значило бы
+    /// показать, будто правка пропала.
+    /// </remarks>
+    private static void WriteExtraLinks(
+        TopologyGraph graph,
+        Dictionary<string, TopologyNode> byId,
+        HashSet<(string, string)> drawn)
     {
-        if (address is null
-            || !System.Net.IPAddress.TryParse(address, out var parsed)
-            || parsed.AddressFamily != System.Net.Sockets.AddressFamily.InterNetwork)
+        var extra = graph.Links
+            .Where(l => !drawn.Contains((l.From, l.To)))
+            .ToList();
+
+        if (extra.Count == 0)
         {
-            return uint.MaxValue;
+            return;
         }
 
-        var bytes = parsed.GetAddressBytes();
+        Console.WriteLine();
+        Console.WriteLine("Связи помимо дерева:");
 
-        return ((uint)bytes[0] << 24) | ((uint)bytes[1] << 16) | ((uint)bytes[2] << 8) | bytes[3];
+        foreach (var link in extra)
+        {
+            var from = byId.TryGetValue(link.From, out var a) ? a.Label : link.From;
+            var to = byId.TryGetValue(link.To, out var b) ? b.Label : link.To;
+
+            Console.WriteLine($"  {from} {Line(link.Confidence)} {to}");
+            Console.WriteLine($"      {link.Because}");
+        }
     }
 
     private static void WriteLegend(TopologyGraph graph)

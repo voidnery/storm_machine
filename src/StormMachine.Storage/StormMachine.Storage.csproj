@@ -14,4 +14,10 @@
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.11" />
   </ItemGroup>
 
+  <!-- Схема видна своим тестам: обновление на непустой базе иначе не проверить,
+       а это ровно тот случай, где ошибка стоит человеку истории измерений. -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="StormMachine.Storage.UnitTests" />
+  </ItemGroup>
+
 </Project>

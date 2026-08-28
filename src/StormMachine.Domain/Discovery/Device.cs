@@ -224,13 +224,15 @@ public sealed record ScanDiff
             // следствием порядка чтения, а не изменений в сети.
             var representative = bucket
                 .OrderByDescending(d => d.IsOnline)
+                .ThenBy(d => IpAddressOrder.Of(d.Address))
                 .ThenBy(d => d.Address, StringComparer.Ordinal)
                 .First();
 
             var addresses = bucket
                 .SelectMany(d => d.Addresses.Count > 0 ? d.Addresses : [d.Address])
                 .Distinct(StringComparer.Ordinal)
-                .OrderBy(a => a, StringComparer.Ordinal)
+                .OrderBy(IpAddressOrder.Of)
+                .ThenBy(a => a, StringComparer.Ordinal)
                 .ToList();
 
             result[identity] = new Entry(

@@ -2,6 +2,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Media;
+using StormMachine.Application.Abstractions;
 using StormMachine.Domain.Topology;
 
 namespace StormMachine.App.Views.Controls;
@@ -29,6 +30,9 @@ public sealed class TopologyCanvas : Control
 
     public static readonly StyledProperty<TopologyGraph?> GraphProperty =
         AvaloniaProperty.Register<TopologyCanvas, TopologyGraph?>(nameof(Graph));
+
+    public static readonly StyledProperty<ITopologyLayout?> LayoutProperty =
+        AvaloniaProperty.Register<TopologyCanvas, ITopologyLayout?>(nameof(Layout));
 
     public static readonly StyledProperty<TopologyNode?> SelectedNodeProperty =
         AvaloniaProperty.Register<TopologyCanvas, TopologyNode?>(
@@ -70,6 +74,7 @@ public sealed class TopologyCanvas : Control
     {
         AffectsRender<TopologyCanvas>(GraphProperty, SelectedNodeProperty);
         GraphProperty.Changed.AddClassHandler<TopologyCanvas>((canvas, _) => canvas.Rebuild());
+        LayoutProperty.Changed.AddClassHandler<TopologyCanvas>((canvas, _) => canvas.Rebuild());
     }
 
     public TopologyGraph? Graph
@@ -87,9 +92,24 @@ public sealed class TopologyCanvas : Control
     /// <summary>Разложенная карта — нужна для выгрузки в SVG.</summary>
     public PlacedGraph Placed => _placed;
 
+    /// <summary>
+    /// Кто считает расположение узлов.
+    /// </summary>
+    /// <remarks>
+    /// Задаётся снаружи, а не берётся статически: раскладка живёт в инфраструктуре
+    /// (её движок тянет чужой пакет), а представлению ссылаться на инфраструктуру
+    /// запрещено — это проверяется архитектурным тестом. Ту же раскладку получает
+    /// отчёт, и потому схема в документе совпадает с полотном на экране.
+    /// </remarks>
+    public ITopologyLayout? Layout
+    {
+        get => GetValue(LayoutProperty);
+        set => SetValue(LayoutProperty, value);
+    }
+
     private void Rebuild()
     {
-        _placed = Graph is { } graph ? TopologyLayout.Arrange(graph) : PlacedGraph.Empty;
+        _placed = Graph is { } graph && Layout is { } layout ? layout.Arrange(graph) : PlacedGraph.Empty;
         FitToView();
         InvalidateVisual();
     }

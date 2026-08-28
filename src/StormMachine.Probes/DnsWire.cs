@@ -16,7 +16,21 @@ public sealed record DnsResponse
 
     public required bool IsTruncated { get; init; }
 
+    /// <summary>
+    /// Резолвер сообщил, что проверил подписи (флаг AD, RFC 4035 §3.2.3).
+    /// </summary>
+    /// <remarks>
+    /// Это утверждение резолвера, а не наша проверка. Собственная проверка потребовала бы
+    /// цепочки доверия от корневого ключа, и выдавать чужое «я проверил» за своё значило бы
+    /// сообщать оператору уверенность, которой у нас нет. Флаг честен ровно в одном: он
+    /// отличает резолвер, который проверяет, от резолвера, который не проверяет.
+    /// </remarks>
+    public required bool IsAuthenticData { get; init; }
+
     public required IReadOnlyList<DnsRecord> Answers { get; init; }
+
+    /// <summary>Зона подписана: в ответе пришли RRSIG. Не зависит от того, кто спрашивал.</summary>
+    public bool IsZoneSigned => Answers.Any(a => a.Type == "RRSIG");
 
     /// <summary>Текстовое имя кода ответа — то, что понятно оператору.</summary>
     public string ResponseCodeName => ResponseCode switch
@@ -52,6 +66,8 @@ internal static class DnsWire
     public const ushort RecordTypeMx = 15;
     public const ushort RecordTypeTxt = 16;
     public const ushort RecordTypeAaaa = 28;
+    public const ushort RecordTypeRrsig = 46;
+    public const ushort RecordTypeOpt = 41;
 
     private const int HeaderLength = 12;
     private const int MaxPointerJumps = 64;
@@ -79,17 +95,29 @@ internal static class DnsWire
         RecordTypePtr => "PTR",
         RecordTypeMx => "MX",
         RecordTypeTxt => "TXT",
+        RecordTypeRrsig => "RRSIG",
+        RecordTypeOpt => "OPT",
         _ => $"TYPE{type}",
     };
 
-    public static byte[] BuildQuery(ushort id, string name, ushort recordType)
+    /// <summary>Размер ответа, который мы готовы принять по UDP (EDNS0, RFC 6891).</summary>
+    private const ushort EdnsPayloadSize = 1232;
+
+    private const int OptRecordLength = 11;
+
+    /// <param name="dnssecOk">
+    /// Запросить подписи: EDNS0 с установленным битом DO. По умолчанию выключено —
+    /// обычное приложение подписей не просит, а измерять надо то, что получит оно.
+    /// Включение меняет и размер ответа, и время: сравнивать с выключенным нельзя.
+    /// </param>
+    public static byte[] BuildQuery(ushort id, string name, ushort recordType, bool dnssecOk = false)
     {
         ArgumentNullException.ThrowIfNull(name);
 
         var labels = name.TrimEnd('.').Split('.', StringSplitOptions.RemoveEmptyEntries);
         var questionLength = labels.Sum(l => 1 + Encoding.ASCII.GetByteCount(l)) + 1 + 4;
 
-        var packet = new byte[HeaderLength + questionLength];
+        var packet = new byte[HeaderLength + questionLength + (dnssecOk ? OptRecordLength : 0)];
 
         BinaryPrimitives.WriteUInt16BigEndian(packet.AsSpan(0), id);
 
@@ -97,6 +125,11 @@ internal static class DnsWire
         // обычное приложение, а не искусственно худший случай.
         BinaryPrimitives.WriteUInt16BigEndian(packet.AsSpan(2), 0x0100);
         BinaryPrimitives.WriteUInt16BigEndian(packet.AsSpan(4), 1);
+
+        if (dnssecOk)
+        {
+            BinaryPrimitives.WriteUInt16BigEndian(packet.AsSpan(10), 1);
+        }
 
         var offset = HeaderLength;
         foreach (var label in labels)
@@ -109,6 +142,20 @@ internal static class DnsWire
         packet[offset++] = 0;
         BinaryPrimitives.WriteUInt16BigEndian(packet.AsSpan(offset), recordType);
         BinaryPrimitives.WriteUInt16BigEndian(packet.AsSpan(offset + 2), 1);
+        offset += 4;
+
+        if (!dnssecOk)
+        {
+            return packet;
+        }
+
+        // Псевдозапись OPT (RFC 6891 §6.1.2): корневое имя, тип 41, «класс» —
+        // размер принимаемого ответа, старший бит TTL — DO.
+        packet[offset++] = 0;
+        BinaryPrimitives.WriteUInt16BigEndian(packet.AsSpan(offset), RecordTypeOpt);
+        BinaryPrimitives.WriteUInt16BigEndian(packet.AsSpan(offset + 2), EdnsPayloadSize);
+        BinaryPrimitives.WriteUInt32BigEndian(packet.AsSpan(offset + 4), 0x0000_8000);
+        BinaryPrimitives.WriteUInt16BigEndian(packet.AsSpan(offset + 8), 0);
 
         return packet;
     }
@@ -164,6 +211,7 @@ internal static class DnsWire
             ResponseCode = flags & 0x000F,
             IsAuthoritative = (flags & 0x0400) != 0,
             IsTruncated = (flags & 0x0200) != 0,
+            IsAuthenticData = (flags & 0x0020) != 0,
             Answers = answers,
         };
     }
@@ -212,6 +260,22 @@ internal static class DnsWire
                 }
 
                 return builder.ToString();
+            }
+
+            // Содержимое подписи не разбираем — проверить её всё равно нечем без цепочки
+            // доверия. Разбираем то, что отвечает на вопрос оператора: что подписано,
+            // кем и до какого числа подпись годна.
+            case RecordTypeRrsig when length > 18:
+            {
+                var covered = RecordTypeName(BinaryPrimitives.ReadUInt16BigEndian(packet[offset..]));
+                var expiration = BinaryPrimitives.ReadUInt32BigEndian(packet[(offset + 8)..]);
+                var cursor = offset + 18;
+                var signer = ReadName(packet, ref cursor);
+
+                var until = DateTimeOffset.FromUnixTimeSeconds(expiration)
+                    .ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
+
+                return $"{covered}, подписал {signer}, годна до {until}";
             }
 
             default:

@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <Description>Опрос оборудования по SNMP: ifTable, LLDP, таблица пересылки.</Description>
+  </PropertyGroup>
+
+  <!-- Библиотека проверена спайком-08 на совместимость с обрезкой публикации:
+       разбор BER и криптография третьей версии её переживают. Лицензия MIT. -->
+  <ItemGroup>
+    <ProjectReference Include="..\StormMachine.Application\StormMachine.Application.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Lextm.SharpSnmpLib" Version="12.5.7" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.11" />
+  </ItemGroup>
+
+</Project>
