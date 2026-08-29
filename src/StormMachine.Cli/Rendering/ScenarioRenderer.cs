@@ -1,8 +1,9 @@
-using System.Globalization;
+﻿using System.Globalization;
 using StormMachine.Application.Abstractions;
 using StormMachine.Application.Scenarios;
 using StormMachine.Domain.Results;
 using StormMachine.Domain.Scenarios;
+using StormMachine.Domain.Text;
 
 namespace StormMachine.Cli.Rendering;
 
@@ -15,22 +16,6 @@ namespace StormMachine.Cli.Rendering;
 /// </remarks>
 internal static class ScenarioRenderer
 {
-    private static string Mark(VerdictLevel level) => level switch
-    {
-        VerdictLevel.Pass => "✓",
-        VerdictLevel.Warn => "!",
-        VerdictLevel.Fail => "✗",
-        _ => "·",
-    };
-
-    private static string Word(VerdictLevel level) => level switch
-    {
-        VerdictLevel.Pass => "в норме",
-        VerdictLevel.Warn => "предупреждение",
-        VerdictLevel.Fail => "не прошло",
-        _ => "не оценено",
-    };
-
     public static void WriteTemplates()
     {
         Console.WriteLine("Готовые сценарии:");
@@ -135,7 +120,7 @@ internal static class ScenarioRenderer
         // и паузой между ними, и рядом с вердиктом это число вводило бы в заблуждение.
         var value = step.PhaseMs is { } ms ? ProbeMetrics.Format("p50", ms) : string.Empty;
 
-        Console.WriteLine($"  {Mark(step.Verdict.Level)} {progress.StepIndex + 1}/{progress.StepCount} "
+        Console.WriteLine($"  {VerdictWording.Mark(step.Verdict.Level)} {progress.StepIndex + 1}/{progress.StepCount} "
                           + $"{step.Name,-28} {value,9}   {step.Verdict.Summary}");
 
         if (step.Error is { Length: > 0 } error)
@@ -345,7 +330,7 @@ internal static class ScenarioRenderer
 
         foreach (var step in run.Steps)
         {
-            Console.WriteLine($"  {Mark(step.Verdict.Level)} {step.Name} — {Word(step.Verdict.Level)}");
+            Console.WriteLine($"  {VerdictWording.Mark(step.Verdict.Level)} {step.Name} — {VerdictWording.Outcome(step.Verdict.Level)}");
             Console.WriteLine($"      {step.Verdict.Summary}");
 
             if (step.Verdict.Explanation is { Length: > 0 } explanation)
@@ -391,40 +376,14 @@ internal static class ScenarioRenderer
         {
             var where = run.FirstFailure?.Name ?? "—";
 
-            Console.WriteLine($"  {target,-30} {Mark(run.Level)} {Word(run.Level),-14} {where}");
+            Console.WriteLine($"  {target,-30} {VerdictWording.Mark(run.Level)} {VerdictWording.Outcome(run.Level),-14} {where}");
         }
 
         Console.WriteLine();
 
         var failed = runs.Count(r => r.Run.Level == VerdictLevel.Fail);
 
-        Console.WriteLine(failed switch
-        {
-            0 => "Итог по набору: ни одна цель не упала.",
-            var f when f == runs.Count =>
-                $"Итог по набору: упали все {runs.Count} целей. Общая часть пути — своя сеть "
-                + "или канал наверх; отдельные серверы столько раз одновременно не ломаются.",
-            _ => $"Итог по набору: упало {failed} из {runs.Count}. Остальные цели прошли тем же путём, "
-                 + "значит дело в упавших, а не в канале.",
-        });
-    }
-
-    /// <summary>Склонение слова «шаг» по числу.</summary>
-    private static string Steps(int count)
-    {
-        var tail = count % 100;
-
-        if (tail is >= 11 and <= 14)
-        {
-            return "шагов";
-        }
-
-        return (count % 10) switch
-        {
-            1 => "шаг",
-            2 or 3 or 4 => "шага",
-            _ => "шагов",
-        };
+        Console.WriteLine(TargetSetConclusion.Describe(runs.Count, failed));
     }
 
     private static void WriteConclusion(ScenarioRun run)
@@ -439,7 +398,7 @@ internal static class ScenarioRenderer
 
             if (skipped > 0)
             {
-                Console.WriteLine($"Следующие {skipped} {Steps(skipped)} не выполнялись: "
+                Console.WriteLine($"Следующие {Plural.With(skipped, "шаг", "шага", "шагов")} не выполнялись: "
                                   + "проверять их было не по чему.");
             }
 

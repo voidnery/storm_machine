@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using StormMachine.Domain.Results;
 using StormMachine.Domain.Scenarios;
@@ -33,13 +33,7 @@ public sealed partial class ScenarioStepRowViewModel : ObservableObject
 
         Name = step.Name;
         Level = step.Verdict.Level;
-        Mark = Level switch
-        {
-            VerdictLevel.Pass => "✓",
-            VerdictLevel.Warn => "!",
-            VerdictLevel.Fail => "✗",
-            _ => "·",
-        };
+        Mark = VerdictWording.Mark(Level);
 
         Summary = step.Verdict.Summary;
         Explanation = step.Verdict.Explanation;

@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using StormMachine.Application.Abstractions;
 using StormMachine.Application.Monitors;
 using StormMachine.Domain.Monitors;
@@ -37,7 +37,7 @@ internal static class MonitorRenderer
 
         foreach (var (monitor, status) in monitors)
         {
-            var state = monitor.IsEnabled ? StateText(status.Level) : "выключен";
+            var state = monitor.IsEnabled ? VerdictWording.State(status.Level) : "выключен";
             var last = status.LastRunUtc is { } at
                 ? at.ToLocalTime().ToString("dd.MM HH:mm", CultureInfo.InvariantCulture)
                 : "не запускался";
@@ -115,7 +115,7 @@ internal static class MonitorRenderer
         }
 
         Console.WriteLine();
-        Console.WriteLine($"  состояние     : {StateText(status.Level)}");
+        Console.WriteLine($"  состояние     : {VerdictWording.State(status.Level)}");
 
         if (!string.IsNullOrWhiteSpace(status.LastSummary))
         {
@@ -147,7 +147,7 @@ internal static class MonitorRenderer
             },
         };
 
-        Console.WriteLine($"{mark}{Local(check.StartedUtc)}  {StateText(check.Level),-12} {check.Summary}");
+        Console.WriteLine($"{mark}{Local(check.StartedUtc)}  {VerdictWording.State(check.Level),-12} {check.Summary}");
 
         if (check.Metric is { } metric && check.Value is { } value)
         {
@@ -377,14 +377,6 @@ internal static class MonitorRenderer
         >= 0.95 => string.Empty,
         >= 0.5 => "  — часть окна не наблюдалась",
         _ => "  — данных мало, доверять числу выше нельзя",
-    };
-
-    private static string StateText(VerdictLevel level) => level switch
-    {
-        VerdictLevel.Pass => "норма",
-        VerdictLevel.Warn => "предупреждение",
-        VerdictLevel.Fail => "отказ",
-        _ => "неизвестно",
     };
 
     private static string LevelWord(VerdictLevel level) => level switch

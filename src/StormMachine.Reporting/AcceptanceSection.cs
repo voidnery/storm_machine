@@ -1,9 +1,10 @@
-using System.Globalization;
+﻿using System.Globalization;
 using QuestPDF.Fluent;
 using QuestPDF.Helpers;
 using QuestPDF.Infrastructure;
 using StormMachine.Application.Abstractions;
 using StormMachine.Domain.Results;
+using StormMachine.Domain.Text;
 
 namespace StormMachine.Reporting;
 
@@ -238,21 +239,6 @@ internal static class AcceptanceSection
         _ => $"{count.ToString(CultureInfo.InvariantCulture)} целям",
     };
 
-    private static string Measurements(int count)
-    {
-        var text = count.ToString(CultureInfo.InvariantCulture);
-        var tens = count % 100;
-
-        if (tens is >= 11 and <= 14)
-        {
-            return $"{text} измерениях";
-        }
-
-        return (count % 10) switch
-        {
-            1 => $"{text} измерении",
-            2 or 3 or 4 => $"{text} измерениях",
-            _ => $"{text} измерениях",
-        };
-    }
+    private static string Measurements(int count) =>
+        Plural.With(count, "измерении", "измерениях", "измерениях");
 }

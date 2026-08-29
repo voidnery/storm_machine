@@ -1,4 +1,4 @@
-using System.Collections.ObjectModel;
+﻿using System.Collections.ObjectModel;
 using System.Globalization;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -24,13 +24,7 @@ public sealed record MonitorRow(Monitor Monitor, MonitorStatus Status)
     public VerdictLevel Level => Monitor.IsEnabled ? Status.Level : VerdictLevel.Unknown;
 
     public string StateText => Monitor.IsEnabled
-        ? Status.Level switch
-        {
-            VerdictLevel.Pass => "норма",
-            VerdictLevel.Warn => "предупреждение",
-            VerdictLevel.Fail => "отказ",
-            _ => "ещё не проверялся",
-        }
+        ? VerdictWording.State(Status.Level, unknown: "ещё не проверялся")
         : "выключен";
 
     public bool IsAlerting => Status.Alert.IsRaised;
@@ -323,13 +317,7 @@ public sealed partial class MonitorsPageViewModel : PageViewModel
                     {
                         CheckKind.Maintenance => "обслуживание",
                         CheckKind.Missed => "не наблюдали",
-                        _ => check.Level switch
-                        {
-                            VerdictLevel.Pass => "норма",
-                            VerdictLevel.Warn => "предупреждение",
-                            VerdictLevel.Fail => "отказ",
-                            _ => "неизвестно",
-                        },
+                        _ => VerdictWording.State(check.Level),
                     },
                     check.Summary,
                     check.Kind == CheckKind.Measured && check.Level == VerdictLevel.Fail,

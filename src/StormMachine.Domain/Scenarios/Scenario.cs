@@ -285,3 +285,53 @@ public sealed record ScenarioRun
     public ScenarioStepResult? FirstFailure =>
         Steps.FirstOrDefault(s => s.Verdict.Level == VerdictLevel.Fail);
 }
+
+/// <summary>
+/// Что означает исход прогона сценария по набору целей.
+/// </summary>
+/// <remarks>
+/// Это вывод из измерения, а не его показ: «упали все» и «упала часть» — разные
+/// утверждения о том, где искать причину. Когда падают все цели набора, общего у них
+/// только начало пути — своя сеть или канал наверх; когда падает часть, остальные
+/// прошли тем же путём, и путь оправдан.
+/// <para>
+/// Живёт здесь, потому что к И-19 этот вывод был написан дословно дважды — в консоли
+/// и в графическом клиенте. Знание о том, что значит измерение, в презентационном слое
+/// не удерживается: два клиента расходятся, и один объясняет оператору одно, а второй
+/// то же самое — иначе. Показ остаётся за клиентом, вывод — здесь.
+/// </para>
+/// </remarks>
+public static class TargetSetConclusion
+{
+    /// <summary>Итог по набору целей.</summary>
+    /// <param name="total">Сколько целей проверено.</param>
+    /// <param name="failed">Сколько из них не прошло.</param>
+    /// <param name="setTitle">Название набора, если оно есть у клиента.</param>
+    public static string Describe(int total, int failed, string? setTitle = null)
+    {
+        var about = string.IsNullOrWhiteSpace(setTitle)
+            ? "Итог по набору"
+            : $"Итог по набору «{setTitle}»";
+
+        if (total <= 0)
+        {
+            return $"{about}: проверять было нечего.";
+        }
+
+        if (failed <= 0)
+        {
+            return $"{about}: ни одна цель не упала.";
+        }
+
+        if (failed >= total)
+        {
+            return $"{about}: упали все {Text.Plural.With(total, "цель", "цели", "целей")}. "
+                   + "Общая часть пути — своя сеть или канал наверх; отдельные серверы "
+                   + "столько раз одновременно не ломаются.";
+        }
+
+        return $"{about}: упало {failed.ToString(System.Globalization.CultureInfo.InvariantCulture)} "
+               + $"из {total.ToString(System.Globalization.CultureInfo.InvariantCulture)}. "
+               + "Остальные цели прошли тем же путём, значит дело в упавших, а не в канале.";
+    }
+}

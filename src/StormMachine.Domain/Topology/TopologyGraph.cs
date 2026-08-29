@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using StormMachine.Domain.Discovery;
 using StormMachine.Domain.Snmp;
 
@@ -579,7 +579,7 @@ public sealed record TopologyGraph
                 Id = $"{subnetId}/остальные",
                 Kind = TopologyNodeKind.HostGroup,
                 Label = $"ещё {hidden.ToString(CultureInfo.InvariantCulture)} "
-                        + Plural(hidden, "устройство", "устройства", "устройств"),
+                        + Text.Plural.Of(hidden, "устройство", "устройства", "устройств"),
                 GroupSize = hidden,
                 Detail = "разверните, чтобы увидеть поимённо",
                 IsOnline = members.Skip(shown).Any(d => d.IsOnline),
@@ -1003,20 +1003,4 @@ public sealed record TopologyGraph
         }
     }
 
-    private static string Plural(int count, string one, string few, string many)
-    {
-        var tens = count % 100;
-
-        if (tens is >= 11 and <= 14)
-        {
-            return many;
-        }
-
-        return (count % 10) switch
-        {
-            1 => one,
-            2 or 3 or 4 => few,
-            _ => many,
-        };
-    }
 }

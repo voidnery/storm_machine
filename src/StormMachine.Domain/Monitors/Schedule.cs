@@ -541,7 +541,7 @@ public sealed record Schedule
     {
         var (count, one, few, many) = Split(interval);
 
-        return count == 1 ? one : $"{count.ToString(CultureInfo.InvariantCulture)} {Plural(count, one, few, many)}";
+        return count == 1 ? one : $"{count.ToString(CultureInfo.InvariantCulture)} {Text.Plural.Of(count, one, few, many)}";
     }
 
     /// <summary>
@@ -557,7 +557,7 @@ public sealed record Schedule
 
         if (count != 1)
         {
-            return $"каждые {count.ToString(CultureInfo.InvariantCulture)} {Plural(count, one, few, many)}";
+            return $"каждые {count.ToString(CultureInfo.InvariantCulture)} {Text.Plural.Of(count, one, few, many)}";
         }
 
         return one switch
@@ -587,23 +587,6 @@ public sealed record Schedule
         }
 
         return ((int)interval.TotalSeconds, "секунда", "секунды", "секунд");
-    }
-
-    private static string Plural(int count, string one, string few, string many)
-    {
-        var tens = count % 100;
-
-        if (tens is >= 11 and <= 14)
-        {
-            return many;
-        }
-
-        return (count % 10) switch
-        {
-            1 => one,
-            2 or 3 or 4 => few,
-            _ => many,
-        };
     }
 
     private DateTimeOffset? FirstAfter(DateTimeOffset after, TimeZoneInfo zone)

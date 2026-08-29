@@ -1,4 +1,4 @@
-using System.Collections.ObjectModel;
+﻿using System.Collections.ObjectModel;
 using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -182,8 +182,8 @@ public sealed partial class ProbesPageViewModel : PageViewModel, ITargetAware, I
 
                 Targets.Add(new ScenarioTargetRow(
                     target,
-                    Mark(run.Level),
-                    Word(run.Level),
+                    VerdictWording.Mark(run.Level),
+                    VerdictWording.Outcome(run.Level),
                     run.FirstFailure?.Name ?? "—"));
             }
 
@@ -260,17 +260,10 @@ public sealed partial class ProbesPageViewModel : PageViewModel, ITargetAware, I
             return Targets.Count == 1 ? $"Итог: {Targets[0].Verdict}." : string.Empty;
         }
 
-        var failed = Targets.Count(t => string.Equals(t.Verdict, Word(VerdictLevel.Fail), StringComparison.Ordinal));
+        var failed = Targets.Count(t =>
+            string.Equals(t.Verdict, VerdictWording.Outcome(VerdictLevel.Fail), StringComparison.Ordinal));
 
-        return failed switch
-        {
-            0 => $"Итог по набору «{set.Title}»: ни одна цель не упала.",
-            var f when f == Targets.Count =>
-                $"Итог по набору «{set.Title}»: упали все {Targets.Count} целей. Общая часть пути — "
-                + "своя сеть или канал наверх; отдельные серверы столько раз одновременно не ломаются.",
-            _ => $"Итог по набору «{set.Title}»: упало {failed} из {Targets.Count}. Остальные цели прошли "
-                 + "тем же путём, значит дело в упавших, а не в канале.",
-        };
+        return TargetSetConclusion.Describe(Targets.Count, failed, set.Title);
     }
 
     [RelayCommand(CanExecute = nameof(IsRunning))]
@@ -284,22 +277,6 @@ public sealed partial class ProbesPageViewModel : PageViewModel, ITargetAware, I
         _cts?.Dispose();
         _cts = null;
     }
-
-    private static string Mark(VerdictLevel level) => level switch
-    {
-        VerdictLevel.Pass => "✓",
-        VerdictLevel.Warn => "!",
-        VerdictLevel.Fail => "✗",
-        _ => "·",
-    };
-
-    private static string Word(VerdictLevel level) => level switch
-    {
-        VerdictLevel.Pass => "в норме",
-        VerdictLevel.Warn => "предупреждение",
-        VerdictLevel.Fail => "не прошло",
-        _ => "не оценено",
-    };
 
     /// <summary>Подпись набора целей для поля ввода.</summary>
     [RelayCommand]
