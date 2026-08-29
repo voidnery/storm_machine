@@ -36,5 +36,6 @@
     <Project Path="tests/StormMachine.Agents.UnitTests/StormMachine.Agents.UnitTests.csproj" />
     <Project Path="tests/StormMachine.Alerting.UnitTests/StormMachine.Alerting.UnitTests.csproj" />
     <Project Path="tests/StormMachine.LoadTests/StormMachine.LoadTests.csproj" />
+    <Project Path="tests/StormMachine.App.UnitTests/StormMachine.App.UnitTests.csproj" />
   </Folder>
 </Solution>

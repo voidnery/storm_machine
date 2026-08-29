@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Проверки графического клиента.
+
+       Представления (.axaml) тестировать не предполагается: их проверяет компилятор
+       разметки, а поведение — глаз оператора. Предмет здесь другой — ViewModel:
+       обычные классы без единой ссылки на графику, и не покрывать их было нечем
+       оправдать, кроме привычки. -->
+
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <TargetFramework>net10.0-windows</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\StormMachine.App\StormMachine.App.csproj" />
+    <ProjectReference Include="..\..\src\StormMachine.Composition\StormMachine.Composition.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="coverlet.collector" Version="6.0.4" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+</Project>

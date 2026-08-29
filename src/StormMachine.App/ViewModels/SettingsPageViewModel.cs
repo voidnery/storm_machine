@@ -1,4 +1,4 @@
-using System.Collections.ObjectModel;
+﻿using System.Collections.ObjectModel;
 using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -114,9 +114,11 @@ public sealed partial class SettingsPageViewModel : PageViewModel
         IRunStore runs,
         UpdateService updates,
         ISnmpCredentialStore credentials,
-        SnmpService snmp)
+        SnmpService snmp,
+        IAgentDirectory agents)
         : base(section)
     {
+        Agents = new AgentsSectionViewModel(agents ?? throw new ArgumentNullException(nameof(agents)));
         _capabilities = capabilities ?? throw new ArgumentNullException(nameof(capabilities));
         _profiles = profiles ?? throw new ArgumentNullException(nameof(profiles));
         _runs = runs ?? throw new ArgumentNullException(nameof(runs));
@@ -127,6 +129,16 @@ public sealed partial class SettingsPageViewModel : PageViewModel
 
     /// <summary>Форма набора учётных данных SNMP.</summary>
     public SnmpCredentialEditorViewModel Editor { get; } = new();
+
+    /// <summary>
+    /// Агенты: сопряжение, список, проверка связи.
+    /// </summary>
+    /// <remarks>
+    /// Живут здесь, а не отдельным разделом навигации, по той же причине, что профили
+    /// и учётные данные: это настройка, а не рабочий экран. Оператор заходит сюда,
+    /// когда заводит вторую точку измерения, и не возвращается, пока она работает.
+    /// </remarks>
+    public AgentsSectionViewModel Agents { get; }
 
     public ObservableCollection<CredentialRow> Credentials { get; } = [];
 
@@ -292,8 +304,21 @@ public sealed partial class SettingsPageViewModel : PageViewModel
         "Продукт распространяется по лицензии MIT. Драйвер захвата Npcap не входит "
         + "в поставку ни при каких условиях: его лицензия NPSL это запрещает.";
 
-    public override async Task ActivateAsync(CancellationToken cancellationToken = default) =>
+    public override async Task ActivateAsync(CancellationToken cancellationToken = default)
+    {
         await RefreshAsync(cancellationToken).ConfigureAwait(true);
+        await Agents.RefreshAsync(cancellationToken).ConfigureAwait(true);
+    }
+
+    /// <summary>
+    /// Уход с экрана отменяет идущее сопряжение.
+    /// </summary>
+    /// <remarks>
+    /// Ожидание звонка держит слушающий сокет и живёт минутами. Оставить его после
+    /// ухода значило бы занять порт: следующая попытка сопряжения упёрлась бы
+    /// в «порт занять не удалось» и не объяснила бы, кем.
+    /// </remarks>
+    public override void Deactivate() => Agents.Dispose();
 
     [RelayCommand]
     private async Task RefreshAsync(CancellationToken cancellationToken)

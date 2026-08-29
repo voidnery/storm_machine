@@ -421,12 +421,6 @@ internal static class MonitorRenderer
         Console.WriteLine("--- против предыдущего такого же периода ---");
         Console.WriteLine();
 
-        if (comparison.Caveat is { } caveat)
-        {
-            Console.WriteLine($"ВНИМАНИЕ: {caveat}");
-            Console.WriteLine();
-        }
-
         var before = comparison.Before;
         var after = comparison.After;
 
@@ -439,7 +433,13 @@ internal static class MonitorRenderer
                           + $"покрытие {Percent(after.Coverage * 100)}");
 
         Console.WriteLine();
-        Console.WriteLine($"  {comparison.Describe()}");
+
+        // Вывод печатается один раз. При плохом покрытии Describe() и есть оговорка,
+        // и печатать её ещё и отдельным предупреждением значило бы сказать одно
+        // и то же дважды в восьми строках — замечено на приёмке И-21.
+        Console.WriteLine(comparison.Caveat is null
+            ? $"  {comparison.Describe()}"
+            : $"  ВНИМАНИЕ: {comparison.Describe()}");
     }
 
     private static string Duration(TimeSpan value) => value switch

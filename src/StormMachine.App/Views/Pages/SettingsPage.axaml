@@ -1,4 +1,4 @@
-<UserControl xmlns="https://github.com/avaloniaui"
+﻿<UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:StormMachine.App.ViewModels"
              x:Class="StormMachine.App.Views.Pages.SettingsPage"
@@ -275,6 +275,133 @@
                     IsVisible="{Binding ProbeResult, Converter={x:Static ObjectConverters.IsNotNull}}">
               <TextBlock Text="{Binding ProbeResult}" FontSize="11" TextWrapping="Wrap" LineHeight="16" />
             </Border>
+
+            <Border Height="1" Background="#2E3746" Margin="0,6" />
+
+            <!-- Агенты.
+
+                 Раздел закрывает долг, который тянулся с И-12: три пробы уровня 0 —
+                 пропускная способность, качество канала и задержка под нагрузкой —
+                 требуют сопряжённого агента, а сопрягать можно было только из консоли.
+                 Экран возможностей показывал их с причиной «нужна вторая точка измерения»
+                 и консольной командой в качестве совета: кто поставил графический
+                 клиент, попадал в тупик. -->
+            <StackPanel Spacing="10" DataContext="{Binding Agents}">
+              <StackPanel x:DataType="vm:AgentsSectionViewModel" Spacing="10">
+
+                <TextBlock Text="Агенты" FontSize="13" FontWeight="SemiBold" />
+
+                <TextBlock FontSize="10" Opacity="0.5" TextWrapping="Wrap" LineHeight="15"
+                           Text="Вторая точка измерения. Без неё пропускная способность, качество канала
+                                 и задержка под нагрузкой измерены быть не могут: скорость между точками
+                                 требует двух точек." />
+
+                <StackPanel Spacing="2" IsVisible="{Binding OwnThumbprint,
+                            Converter={x:Static ObjectConverters.IsNotNull}}">
+                  <TextBlock Text="Наш отпечаток — его называют тому, кто у агента" FontSize="10"
+                             Opacity="0.6" />
+                  <TextBlock Text="{Binding OwnThumbprint}" FontSize="11" FontFamily="Consolas"
+                             TextWrapping="Wrap" />
+                </StackPanel>
+
+                <TextBlock Text="Сопряжённых агентов нет." FontSize="11" Opacity="0.5"
+                           IsVisible="{Binding !HasAgents}" />
+
+                <ListBox ItemsSource="{Binding Agents}" SelectedItem="{Binding Selected}"
+                         Background="Transparent" BorderThickness="0" MaxHeight="160"
+                         IsVisible="{Binding HasAgents}">
+                  <ListBox.ItemTemplate>
+                    <DataTemplate x:DataType="vm:AgentRow">
+                      <Grid ColumnDefinitions="*,Auto" Margin="0,3">
+                        <StackPanel Grid.Column="0" Spacing="1">
+                          <TextBlock Text="{Binding Name}" FontSize="12" TextTrimming="CharacterEllipsis" />
+                          <TextBlock Text="{Binding Where}" FontSize="10" Opacity="0.5"
+                                     TextTrimming="CharacterEllipsis" />
+                        </StackPanel>
+                        <TextBlock Grid.Column="1" Text="{Binding Thumbprint}" FontSize="10"
+                                   FontFamily="Consolas" Opacity="0.6" VerticalAlignment="Center" />
+                      </Grid>
+                    </DataTemplate>
+                  </ListBox.ItemTemplate>
+                </ListBox>
+
+                <Grid ColumnDefinitions="Auto,Auto,*" IsVisible="{Binding HasAgents}">
+                  <Button Grid.Column="0" Content="Проверить связь" Command="{Binding CheckCommand}"
+                          Padding="10,5" Margin="0,0,6,0" />
+                  <Button Grid.Column="1" Content="Забыть" Command="{Binding ForgetCommand}" Padding="10,5" />
+                </Grid>
+
+                <Border Height="1" Background="#2E3746" Margin="0,2" />
+
+                <TextBlock Text="Сопрячь новый" FontSize="11" FontWeight="SemiBold" Opacity="0.8" />
+
+                <!-- Два способа, потому что соединение устанавливает любая сторона:
+                     входящие на Windows заблокированы по умолчанию, а правило требует
+                     администратора. Где прав нет — звонит агент. -->
+                <TextBlock FontSize="10" Opacity="0.5" TextWrapping="Wrap" LineHeight="15"
+                           Text="Звонить самим — когда на машине агента разрешены входящие.
+                                 Ждать звонка — когда прав там нет: исходящие разрешены всегда." />
+
+                <Grid ColumnDefinitions="*,Auto">
+                  <TextBox Grid.Column="0" PlaceholderText="адрес агента или адрес:порт"
+                           Text="{Binding Host}" IsEnabled="{Binding !IsBusy}" />
+                  <Button Grid.Column="1" Content="Найти в сети" Command="{Binding BrowseCommand}"
+                          Padding="10,5" Margin="6,0,0,0" />
+                </Grid>
+
+                <ListBox ItemsSource="{Binding Found}" SelectedItem="{Binding SelectedFound}"
+                         Background="Transparent" BorderThickness="0" MaxHeight="110"
+                         IsVisible="{Binding Found.Count}">
+                  <ListBox.ItemTemplate>
+                    <DataTemplate x:DataType="vm:DiscoveredAgentRow">
+                      <Grid ColumnDefinitions="*,Auto" Margin="0,2">
+                        <StackPanel Grid.Column="0" Spacing="1">
+                          <TextBlock Text="{Binding Name}" FontSize="11" />
+                          <TextBlock Text="{Binding Where}" FontSize="10" Opacity="0.5" />
+                        </StackPanel>
+                        <TextBlock Grid.Column="1" Text="{Binding State}" FontSize="10" Opacity="0.6"
+                                   VerticalAlignment="Center" />
+                      </Grid>
+                    </DataTemplate>
+                  </ListBox.ItemTemplate>
+                </ListBox>
+
+                <Button Content="Взять этот адрес" Command="{Binding UseFoundCommand}" Padding="10,4"
+                        FontSize="11" HorizontalAlignment="Left" IsVisible="{Binding Found.Count}" />
+
+                <TextBox PlaceholderText="код сопряжения от агента" Text="{Binding Code}"
+                         IsEnabled="{Binding !IsBusy}" />
+
+                <Grid ColumnDefinitions="Auto,Auto,*">
+                  <Button Grid.Column="0" Content="Позвонить" Command="{Binding DialCommand}"
+                          Padding="12,5" Margin="0,0,6,0" IsEnabled="{Binding !IsBusy}"
+                          Background="{StaticResource AccentBrush}" Foreground="White" />
+                  <Button Grid.Column="1" Content="Ждать звонка" Command="{Binding WaitForCallCommand}"
+                          Padding="12,5" Margin="0,0,6,0" IsEnabled="{Binding !IsBusy}" />
+                  <Button Grid.Column="2" Content="Отменить" Command="{Binding StopCommand}"
+                          Padding="10,5" HorizontalAlignment="Left" IsVisible="{Binding IsBusy}" />
+                </Grid>
+
+                <!-- Ход сопряжения показывается здесь, а не уходит в консоль:
+                     у графического клиента её нет. Именно так в И-19 пропадала
+                     просьба «набери на второй машине вот это». -->
+                <Border Padding="10,8" CornerRadius="4" Background="#232B3B"
+                        IsVisible="{Binding Progress, Converter={x:Static ObjectConverters.IsNotNull}}">
+                  <TextBlock Text="{Binding Progress}" FontSize="11" TextWrapping="Wrap" LineHeight="16" />
+                </Border>
+
+                <TextBlock Text="{Binding Message}" FontSize="11" Foreground="#7DD3A0" TextWrapping="Wrap"
+                           IsVisible="{Binding Message, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                <TextBlock Text="{Binding Error}" FontSize="11" Foreground="{StaticResource DangerBrush}"
+                           TextWrapping="Wrap"
+                           IsVisible="{Binding Error, Converter={x:Static ObjectConverters.IsNotNull}}" />
+
+                <TextBlock FontSize="10" Opacity="0.5" TextWrapping="Wrap" LineHeight="15"
+                           Text="Отпечаток сверяется глазами и всегда. Объявление о себе в сети подделать
+                                 может кто угодно: поиск избавляет от набора адреса и только от этого." />
+
+              </StackPanel>
+            </StackPanel>
 
             <Border Height="1" Background="#2E3746" Margin="0,6" />
 
