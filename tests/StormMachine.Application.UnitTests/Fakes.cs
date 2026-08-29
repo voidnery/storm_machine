@@ -1,8 +1,9 @@
-using System.Runtime.CompilerServices;
+﻿using System.Runtime.CompilerServices;
 using StormMachine.Application.Abstractions;
 using StormMachine.Application.Probes;
 using StormMachine.Domain.Measurements;
 using StormMachine.Domain.Monitors;
+using StormMachine.Domain.Profiles;
 using StormMachine.Domain.Results;
 using StormMachine.Domain.Targets;
 using Monitor = StormMachine.Domain.Monitors.Monitor;
@@ -265,4 +266,35 @@ internal static class Fakes
         Schedule = schedule,
         Thresholds = [Domain.Scenarios.Threshold.Parse("p95 < 100")],
     };
+}
+
+/// <summary>
+/// Хранилище профилей, которое не читается.
+/// </summary>
+/// <remarks>
+/// Проверяет, что сбой необязательной части не срывает измерение: профили —
+/// удобство, а не условие работы продукта.
+/// </remarks>
+internal sealed class BrokenProfileStore : IProfileStore
+{
+    public Task<IReadOnlyList<NetworkProfile>> ListAsync(CancellationToken cancellationToken = default) =>
+        throw new IOException("база профилей недоступна");
+
+    public Task<NetworkProfile?> GetAsync(Guid id, CancellationToken cancellationToken = default) =>
+        throw new IOException("база профилей недоступна");
+
+    public Task<NetworkProfile?> FindAsync(string nameOrId, CancellationToken cancellationToken = default) =>
+        throw new IOException("база профилей недоступна");
+
+    public Task<NetworkProfile?> GetActiveAsync(CancellationToken cancellationToken = default) =>
+        throw new IOException("база профилей недоступна");
+
+    public Task SaveAsync(NetworkProfile profile, CancellationToken cancellationToken = default) =>
+        throw new IOException("база профилей недоступна");
+
+    public Task ActivateAsync(Guid? id, CancellationToken cancellationToken = default) =>
+        throw new IOException("база профилей недоступна");
+
+    public Task<bool> DeleteAsync(Guid id, CancellationToken cancellationToken = default) =>
+        throw new IOException("база профилей недоступна");
 }

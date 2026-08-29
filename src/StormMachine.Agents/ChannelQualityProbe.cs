@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using System.Runtime.CompilerServices;
 using StormMachine.Application.Abstractions;
 using StormMachine.Application.Probes;
@@ -145,7 +145,7 @@ public sealed class ChannelQualityProbe(AgentDirectory directory) : IProbe
                 // При обратном направлении здесь ожидание звонка агента, а не отказ:
                 // оператор попросил измерить, и заставлять его искать вторую команду
                 // там, где нужна одна, незачем.
-                var waiting = new Progress<PairingProgress>(p => Console.WriteLine(p.Message));
+                var waiting = new PairingRelay(observer);
 
                 using var session = await _directory
                     .OpenAsync(agent, waiting, cancellationToken)

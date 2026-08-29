@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
 using StormMachine.Protocol;
@@ -20,23 +20,13 @@ public sealed class TrafficTests
     [Fact]
     public void Pacer_KeepsTheInterval()
     {
-        // Спайк-05 намерил ошибку такта p99 = 0.000 мс. Здесь порог намеренно
-        // грубее: тест идёт вместе с остальными и на занятой машине.
-        var pacer = new PacketPacer(1.0);
-        var errors = new List<double>(200);
-        var watch = Stopwatch.StartNew();
-
-        for (var i = 0; i < 200; i++)
-        {
-            errors.Add(pacer.WaitForNext());
-        }
-
-        watch.Stop();
+        // Спайк-05 намерил ошибку такта p99 = 0.000 мс.
+        var (errors, elapsed) = RunPacer(new PacketPacer(1.0), 200);
 
         errors.Sort();
 
         Assert.True(errors[190] < 1.0, $"p95 ошибки такта {errors[190]:0.000} мс — темповка не держит интервал.");
-        Assert.InRange(watch.Elapsed.TotalMilliseconds, 190, 260);
+        Assert.InRange(elapsed, 190, 260);
     }
 
     [Fact]
@@ -45,17 +35,54 @@ public sealed class TrafficTests
         // Следующий такт отсчитывается от намеченного, а не от фактического момента.
         // Иначе за тысячу тактов набежала бы заметная разница, и скорость считалась бы
         // по неверной длительности.
-        var pacer = new PacketPacer(0.5);
-        var watch = Stopwatch.StartNew();
+        var (_, elapsed) = RunPacer(new PacketPacer(0.5), 400);
 
-        for (var i = 0; i < 400; i++)
+        Assert.InRange(elapsed, 190, 230);
+    }
+
+    /// <summary>
+    /// Гоняет темповку в выделенном потоке и возвращает ошибки тактов и общую длительность.
+    /// </summary>
+    /// <remarks>
+    /// Выделенный поток здесь — не украшение, а условие, которое <see cref="PacketPacer"/>
+    /// сам себе ставит: он занимает ядро целиком и «обязан идти в выделенном потоке, а не
+    /// в пуле». Пока цикл крутился прямо в потоке xunit, тест мерил не темповку, а
+    /// планировщик Windows: двенадцать тестовых сборок идут параллельно, поток пула
+    /// после <c>Thread.Sleep(0)</c> возвращался через миллисекунды, и p95 ошибки уходила
+    /// за порог. Отказ выглядел плавающим — в одиночку тест проходил всегда.
+    /// <para>
+    /// Поймано в И-19. Порог не тронут намеренно: смягчить его значило бы списать
+    /// настоящую потерю точности на занятость машины. Исправлены условия прогона,
+    /// а не мерка.
+    /// </para>
+    /// </remarks>
+    private static (List<double> Errors, double ElapsedMs) RunPacer(PacketPacer pacer, int ticks)
+    {
+        var errors = new List<double>(ticks);
+        var elapsed = 0.0;
+
+        var thread = new Thread(() =>
         {
-            pacer.WaitForNext();
-        }
+            var watch = Stopwatch.StartNew();
 
-        watch.Stop();
+            for (var i = 0; i < ticks; i++)
+            {
+                errors.Add(pacer.WaitForNext());
+            }
 
-        Assert.InRange(watch.Elapsed.TotalMilliseconds, 190, 230);
+            watch.Stop();
+            elapsed = watch.Elapsed.TotalMilliseconds;
+        })
+        {
+            IsBackground = true,
+            Priority = ThreadPriority.AboveNormal,
+        };
+
+        thread.Start();
+
+        Assert.True(thread.Join(TimeSpan.FromSeconds(30)), "Темповка не уложилась в 30 секунд.");
+
+        return (errors, elapsed);
     }
 
     [Fact]

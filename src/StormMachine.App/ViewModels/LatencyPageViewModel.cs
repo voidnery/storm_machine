@@ -1,4 +1,4 @@
-using System.Collections.ObjectModel;
+﻿using System.Collections.ObjectModel;
 using System.Globalization;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -451,17 +451,7 @@ public sealed partial class LatencyPageViewModel : PageViewModel, ITargetAware
     {
         var adapter = _environment.GetPrimaryAdapter();
 
-        var kind = adapter is null ? AdapterKind.Unknown : adapter.Kind;
-        var context = new MeasurementContext
-        {
-            InterfaceName = adapter?.Name ?? "неизвестен",
-            AdapterKind = kind,
-            InterfaceAddress = adapter?.IPv4Address,
-            CalibrationBaselineMs = _clock.CalibrationBaselineMs,
-            ProductVersion = ProductInfo.Version,
-            Methodology = Methodology.IcmpEcho,
-            StartedUtc = DateTimeOffset.UtcNow,
-        };
+        var context = Application.Runs.MeasurementConditions.Build(adapter, _clock, Methodology.IcmpEcho);
 
         MeasurementConditions =
             $"{context.InterfaceName} · порог {context.CalibrationBaselineMs.ToString("0.000", CultureInfo.InvariantCulture)} мс · {Methodology.IcmpEcho}";

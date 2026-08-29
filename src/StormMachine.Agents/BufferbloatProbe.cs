@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using System.Runtime.CompilerServices;
 using StormMachine.Application.Abstractions;
 using StormMachine.Application.Probes;
@@ -178,7 +178,9 @@ public sealed class BufferbloatProbe(AgentDirectory directory, Lazy<IProbeRegist
 
         var loading = Task.Run(async () =>
         {
-            using var session = await _directory.OpenAsync(agent, null, stopLoad.Token).ConfigureAwait(false);
+            using var session = await _directory
+                .OpenAsync(agent, new PairingRelay(observer), stopLoad.Token)
+                .ConfigureAwait(false);
 
             var result = await TestConductor
                 .RequestAsync(session, load, null, stopLoad.Token)

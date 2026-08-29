@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 
 namespace StormMachine.Domain.Monitors;
 
@@ -294,7 +294,16 @@ public sealed record Schedule
     };
 
     /// <summary>Проверяет расписание целиком и возвращает список ошибок.</summary>
-    public IReadOnlyList<string> Validate()
+    /// <remarks>
+    /// Момент берётся текущий. Проверка «расписание целиком накрыто окнами обслуживания»
+    /// смотрит вперёд от него, и это единственное место домена, зависящее от часов, —
+    /// отсюда и перегрузка с явным моментом: без неё эту ветку не проверить, не привязав
+    /// тест к настоящему «сейчас» (найдено в И-19).
+    /// </remarks>
+    public IReadOnlyList<string> Validate() => Validate(DateTimeOffset.UtcNow);
+
+    /// <summary>То же, но от заданного момента.</summary>
+    public IReadOnlyList<string> Validate(DateTimeOffset now)
     {
         var errors = new List<string>();
 
@@ -342,7 +351,7 @@ public sealed record Schedule
         if (errors.Count == 0
             && Maintenance.Count > 0
             && Kind != ScheduleKind.Once
-            && NextAfter(DateTimeOffset.UtcNow) is null)
+            && NextAfter(now) is null)
         {
             errors.Add(
                 "Расписание целиком попадает в окна обслуживания — проверка не выполнится ни разу. "

@@ -59,6 +59,15 @@ public sealed class ActiveRunViewModel : ActiveOperationViewModel
         return drained;
     }
 
+    /// <summary>
+    /// Показывает, что проба делает прямо сейчас. Вызывается из потока интерфейса.
+    /// </summary>
+    /// <remarks>
+    /// Затирается первым же сэмплом — и это правильно: как только пошли измерения,
+    /// ожидание закончилось, а счётчик проб полезнее.
+    /// </remarks>
+    internal void Report(string message) => Detail = message;
+
     internal void Finish(RunOutcome outcome)
     {
         Outcome = outcome;

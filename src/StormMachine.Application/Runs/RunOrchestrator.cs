@@ -1,4 +1,4 @@
-using StormMachine.Application.Abstractions;
+﻿using StormMachine.Application.Abstractions;
 using StormMachine.Application.Probes;
 using StormMachine.Domain.Measurements;
 using StormMachine.Domain.Results;
@@ -13,6 +13,17 @@ public sealed record RunOptions
 
     /// <summary>Вызывается на каждый сэмпл по мере поступления — для живого вывода.</summary>
     public Action<Sample>? OnSample { get; init; }
+
+    /// <summary>
+    /// Вызывается, когда проба сообщает о ходе подготовки.
+    /// </summary>
+    /// <remarks>
+    /// Отдельно от <see cref="OnSample"/>, потому что это не измерение: сюда попадает,
+    /// например, ожидание звонка агента вместе с командой, которую надо набрать на его
+    /// машине. Вызов идёт из потока пробы — переносить его в поток интерфейса обязан
+    /// тот, кто обработчик передал.
+    /// </remarks>
+    public Action<string>? OnProgress { get; init; }
 
     /// <summary>Пресет, из которого идёт запуск. Попадает в журнал вместе с прогоном.</summary>
     public Guid? PresetId { get; init; }
@@ -72,8 +83,12 @@ public sealed class RunOrchestrator(
         await _clock.CalibrateAsync(cancellationToken).ConfigureAwait(false);
 
         var adapter = _environment.GetPrimaryAdapter();
-        var context = BuildContext(adapter, descriptor.Methodology, await ProfileAsync(cancellationToken).ConfigureAwait(false));
-        var collector = new ProbeCollector();
+        var context = MeasurementConditions.Build(
+            adapter,
+            _clock,
+            descriptor.Methodology,
+            await MeasurementConditions.ActiveProfileAsync(_profiles, cancellationToken).ConfigureAwait(false));
+        var collector = new ProbeCollector(options.OnProgress);
         var samples = new List<Sample>();
 
         IRunWriter? writer = null;
@@ -155,37 +170,4 @@ public sealed class RunOrchestrator(
             }
         }
     }
-
-    /// <summary>Имя активного профиля. Сбой чтения не должен срывать измерение.</summary>
-    private async Task<string?> ProfileAsync(CancellationToken cancellationToken)
-    {
-        if (_profiles is null)
-        {
-            return null;
-        }
-
-        try
-        {
-            return (await _profiles.GetActiveAsync(cancellationToken).ConfigureAwait(false))?.Name;
-        }
-        catch (Exception ex) when (ex is InvalidOperationException or IOException)
-        {
-            return null;
-        }
-    }
-
-    private MeasurementContext BuildContext(
-        NetworkAdapter? adapter,
-        Methodology methodology,
-        string? profile) => new()
-    {
-        InterfaceName = adapter?.Name ?? "неизвестен",
-        AdapterKind = adapter?.Kind ?? AdapterKind.Unknown,
-        InterfaceAddress = adapter?.IPv4Address,
-        CalibrationBaselineMs = _clock.CalibrationBaselineMs,
-        ProductVersion = ProductInfo.Version,
-        Methodology = methodology,
-        Profile = profile,
-        StartedUtc = DateTimeOffset.UtcNow,
-    };
 }

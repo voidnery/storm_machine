@@ -1,4 +1,4 @@
-using System.CommandLine;
+﻿using System.CommandLine;
 using Microsoft.Extensions.DependencyInjection;
 using StormMachine.Application;
 using StormMachine.Application.Abstractions;
@@ -142,10 +142,18 @@ internal static class ProbeCommandFactory
         await clock.CalibrateAsync(cancellationToken).ConfigureAwait(false);
 
         var adapter = environment.GetPrimaryAdapter();
+
+        // Профиль забирается тем же способом, что и в оркестраторе, и по той же причине:
+        // шапка обязана показывать те условия, которые лягут в журнал. Разойтись им
+        // нельзя — иначе оператор читает одно, а сравнивать потом будет другое.
+        var profile = await MeasurementConditions
+            .ActiveProfileAsync(services.GetService<IProfileStore>(), cancellationToken)
+            .ConfigureAwait(false);
+
         ProbeRenderer.WriteHeader(
             descriptor,
             request.Target,
-            ProbeRenderer.BuildContext(adapter, clock, descriptor.Methodology),
+            MeasurementConditions.Build(adapter, clock, descriptor.Methodology, profile),
             adapter);
 
         // Ctrl+C отменяет измерение, но не прерывает подведение итога: уже измеренное
@@ -171,6 +179,11 @@ internal static class ProbeCommandFactory
                 {
                     Save = save,
                     OnSample = quiet ? null : ProbeRenderer.CreateLiveWriter(descriptor),
+
+                    // Ход подготовки идёт и в тихом режиме: в нём подавлены измерения,
+                    // а «жду звонка агента, набери на его машине вот это» — просьба
+                    // к оператору, без которой прогон просто не состоится.
+                    OnProgress = ProbeRenderer.WriteProgress,
                 },
                 linked.Token).ConfigureAwait(false);
         }

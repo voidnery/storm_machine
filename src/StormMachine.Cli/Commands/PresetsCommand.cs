@@ -1,4 +1,4 @@
-using System.CommandLine;
+﻿using System.CommandLine;
 using System.Globalization;
 using Microsoft.Extensions.DependencyInjection;
 using StormMachine.Application.Abstractions;
@@ -161,10 +161,14 @@ internal static class PresetsCommand
             await clock.CalibrateAsync(cancellationToken).ConfigureAwait(false);
             var adapter = environment.GetPrimaryAdapter();
 
+            var profile = await MeasurementConditions
+                .ActiveProfileAsync(services.GetService<IProfileStore>(), cancellationToken)
+                .ConfigureAwait(false);
+
             ProbeRenderer.WriteHeader(
                 probe.Descriptor,
                 preset.Target,
-                ProbeRenderer.BuildContext(adapter, clock, probe.Descriptor.Methodology),
+                MeasurementConditions.Build(adapter, clock, probe.Descriptor.Methodology, profile),
                 adapter);
 
             using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);

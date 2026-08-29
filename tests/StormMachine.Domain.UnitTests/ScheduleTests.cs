@@ -1,4 +1,4 @@
-using StormMachine.Domain.Monitors;
+﻿using StormMachine.Domain.Monitors;
 
 namespace StormMachine.Domain.UnitTests;
 
@@ -138,6 +138,30 @@ public sealed class ScheduleTests
 
         Assert.Single(errors);
         Assert.Contains("не выполнится ни разу", errors[0], StringComparison.Ordinal);
+    }
+
+    [Fact(DisplayName = "Проверка расписания принимает момент, а не читает часы")]
+    public void ValidateTakesTheMomentExplicitly()
+    {
+        // Единственное место домена, зависевшее от часов, — эта проверка: она смотрит
+        // вперёд от «сейчас». Пока момент брался из DateTimeOffset.UtcNow, ветку нельзя
+        // было проверить, не привязав тест к настоящему времени: однократный запуск,
+        // назначенный на будущее, через год после написания теста оказался бы в прошлом
+        // и повёл себя иначе. Найдено при разборе долга в И-19.
+        var once = Schedule.OnceAt(At(15, 12));
+
+        // Тот же объект расписания, два разных момента — два разных вывода.
+        Assert.Empty(once.Validate(At(10, 12)));
+        Assert.Empty(once.Validate(At(20, 12)));
+
+        var covered = Schedule.ByCron("0 3 * * *") with
+        {
+            Maintenance = [new MaintenanceWindow { Start = new TimeOnly(2, 0), End = new TimeOnly(4, 0) }],
+        };
+
+        // А здесь вывод от момента не зависит — и это тоже утверждение о поведении.
+        Assert.Single(covered.Validate(At(10, 12)));
+        Assert.Single(covered.Validate(At(20, 12)));
     }
 
     [Fact(DisplayName = "Интервальный монитор в окне обслуживания молчит и возвращается после")]

@@ -1,6 +1,7 @@
-using System.CommandLine;
+﻿using System.CommandLine;
 using Microsoft.Extensions.DependencyInjection;
 using StormMachine.Application.Abstractions;
+using StormMachine.Application.Runs;
 using StormMachine.Domain.Measurements;
 
 namespace StormMachine.Cli.Commands;
@@ -77,16 +78,8 @@ internal static class EnvCommand
         return command;
     }
 
-    private static MeasurementContext ContextFor(NetworkAdapter adapter, IHighResolutionClock clock) => new()
-    {
-        InterfaceName = adapter.Name,
-        AdapterKind = adapter.Kind,
-        InterfaceAddress = adapter.IPv4Address,
-        CalibrationBaselineMs = clock.CalibrationBaselineMs,
-        ProductVersion = Application.ProductInfo.Version,
-        Methodology = Methodology.Unspecified,
-        StartedUtc = DateTimeOffset.UtcNow,
-    };
+    private static MeasurementContext ContextFor(NetworkAdapter adapter, IHighResolutionClock clock) =>
+        MeasurementConditions.Build(adapter, clock, Methodology.Unspecified);
 
     public static string Describe(AdapterKind kind) => kind switch
     {

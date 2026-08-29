@@ -18,6 +18,24 @@ public interface IProbeObserver
 
     /// <summary>Проба установила структурный факт.</summary>
     void OnFact(ProbeFact fact);
+
+    /// <summary>
+    /// Проба сообщает, что происходит прямо сейчас.
+    /// </summary>
+    /// <remarks>
+    /// Третий канал понадобился в И-19. Ход подготовки — не сэмпл и не факт: он ничего
+    /// не измеряет и в журнале ему делать нечего, но показать его надо <b>пока идёт
+    /// ожидание</b>, а не в итоге. Факт для этого не годится по времени: факты видны
+    /// после прогона, а сообщение «жду звонка агента, на его машине набрать вот это»
+    /// после прогона бесполезно — ждать уже нечего.
+    /// <para>
+    /// До этого пробы агента писали такие сообщения прямо в <c>Console</c>. В консоли
+    /// это работало, а графический клиент собран как <c>WinExe</c> и консоли не имеет:
+    /// сообщение с указанием, что набрать на второй машине, пропадало, и прогон
+    /// молча стоял до истечения срока ожидания.
+    /// </para>
+    /// </remarks>
+    void OnProgress(string message);
 }
 
 /// <summary>Наблюдатель, который ничего не запоминает. Для вызовов, где факты не нужны.</summary>
@@ -36,12 +54,22 @@ public sealed class NullProbeObserver : IProbeObserver
     public void OnFact(ProbeFact fact)
     {
     }
+
+    public void OnProgress(string message)
+    {
+    }
 }
 
 /// <summary>Собирает факты одного прогона.</summary>
-public sealed class ProbeCollector : IProbeObserver
+/// <remarks>
+/// Ход подготовки не копится, а отдаётся сразу: он нужен во время ожидания.
+/// Обработчик вызывается из того потока, в котором работает проба, — переносить
+/// вызов в поток интерфейса обязан тот, кто обработчик передал.
+/// </remarks>
+public sealed class ProbeCollector(Action<string>? onProgress = null) : IProbeObserver
 {
     private readonly List<ProbeFact> _facts = [];
+    private readonly Action<string>? _onProgress = onProgress;
 
     public string? ResolvedAddress { get; private set; }
 
@@ -54,6 +82,8 @@ public sealed class ProbeCollector : IProbeObserver
         ArgumentNullException.ThrowIfNull(fact);
         _facts.Add(fact);
     }
+
+    public void OnProgress(string message) => _onProgress?.Invoke(message);
 
     /// <summary>Факты одной категории — для показа сгруппированными.</summary>
     public IEnumerable<ProbeFact> ByCategory(string category) =>

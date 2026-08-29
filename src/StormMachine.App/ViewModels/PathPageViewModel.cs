@@ -1,4 +1,4 @@
-using System.Collections.ObjectModel;
+﻿using System.Collections.ObjectModel;
 using System.Globalization;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -557,16 +557,7 @@ public sealed partial class PathPageViewModel : PageViewModel, ITargetAware
     {
         var adapter = _environment.GetPrimaryAdapter();
 
-        var context = new MeasurementContext
-        {
-            InterfaceName = adapter?.Name ?? "неизвестен",
-            AdapterKind = adapter?.Kind ?? AdapterKind.Unknown,
-            InterfaceAddress = adapter?.IPv4Address,
-            CalibrationBaselineMs = _clock.CalibrationBaselineMs,
-            ProductVersion = ProductInfo.Version,
-            Methodology = Methodology.Traceroute,
-            StartedUtc = DateTimeOffset.UtcNow,
-        };
+        var context = Application.Runs.MeasurementConditions.Build(adapter, _clock, Methodology.Traceroute);
 
         MeasurementConditions = $"{context.InterfaceName} · порог "
                                 + $"{context.CalibrationBaselineMs.ToString("0.000", CultureInfo.InvariantCulture)} мс "

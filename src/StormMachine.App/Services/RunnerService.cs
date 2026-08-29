@@ -116,6 +116,12 @@ public sealed class RunnerService(RunOrchestrator orchestrator)
                 {
                     Save = save,
                     OnSample = queue.Enqueue,
+
+                    // В отличие от сэмплов, ход подготовки не копится в очереди:
+                    // сообщений тут единицы за прогон, и каждое надо показать сразу.
+                    // Именно оно объясняет оператору, почему прогон стоит и что
+                    // сделать на второй машине, чтобы он пошёл.
+                    OnProgress = message => Dispatcher.UIThread.Post(() => run.Report(message)),
                     PresetId = presetId,
                     PresetVersion = presetVersion,
                 },
