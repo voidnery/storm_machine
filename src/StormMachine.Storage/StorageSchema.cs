@@ -1,4 +1,4 @@
-using Microsoft.Data.Sqlite;
+﻿using Microsoft.Data.Sqlite;
 
 namespace StormMachine.Storage;
 
@@ -12,7 +12,7 @@ namespace StormMachine.Storage;
 internal static class StorageSchema
 {
     /// <summary>Текущая версия схемы. Растёт при каждом изменении структуры.</summary>
-    public const int CurrentVersion = 12;
+    public const int CurrentVersion = 13;
 
     public static void EnsureCreated(SqliteConnection connection)
     {
@@ -131,6 +131,12 @@ internal static class StorageSchema
         {
             UpgradeToVersion12(connection);
             version = 12;
+        }
+
+        if (version == 12)
+        {
+            UpgradeToVersion13(connection);
+            version = 13;
         }
 
         return version;
@@ -403,6 +409,92 @@ internal static class StorageSchema
     /// машину переименовали, площадка переехала. Отпечаток не меняется, он и есть
     /// личность агента, и агент, сменивший адрес, обязан остаться тем же агентом.
     /// </remarks>
+    /// <summary>
+    /// История наблюдений за оборудованием: счётчики портов и услышанное в эфире.
+    /// </summary>
+    /// <remarks>
+    /// Появилась в И-21. До неё оба вида данных продукт читать умел, а хранить — нет:
+    /// загрузка порта мерилась на месте и показывалась, услышанные соседи и серверы DHCP
+    /// показывались и забывались. Без истории нет ответа ни на «что было с портом ночью»,
+    /// ни на «когда появился этот сервер DHCP» — а это первые вопросы, которые задают,
+    /// увидев неладное.
+    /// <para>
+    /// Обе таблицы — временные ряды и растут линейно, поэтому попадают под ту же политику
+    /// хранения, что и сэмплы измерений. Иначе они превратили бы файл базы в проблему
+    /// ровно тем же способом, от которого политика и защищает.
+    /// </para>
+    /// </remarks>
+    private static void UpgradeToVersion13(SqliteConnection connection)
+    {
+        // Счётчики порта. Ключ включает момент: это ряд, а не текущее состояние.
+        //
+        // Значения счётчиков не хранятся сырыми — хранится уже посчитанная разница
+        // двух снимков. Сырой счётчик 32 бит переполняется на гигабитном порту
+        // за полминуты, и ряд таких значений без пометок о переполнении бесполезен;
+        // разница же считается в момент опроса, когда оба снимка на руках.
+        Execute(connection, """
+            CREATE TABLE IF NOT EXISTS port_load (
+                device        TEXT    NOT NULL,
+                if_index      INTEGER NOT NULL,
+                at_ticks      INTEGER NOT NULL,
+                if_name       TEXT,
+                interval_ms   INTEGER NOT NULL,
+                in_bps        REAL    NOT NULL,
+                out_bps       REAL    NOT NULL,
+                speed_bps     INTEGER NOT NULL,
+                in_errors     INTEGER NOT NULL,
+                out_errors    INTEGER NOT NULL,
+                in_discards   INTEGER NOT NULL,
+                out_discards  INTEGER NOT NULL,
+                PRIMARY KEY (device, if_index, at_ticks)
+            ) WITHOUT ROWID;
+            """);
+
+        // Выборка «что было с этим портом за сутки» идёт по ведущим колонкам ключа,
+        // а «что было со всем оборудованием за час» — по времени, и для второй нужен
+        // свой индекс.
+        Execute(connection, "CREATE INDEX IF NOT EXISTS ix_port_load_at ON port_load (at_ticks DESC);");
+
+        // Услышанные соседи. Ключ — кто и через какой наш порт: одно и то же
+        // соседство, услышанное десять раз, это одно соседство с обновлённым
+        // временем, а не десять записей.
+        Execute(connection, """
+            CREATE TABLE IF NOT EXISTS heard_neighbors (
+                local_if      TEXT    NOT NULL,
+                chassis       TEXT    NOT NULL,
+                port_id       TEXT    NOT NULL,
+                system_name   TEXT,
+                port_name     TEXT,
+                protocol      INTEGER NOT NULL,
+                first_seen    INTEGER NOT NULL,
+                last_seen     INTEGER NOT NULL,
+                PRIMARY KEY (local_if, chassis, port_id)
+            ) WITHOUT ROWID;
+            """);
+
+        Execute(
+            connection,
+            "CREATE INDEX IF NOT EXISTS ix_heard_neighbors_seen ON heard_neighbors (last_seen DESC);");
+
+        // Серверы DHCP. Здесь ключ включает то, что сервер раздаёт: сервер, начавший
+        // объявлять другой шлюз, — это событие, ради которого захват и слушают,
+        // и потерять его, обновив строку на месте, нельзя.
+        Execute(connection, """
+            CREATE TABLE IF NOT EXISTS heard_dhcp (
+                server        TEXT    NOT NULL,
+                offered_gw    TEXT    NOT NULL,
+                server_mac    TEXT,
+                offered_dns   TEXT    NOT NULL,
+                first_seen    INTEGER NOT NULL,
+                last_seen     INTEGER NOT NULL,
+                sightings     INTEGER NOT NULL,
+                PRIMARY KEY (server, offered_gw)
+            ) WITHOUT ROWID;
+            """);
+
+        Execute(connection, "CREATE INDEX IF NOT EXISTS ix_heard_dhcp_seen ON heard_dhcp (last_seen DESC);");
+    }
+
     private static void UpgradeToVersion12(SqliteConnection connection)
     {
         // Учётные данные SNMP. Пароли лежат зашифрованными средствами машины —

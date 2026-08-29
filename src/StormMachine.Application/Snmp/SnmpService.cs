@@ -1,4 +1,4 @@
-using StormMachine.Application.Abstractions;
+﻿using StormMachine.Application.Abstractions;
 using StormMachine.Domain.Discovery;
 using StormMachine.Domain.Snmp;
 
@@ -27,11 +27,26 @@ public sealed record PortLoad(SnmpInterface Interface, InterfaceLoad? Load, Load
 /// пробовался тот набор, который чаще подходит, а не тот, что завели раньше.
 /// </para>
 /// </remarks>
-public sealed class SnmpService(ISnmpClient client, ISnmpCredentialStore credentials)
+public sealed class SnmpService(
+    ISnmpClient client,
+    ISnmpCredentialStore credentials,
+    IObservationStore? observations = null)
 {
     private readonly ISnmpClient _client = client ?? throw new ArgumentNullException(nameof(client));
     private readonly ISnmpCredentialStore _credentials = credentials
         ?? throw new ArgumentNullException(nameof(credentials));
+
+    /// <summary>
+    /// История наблюдений. Необязательна: опрос осмыслен и без неё.
+    /// </summary>
+    /// <remarks>
+    /// Запись идёт здесь, а не в клиентах, по той же причине, по которой прогоны пишет
+    /// оркестратор, а не консоль с окном по отдельности: два места записи разойдутся,
+    /// и история будет зависеть от того, откуда спросили. До И-21 счётчики не писались
+    /// вовсе — мерились на месте, показывались и забывались, а спрашивают у продукта
+    /// «что было с портом ночью».
+    /// </remarks>
+    private readonly IObservationStore? _observations = observations;
 
     /// <summary>Есть ли вообще чем опрашивать.</summary>
     public async Task<bool> HasCredentialsAsync(CancellationToken cancellationToken = default) =>
@@ -177,7 +192,72 @@ public sealed class SnmpService(ISnmpClient client, ISnmpCredentialStore credent
             result.Add(new PortLoad(port, load, refusal));
         }
 
+        await RememberAsync(host, result, cancellationToken).ConfigureAwait(false);
+
         return result;
+    }
+
+    /// <summary>
+    /// Складывает посчитанную нагрузку в историю.
+    /// </summary>
+    /// <remarks>
+    /// В историю идёт разница двух снимков, а не сырые счётчики: сырой счётчик 32 бит
+    /// переполняется на гигабитном порту за 34 секунды, и ряд таких значений
+    /// без пометок о переполнении бесполезен. Разница же считается здесь, где оба
+    /// снимка на руках и известен промежуток.
+    /// <para>
+    /// Порты, у которых нагрузку посчитать не удалось, в историю не попадают: строка
+    /// с нулями означала бы «трафика не было», а на самом деле «не измерили».
+    /// </para>
+    /// <para>
+    /// Сбой записи не срывает опрос. Оператор спросил про нагрузку и обязан её увидеть;
+    /// история — следствие, а не цель вызова.
+    /// </para>
+    /// </remarks>
+    private async Task RememberAsync(
+        string host,
+        IReadOnlyList<PortLoad> ports,
+        CancellationToken cancellationToken)
+    {
+        if (_observations is null)
+        {
+            return;
+        }
+
+        var at = DateTimeOffset.UtcNow;
+
+        var points = ports
+            .Where(p => p.Load is not null)
+            .Select(p => new PortLoadPoint
+            {
+                Device = host,
+                IfIndex = p.Interface.Index,
+                IfName = p.Interface.Name,
+                AtUtc = at,
+                Interval = p.Load!.Interval,
+                InBitsPerSecond = p.Load.InBitsPerSecond,
+                OutBitsPerSecond = p.Load.OutBitsPerSecond,
+                SpeedBitsPerSecond = p.Load.SpeedBitsPerSecond,
+                InErrors = p.Load.InErrors,
+                OutErrors = p.Load.OutErrors,
+                InDiscards = p.Load.InDiscards,
+                OutDiscards = p.Load.OutDiscards,
+            })
+            .ToList();
+
+        if (points.Count == 0)
+        {
+            return;
+        }
+
+        try
+        {
+            await _observations.SavePortLoadAsync(points, cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or IOException)
+        {
+            // История не записалась — но измеренное оператор всё равно увидит.
+        }
     }
 
     /// <summary>

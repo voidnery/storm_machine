@@ -1,4 +1,4 @@
-using System.CommandLine;
+﻿using System.CommandLine;
 using System.Globalization;
 using Microsoft.Extensions.DependencyInjection;
 using StormMachine.Application.Abstractions;
@@ -34,6 +34,7 @@ internal static class SnmpCommand
         command.Subcommands.Add(BuildNeighbors(services));
         command.Subcommands.Add(BuildForwarding(services));
         command.Subcommands.Add(BuildWalk(services));
+        command.Subcommands.Add(HistoryCommands.CreatePortHistory(services));
 
         command.SetAction(async (_, cancellationToken) =>
         {

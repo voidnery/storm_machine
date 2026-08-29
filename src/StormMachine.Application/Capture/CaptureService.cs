@@ -1,4 +1,4 @@
-using StormMachine.Application.Abstractions;
+﻿using StormMachine.Application.Abstractions;
 using StormMachine.Domain.Capture;
 
 namespace StormMachine.Application.Capture;
@@ -16,7 +16,10 @@ namespace StormMachine.Application.Capture;
 /// работает как работало, а здесь честно сказано, чего не хватает и откуда это взять.
 /// </para>
 /// </remarks>
-public sealed class CaptureService(ICaptureProvider capture, INetworkEnvironment environment)
+public sealed class CaptureService(
+    ICaptureProvider capture,
+    INetworkEnvironment environment,
+    IObservationStore? observations = null)
 {
     /// <summary>Откуда берут драйвер. Продукт его не распространяет.</summary>
     public const string DriverSite = "https://npcap.com";
@@ -24,6 +27,18 @@ public sealed class CaptureService(ICaptureProvider capture, INetworkEnvironment
     private readonly ICaptureProvider _capture = capture ?? throw new ArgumentNullException(nameof(capture));
     private readonly INetworkEnvironment _environment = environment
         ?? throw new ArgumentNullException(nameof(environment));
+
+    /// <summary>
+    /// История услышанного. Необязательна: прослушивание осмысленно и без неё.
+    /// </summary>
+    /// <remarks>
+    /// До И-21 услышанное показывалось и забывалось, и это обесценивало половину
+    /// уровня 2. Посторонний сервер DHCP сам по себе ничего не доказывает — две
+    /// законные пары в одном домене встречаются не реже подставного сервера; а вот
+    /// сервер, появившийся вчера, это уже событие. Ответить на «когда появился»
+    /// без истории нельзя.
+    /// </remarks>
+    private readonly IObservationStore? _observations = observations;
 
     public CaptureRefusal Availability => _capture.Availability;
 
@@ -101,11 +116,30 @@ public sealed class CaptureService(ICaptureProvider capture, INetworkEnvironment
         return adapters.FirstOrDefault(a => !a.IsLoopback) ?? adapters[0];
     }
 
-    public Task<CaptureResult> ListenAsync(
+    public async Task<CaptureResult> ListenAsync(
         CaptureAdapter adapter,
         CaptureOptions options,
-        CancellationToken cancellationToken = default) =>
-        _capture.ListenAsync(adapter, options, cancellationToken);
+        CancellationToken cancellationToken = default)
+    {
+        var result = await _capture.ListenAsync(adapter, options, cancellationToken).ConfigureAwait(false);
+
+        if (_observations is not null)
+        {
+            try
+            {
+                // CancellationToken.None намеренно: прослушивание закончилось, услышанное
+                // на руках, и терять его из-за той же отмены, которая его прервала,
+                // было бы обидно вдвойне — второй раз услышать то же самое нельзя.
+                await _observations.SaveCaptureAsync(result, CancellationToken.None).ConfigureAwait(false);
+            }
+            catch (Exception ex) when (ex is InvalidOperationException or IOException)
+            {
+                // История не записалась — но услышанное оператор всё равно увидит.
+            }
+        }
+
+        return result;
+    }
 
     /// <summary>
     /// Шлюзы, известные системе, — чтобы отличить объявленный DHCP-сервером шлюз от нашего.

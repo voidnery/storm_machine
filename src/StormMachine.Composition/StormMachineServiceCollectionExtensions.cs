@@ -1,4 +1,4 @@
-using Microsoft.Extensions.DependencyInjection;
+﻿using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using StormMachine.Application;
 using StormMachine.Agents;
@@ -145,6 +145,12 @@ public static class StormMachineServiceCollectionExtensions
         services.AddSingleton<IBaselineStore>(provider => new SqliteBaselineStore(
             (SqliteRunStore)provider.GetRequiredService<IRunStore>()));
 
+        // История наблюдений за оборудованием (И-21): счётчики портов и услышанное
+        // в эфире. До неё оба вида данных продукт читал и забывал, а спрашивают у него
+        // «что было ночью» и «когда этот сервер появился».
+        services.AddSingleton<IObservationStore>(provider => new SqliteObservationStore(
+            (SqliteRunStore)provider.GetRequiredService<IRunStore>()));
+
         // Отчёты. Движок PDF спрятан за IReportRenderer — замена стоит день, а не месяц.
         services.AddSingleton<IReportRenderer, PdfReportRenderer>();
 
@@ -213,6 +219,21 @@ public static class StormMachineServiceCollectionExtensions
 
         var store = services.GetRequiredService<IRunStore>();
         await store.InitializeAsync(cancellationToken).ConfigureAwait(false);
+
+        // Наблюдения убираются по тому же горизонту, что и прогоны: это временные ряды,
+        // растущие линейно, и без ограничения они превратили бы файл базы в проблему
+        // ровно тем же способом, от которого политика хранения и защищает.
+        try
+        {
+            await services.GetRequiredService<IObservationStore>()
+                .ApplyRetentionAsync(Domain.Results.RetentionPolicy.Default.RunHorizon, cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or IOException)
+        {
+            // Уборка истории — не условие работы продукта. Не убралось сегодня —
+            // уберётся завтра, а измерять надо сейчас.
+        }
 
         var clock = services.GetRequiredService<IHighResolutionClock>();
         await clock.CalibrateAsync(cancellationToken).ConfigureAwait(false);

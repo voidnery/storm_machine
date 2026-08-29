@@ -1,4 +1,4 @@
-using System.CommandLine;
+﻿using System.CommandLine;
 using System.Globalization;
 using Microsoft.Extensions.DependencyInjection;
 using StormMachine.Application.Abstractions;
@@ -30,6 +30,7 @@ internal static class CaptureCommand
 
         command.Subcommands.Add(BuildDevices(services));
         command.Subcommands.Add(BuildListen(services));
+        command.Subcommands.Add(HistoryCommands.CreateHeardHistory(services));
 
         command.SetAction((_, _) =>
         {
