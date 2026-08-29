@@ -27,6 +27,7 @@ internal static class TopologyRenderer
         TopologyNodeKind.ThisMachine => "◉",
         TopologyNodeKind.Subnet => "▤",
         TopologyNodeKind.Router => "◈",
+        TopologyNodeKind.Switch => "▥",
         TopologyNodeKind.HostGroup => "▪▪",
         TopologyNodeKind.ExternalHop => "○",
         TopologyNodeKind.Internet => "☁",
@@ -266,7 +267,13 @@ internal static class TopologyRenderer
             Console.WriteLine();
             Console.WriteLine($"  Выведенных связей {graph.InferredLinks} из {graph.Links.Count} "
                               + $"({share.ToString("0", CultureInfo.InvariantCulture)}%). Это не ошибки:");
-            Console.WriteLine("  без SNMP и захвата пакетов часть связей приходится выводить по правилам.");
+            // Оговорка меняется по факту: сказать «без SNMP» на карте, построенной
+            // с опросом, значило бы объяснять оставшиеся догадки отсутствием того,
+            // что уже сделано.
+            Console.WriteLine(graph.Nodes.Any(n => n.Kind == TopologyNodeKind.Switch)
+                ? "  опрос по SNMP закрыл часть связей, остальные выведены по правилам."
+                : "  без SNMP и захвата пакетов часть связей приходится выводить по правилам.");
+
             Console.WriteLine("  Каждая выведенная связь названа причиной — её можно проверить и оспорить.");
         }
     }

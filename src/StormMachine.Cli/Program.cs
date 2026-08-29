@@ -140,6 +140,7 @@ internal static class Program
         root.Subcommands.Add(EnvCommand.Create(services));
         root.Subcommands.Add(ProfilesCommand.Create(services));
         root.Subcommands.Add(SnmpCommand.Create(services));
+        root.Subcommands.Add(CaptureCommand.Create(services));
         root.Subcommands.Add(BuildProbesCommand(services));
         root.Subcommands.Add(BuildCapabilitiesCommand(services));
         root.Subcommands.Add(BuildAboutCommand(services));

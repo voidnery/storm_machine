@@ -1,67 +1,6 @@
+using StormMachine.Domain.Discovery;
+
 namespace StormMachine.Domain.Snmp;
-
-/// <summary>Каким протоколом обнаружен сосед.</summary>
-public enum NeighborProtocol
-{
-    /// <summary>IEEE 802.1AB — стандарт, понимают почти все.</summary>
-    Lldp,
-
-    /// <summary>Cisco Discovery Protocol — там, где LLDP выключен.</summary>
-    Cdp,
-}
-
-/// <summary>
-/// Сосед, о котором устройство объявило само.
-/// </summary>
-/// <remarks>
-/// Самое ценное свидетельство о топологии второго уровня, какое вообще бывает:
-/// два устройства согласованно утверждают, что соединены, и называют порты
-/// с обеих сторон. Ни ARP, ни трассировка такого не дают — они говорят
-/// «в одном сегменте», а не «этим проводом в этот порт».
-/// <para>
-/// Оговорка, которую нельзя опускать: между двумя устройствами с LLDP может стоять
-/// неуправляемый коммутатор, и тогда они всё равно видят друг друга соседями.
-/// Связь настоящая, но «прямая» она только логически.
-/// </para>
-/// </remarks>
-public sealed record SnmpNeighbor
-{
-    public required NeighborProtocol Protocol { get; init; }
-
-    /// <summary>Наш порт, на котором виден сосед. <c>ifIndex</c> локального устройства.</summary>
-    public required int LocalIfIndex { get; init; }
-
-    /// <summary>Имя нашего порта, если удалось сопоставить.</summary>
-    public string? LocalPort { get; init; }
-
-    /// <summary>Как сосед себя называет: <c>lldpRemSysName</c> или <c>cdpCacheDeviceId</c>.</summary>
-    public string? RemoteName { get; init; }
-
-    /// <summary>Идентификатор шасси соседа — обычно его базовый MAC.</summary>
-    public string? RemoteChassisId { get; init; }
-
-    /// <summary>Порт соседа, которым он к нам подключён.</summary>
-    public string? RemotePort { get; init; }
-
-    /// <summary>Описание порта соседа — часто содержит подпись администратора.</summary>
-    public string? RemotePortDescription { get; init; }
-
-    /// <summary>Модель и прошивка соседа, если объявлены.</summary>
-    public string? RemoteDescription { get; init; }
-
-    /// <summary>Адрес управления соседа, если он его объявил.</summary>
-    public string? RemoteAddress { get; init; }
-
-    /// <summary>Как назвать соседа в отчёте и на карте.</summary>
-    public string DisplayName =>
-        RemoteName ?? RemoteAddress ?? RemoteChassisId ?? "сосед без имени";
-
-    /// <summary>Строка «почему» для связи на карте.</summary>
-    public string Because =>
-        $"{(Protocol == NeighborProtocol.Lldp ? "LLDP" : "CDP")}: "
-        + $"порт {LocalPort ?? LocalIfIndex.ToString(System.Globalization.CultureInfo.InvariantCulture)}"
-        + (RemotePort is null ? string.Empty : $" ↔ {RemotePort}");
-}
 
 /// <summary>
 /// Строка таблицы пересылки: какой MAC виден на каком порту.
@@ -117,7 +56,7 @@ public sealed record SwitchPort
 {
     public required SnmpInterface Interface { get; init; }
 
-    public IReadOnlyList<SnmpNeighbor> Neighbors { get; init; } = [];
+    public IReadOnlyList<LinkNeighbor> Neighbors { get; init; } = [];
 
     public IReadOnlyList<ForwardingEntry> Addresses { get; init; } = [];
 
@@ -157,7 +96,7 @@ public sealed record SnmpDevice
 
     public IReadOnlyList<SnmpInterface> Interfaces { get; init; } = [];
 
-    public IReadOnlyList<SnmpNeighbor> Neighbors { get; init; } = [];
+    public IReadOnlyList<LinkNeighbor> Neighbors { get; init; } = [];
 
     public IReadOnlyList<ForwardingEntry> Forwarding { get; init; } = [];
 

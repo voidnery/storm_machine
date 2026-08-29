@@ -29,6 +29,7 @@ public sealed class ArchitectureRulesTests
         "StormMachine.Discovery",
         "StormMachine.Reporting",
         "StormMachine.Scheduling",
+        "StormMachine.Snmp",
         "StormMachine.Agents",
     ];
 
@@ -119,6 +120,45 @@ public sealed class ArchitectureRulesTests
             $"Alerting ссылается на посторонние проекты: {string.Join(", ", unexpected)}. "
             + "Каналы — реализация порта IAlertChannel и знают ровно столько же, "
             + "сколько хранилище или пробы.");
+    }
+
+    [Fact(DisplayName = "Правило 2б: захват пакетов живёт только в плагине")]
+    public void Capture_LivesOnlyInPlugins()
+    {
+        // Условие приёмки И-18. Уровень 2 необязателен: продукт обязан работать
+        // полностью и без драйвера захвата, который не входит в поставку ни при каких
+        // условиях. Ссылка на SharpPcap, просочившаяся в src/, сделала бы захват
+        // частью ядра — и первое же обращение к нему у пользователя без Npcap
+        // перестало бы быть его добровольным выбором.
+        var leaks = RepositoryLayout.SourceProjects
+            .Where(p => p.PackageReferences.Any(r =>
+                r.Contains("SharpPcap", StringComparison.OrdinalIgnoreCase)
+                || r.Contains("PacketDotNet", StringComparison.OrdinalIgnoreCase)))
+            .Select(p => p.Name)
+            .ToList();
+
+        Assert.True(
+            leaks.Count == 0,
+            $"Захват пакетов просочился в src/: {string.Join(", ", leaks)}. "
+            + "SharpPcap разрешён только в plugins/.");
+
+        var plugin = RepositoryLayout.PluginProjects
+            .FirstOrDefault(p => p.Name == "StormMachine.Capture.Npcap");
+
+        Assert.NotNull(plugin);
+
+        Assert.Contains(
+            plugin!.PackageReferences,
+            r => r.Contains("SharpPcap", StringComparison.OrdinalIgnoreCase));
+
+        // Плагин видит только слой приложения: реализовать порт — вся его работа.
+        var unexpected = plugin.ProjectReferences
+            .Where(r => !r.Contains("StormMachine.Application", StringComparison.Ordinal))
+            .ToList();
+
+        Assert.True(
+            unexpected.Count == 0,
+            $"Плагин захвата ссылается на посторонние проекты: {string.Join(", ", unexpected)}.");
     }
 
     [Fact(DisplayName = "Правило 3: представление не знает об инфраструктуре")]

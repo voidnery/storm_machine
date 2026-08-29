@@ -3,6 +3,7 @@ using StormMachine.Application.Capabilities;
 using StormMachine.Application.Probes;
 using StormMachine.Domain.Agents;
 using StormMachine.Domain.Capabilities;
+using StormMachine.Domain.Capture;
 using StormMachine.Domain.Measurements;
 using StormMachine.Domain.Results;
 
@@ -45,11 +46,10 @@ public sealed class CapabilityInspectorTests
             {
                 IsElevated = elevated,
                 CanOpenRawSockets = rawSockets,
-                IsCaptureDriverInstalled = captureDriver,
-                CaptureDriverDescription = captureDriver ? "Npcap 1.79" : null,
             },
             new FakeAgentStore(agents),
-            new FakeEnvironment());
+            new FakeEnvironment(),
+            new FakeCapture(captureDriver));
 
     private static Capability Find(CapabilityReport report, string id) =>
         report.Capabilities.Single(c => c.Id == id);
@@ -135,25 +135,58 @@ public sealed class CapabilityInspectorTests
         // Строка на экране — единственное место, где это видит оператор.
         var report = await Inspector([Descriptor("ping")]).InspectAsync();
 
-        var capture = Find(report, "capture.plugin");
+        var capture = Find(report, "capture.neighbors");
 
-        Assert.Equal(CapabilityState.Planned, capture.State);
+        Assert.Equal(CapabilityState.NeedsDriver, capture.State);
         Assert.Contains("не распространяет", capture.HowToEnable, StringComparison.Ordinal);
         Assert.Equal(CapabilityInspector.CaptureDriverSite, capture.Where);
     }
 
-    [Fact(DisplayName = "Найденный драйвер захвата не выдаётся за готовую возможность")]
-    public async Task InstalledDriverIsNotEnough()
+    [Fact(DisplayName = "С драйвером возможности уровня 2 появляются")]
+    public async Task DriverEnablesCapture()
     {
-        // Драйвер есть, а плагина в продукте нет. Показать «доступно» значило бы
-        // пообещать то, чего в этом выпуске просто не написано.
+        // Условие приёмки И-18: без Npcap продукт работает и честно говорит, чего
+        // не хватает; с Npcap функции появляются. До И-18 здесь стояло «запланировано»,
+        // потому что плагина не было, — теперь он есть, и проверка это закрепляет.
         var report = await Inspector([Descriptor("ping")], captureDriver: true).InspectAsync();
 
-        var capture = Find(report, "capture.plugin");
+        Assert.Equal(CapabilityState.Available, Find(report, "capture.neighbors").State);
+        Assert.Equal(CapabilityState.Available, Find(report, "capture.dhcp").State);
+        Assert.Equal(CapabilityState.Available, report.StateOf(CapabilityLevel.Capture));
 
-        Assert.Equal(CapabilityState.Planned, capture.State);
+        var capture = Find(report, "capture.neighbors");
+
         Assert.Contains("Npcap 1.79", capture.Detail, StringComparison.Ordinal);
         Assert.Null(capture.Where);
+    }
+
+    [Fact(DisplayName = "Драйвер, не пускающий без прав, отличается от отсутствующего")]
+    public async Task DeniedDriverIsDistinct()
+    {
+        // Два разных совета: в одном случае ставить драйвер, в другом — перезапуститься
+        // администратором. Склеить их в «недоступно» значит послать человека вслепую.
+        var inspector = new CapabilityInspector(
+            new DescriptorRegistry([Descriptor("ping")]),
+            new FakeSystemCapabilities(),
+            new FakeAgentStore(0),
+            new FakeEnvironment(),
+            new FakeCapture(CaptureRefusal.NeedsElevation));
+
+        var capture = Find(await inspector.InspectAsync(), "capture.neighbors");
+
+        Assert.Equal(CapabilityState.NeedsElevation, capture.State);
+        Assert.Contains("администратора", capture.HowToEnable, StringComparison.Ordinal);
+    }
+
+    [Fact(DisplayName = "SNMP без учётных данных ждёт их, а не числится запланированным")]
+    public async Task SnmpNeedsCredentials()
+    {
+        // До И-17 здесь стояло «запланировано». Оставить это после того, как опрос
+        // сделан, — та же ложь, что спрятать недоступное.
+        var capture = Find(await Inspector([Descriptor("ping")]).InspectAsync(), "snmp");
+
+        Assert.Equal(CapabilityState.NeedsCredentials, capture.State);
+        Assert.Contains("storm snmp creds add", capture.HowToEnable, StringComparison.Ordinal);
     }
 
     [Fact(DisplayName = "Недоступное хранилище агентов не роняет сводку")]
@@ -182,6 +215,26 @@ public sealed class CapabilityInspectorTests
 
             return false;
         }
+    }
+
+    /// <summary>Плагин захвата, отвечающий заданным состоянием.</summary>
+    private sealed class FakeCapture(CaptureRefusal refusal) : ICaptureProvider
+    {
+        public FakeCapture(bool driver)
+            : this(driver ? CaptureRefusal.None : CaptureRefusal.NoDriver)
+        {
+        }
+
+        public CaptureRefusal Availability { get; } = refusal;
+
+        public string? DriverDescription => Availability == CaptureRefusal.NoDriver ? null : "Npcap 1.79";
+
+        public IReadOnlyList<CaptureAdapter> Adapters() => [];
+
+        public Task<CaptureResult> ListenAsync(
+            CaptureAdapter adapter,
+            CaptureOptions options,
+            CancellationToken cancellationToken = default) => throw new NotSupportedException();
     }
 
     private sealed class FakeSystemCapabilities : ISystemCapabilities

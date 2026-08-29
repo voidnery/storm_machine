@@ -49,7 +49,7 @@ public sealed class TopologySwitchTests
         string address = "192.168.1.2",
         string name = "sw-access-01",
         IReadOnlyList<ForwardingEntry>? forwarding = null,
-        IReadOnlyList<SnmpNeighbor>? neighbors = null) => new()
+        IReadOnlyList<LinkNeighbor>? neighbors = null) => new()
     {
         Address = address,
         System = new SnmpSystem { Description = "Test switch, 8 ports", Name = name, Services = 2 },
@@ -129,7 +129,7 @@ public sealed class TopologySwitchTests
                     forwarding: [Entry("AA-BB-CC-00-00-01", 1, "Gi0/1")],
                     neighbors:
                     [
-                        new SnmpNeighbor
+                        new LinkNeighbor
                         {
                             Protocol = NeighborProtocol.Lldp,
                             LocalIfIndex = 1,
@@ -158,7 +158,7 @@ public sealed class TopologySwitchTests
             [
                 Switch(neighbors:
                 [
-                    new SnmpNeighbor
+                    new LinkNeighbor
                     {
                         Protocol = NeighborProtocol.Lldp,
                         LocalIfIndex = 1,
@@ -191,7 +191,7 @@ public sealed class TopologySwitchTests
             [
                 Switch(neighbors:
                 [
-                    new SnmpNeighbor
+                    new LinkNeighbor
                     {
                         Protocol = NeighborProtocol.Lldp,
                         LocalIfIndex = 1,
@@ -215,7 +215,7 @@ public sealed class TopologySwitchTests
             name: "sw-access-01",
             neighbors:
             [
-                new SnmpNeighbor
+                new LinkNeighbor
                 {
                     Protocol = NeighborProtocol.Lldp,
                     LocalIfIndex = 1,
@@ -271,6 +271,68 @@ public sealed class TopologySwitchTests
             l.From == "сеть:192.168.1.0/24" && l.To == "свитч:192.168.1.2");
 
         Assert.Equal(LinkConfidence.Confirmed, link.Confidence);
+    }
+
+    // -------------------------------------------------------- услышанное своим адаптером
+
+    [Fact(DisplayName = "Услышанный сосед цепляется к этой машине, а не к подсети")]
+    public void HeardNeighborHangsOnThisMachine()
+    {
+        // Кадр пришёл к нам и утверждает ровно одно: вот к этому устройству и вот
+        // в этот его порт подключены мы сами. Ни один другой источник на этот вопрос
+        // без учётных данных не отвечает.
+        var graph = TopologyGraph.Build(new TopologyInput
+        {
+            Subnets = [Subnet()],
+            Neighbors =
+            [
+                new LinkNeighbor
+                {
+                    Protocol = NeighborProtocol.Lldp,
+                    Source = NeighborSource.Capture,
+                    LocalIfIndex = 0,
+                    LocalPort = "Ethernet",
+                    RemoteName = "sw-access-01",
+                    RemotePort = "Gi0/7",
+                },
+            ],
+        });
+
+        var link = graph.Links.Single(l => l.To.Contains("sw-access-01", StringComparison.Ordinal));
+
+        Assert.Equal(TopologyGraph.ThisMachineId, link.From);
+        Assert.Equal(LinkConfidence.Confirmed, link.Confidence);
+        Assert.Contains("Gi0/7", link.Because, StringComparison.Ordinal);
+        Assert.Contains("услышан своим адаптером", link.Because, StringComparison.Ordinal);
+        Assert.Contains("подключены мы сами", link.Because, StringComparison.Ordinal);
+    }
+
+    [Fact(DisplayName = "Опрошенный и услышанный — один узел, а не два")]
+    public void HeardAndPolledMerge()
+    {
+        // Иначе на карте появился бы двойник: тот же коммутатор под тем же именем,
+        // но отдельным прямоугольником, и связи разошлись бы по двум узлам.
+        var graph = TopologyGraph.Build(new TopologyInput
+        {
+            Subnets = [Subnet()],
+            Switches = [Switch(address: "192.168.1.2", name: "sw-access-01")],
+            Neighbors =
+            [
+                new LinkNeighbor
+                {
+                    Protocol = NeighborProtocol.Lldp,
+                    Source = NeighborSource.Capture,
+                    LocalIfIndex = 0,
+                    LocalPort = "Ethernet",
+                    RemoteName = "sw-access-01",
+                    RemotePort = "Gi0/7",
+                },
+            ],
+        });
+
+        Assert.Single(graph.Nodes, n => n.Label == "sw-access-01");
+        Assert.Contains(graph.Links, l => l.From == TopologyGraph.ThisMachineId
+                                          && l.To == "свитч:192.168.1.2");
     }
 
     [Fact(DisplayName = "Карта не зависит от порядка опрошенных устройств")]

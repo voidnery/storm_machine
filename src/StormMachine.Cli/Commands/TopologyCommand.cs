@@ -48,6 +48,13 @@ internal static class TopologyCommand
             AllowMultipleArgumentsPerToken = true,
         };
 
+        // Прослушивание — тоже отдельным ключом: оно занимает десятки секунд,
+        // и делать его при каждом взгляде на карту незачем.
+        var captureOption = new Option<int>("--захват", "--capture")
+        {
+            Description = "Послушать эфир столько секунд и узнать, в чей порт воткнуты мы сами.",
+        };
+
         var jsonOption = new Option<string>("--json")
         {
             Description = "Записать карту в файл JSON.",
@@ -61,6 +68,7 @@ internal static class TopologyCommand
             noVirtualOption,
             snmpOption,
             deviceOption,
+            captureOption,
             jsonOption,
         };
 
@@ -79,6 +87,8 @@ internal static class TopologyCommand
                     CollapseThreshold = parseResult.GetValue(expandOption) ? int.MaxValue : 12,
                     UseSnmp = parseResult.GetValue(snmpOption),
                     SnmpTargets = parseResult.GetValue(deviceOption) ?? [],
+                    UseCapture = parseResult.GetValue(captureOption) > 0,
+                    CaptureDuration = TimeSpan.FromSeconds(Math.Max(1, parseResult.GetValue(captureOption))),
                 },
                 Console.WriteLine,
                 cancellationToken).ConfigureAwait(false);

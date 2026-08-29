@@ -19,6 +19,7 @@
     <ProjectReference Include="..\StormMachine.Probes\StormMachine.Probes.csproj" />
     <ProjectReference Include="..\StormMachine.Reporting\StormMachine.Reporting.csproj" />
     <ProjectReference Include="..\StormMachine.Snmp\StormMachine.Snmp.csproj" />
+    <ProjectReference Include="..\..\plugins\StormMachine.Capture.Npcap\StormMachine.Capture.Npcap.csproj" />
     <ProjectReference Include="..\StormMachine.Storage\StormMachine.Storage.csproj" />
   </ItemGroup>
 

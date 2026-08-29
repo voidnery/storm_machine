@@ -1,4 +1,5 @@
 using StormMachine.Application.Abstractions;
+using StormMachine.Domain.Discovery;
 using StormMachine.Domain.Snmp;
 
 namespace StormMachine.Application.Snmp;
@@ -237,8 +238,8 @@ public sealed class SnmpService(ISnmpClient client, ISnmpCredentialStore credent
     }
 
     /// <summary>Подставляет имена портов к соседям: <c>ifIndex</c> человеку ничего не говорит.</summary>
-    private static IReadOnlyList<SnmpNeighbor> Named(
-        IReadOnlyList<SnmpNeighbor> neighbors,
+    private static IReadOnlyList<LinkNeighbor> Named(
+        IReadOnlyList<LinkNeighbor> neighbors,
         IReadOnlyList<SnmpInterface> interfaces)
     {
         var names = interfaces.ToDictionary(i => i.Index, i => i.Name);

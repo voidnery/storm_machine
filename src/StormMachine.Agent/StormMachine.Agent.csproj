@@ -19,6 +19,14 @@
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <PublishTrimmed>true</PublishTrimmed>
     <InvariantGlobalization>true</InvariantGlobalization>
+
+    <!-- Нативные библиотеки — внутрь бинаря. Сегодня агенту нечего складывать
+         рядом: он ссылается только на протокол. Но tools/pack-agent.sh копирует
+         на площадку РОВНО ОДИН ФАЙЛ, и в этом весь смысл портативности агента.
+         Стоит появиться первой нативной зависимости — и без этой строки скрипт
+         молча увезёт заказчику нерабочий бинарь. Строка стоит заранее именно
+         потому, что цена её отсутствия платится не здесь и не сразу. -->
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
   </PropertyGroup>
 
   <ItemGroup>

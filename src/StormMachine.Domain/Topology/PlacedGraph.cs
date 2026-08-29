@@ -54,6 +54,7 @@ public sealed record PlacedGraph
         TopologyNodeKind.ThisMachine => (170, 46),
         TopologyNodeKind.Subnet => (190, 44),
         TopologyNodeKind.Router => (170, 44),
+        TopologyNodeKind.Switch => (180, 44),
         TopologyNodeKind.Internet => (140, 44),
         TopologyNodeKind.HostGroup => (170, 40),
         _ => (180, 38),

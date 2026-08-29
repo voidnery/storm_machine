@@ -1,6 +1,7 @@
 using System.Globalization;
 using StormMachine.Application.Abstractions;
 using StormMachine.Application.Snmp;
+using StormMachine.Domain.Discovery;
 using StormMachine.Domain.Snmp;
 
 namespace StormMachine.Cli.Rendering;
@@ -218,7 +219,7 @@ internal static class SnmpRenderer
             Console.WriteLine(
                 $"  {Cut(neighbor.LocalPort ?? neighbor.LocalIfIndex.ToString(CultureInfo.InvariantCulture), 20),-20} "
                 + $"{Cut(neighbor.DisplayName, 28),-28} {Cut(neighbor.RemotePort ?? "—", 22),-22} "
-                + (neighbor.Protocol == NeighborProtocol.Lldp ? "LLDP" : "CDP"));
+                + neighbor.ProtocolName);
         }
 
         Console.WriteLine();

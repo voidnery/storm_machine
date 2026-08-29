@@ -1,3 +1,4 @@
+using StormMachine.Domain.Discovery;
 using StormMachine.Domain.Snmp;
 
 namespace StormMachine.Application.Abstractions;
@@ -71,7 +72,7 @@ public interface ISnmpClient
         CancellationToken cancellationToken = default);
 
     /// <summary>Соседи по LLDP и CDP.</summary>
-    Task<IReadOnlyList<SnmpNeighbor>> GetNeighborsAsync(
+    Task<IReadOnlyList<LinkNeighbor>> GetNeighborsAsync(
         string host,
         SnmpCredential credential,
         CancellationToken cancellationToken = default);

@@ -314,6 +314,10 @@ public sealed class TopologyCanvas : Control
     {
         TopologyNodeKind.ThisMachine => Accent,
         TopologyNodeKind.Router => Accent,
+
+        // Коммутатор — свой цвет: он появляется только при опросе по SNMP,
+        // и отличать его от выведенного по правилам маршрутизатора важно.
+        TopologyNodeKind.Switch => new SolidColorBrush(Color.Parse("#7DD3A0")),
         TopologyNodeKind.Subnet => new SolidColorBrush(Color.Parse("#4B5A72")),
         TopologyNodeKind.Internet => Warning,
         TopologyNodeKind.HostGroup => new SolidColorBrush(Color.Parse("#4B5A72")),

@@ -1,5 +1,6 @@
 using Lextm.SharpSnmpLib;
 using StormMachine.Application.Abstractions;
+using StormMachine.Domain.Discovery;
 using StormMachine.Domain.Snmp;
 using SnmpException = StormMachine.Application.Abstractions.SnmpException;
 
@@ -183,14 +184,14 @@ public sealed class SharpSnmpClient : ISnmpClient
         ];
     }
 
-    public async Task<IReadOnlyList<SnmpNeighbor>> GetNeighborsAsync(
+    public async Task<IReadOnlyList<LinkNeighbor>> GetNeighborsAsync(
         string host,
         SnmpCredential credential,
         CancellationToken cancellationToken = default)
     {
         var session = await SnmpSession.OpenAsync(host, credential, cancellationToken).ConfigureAwait(false);
 
-        var found = new List<SnmpNeighbor>();
+        var found = new List<LinkNeighbor>();
 
         found.AddRange(await Lldp(session, cancellationToken).ConfigureAwait(false));
 
@@ -263,7 +264,7 @@ public sealed class SharpSnmpClient : ISnmpClient
 
     // ------------------------------------------------------------------ соседи
 
-    private static async Task<IReadOnlyList<SnmpNeighbor>> Lldp(
+    private static async Task<IReadOnlyList<LinkNeighbor>> Lldp(
         SnmpSession session,
         CancellationToken cancellationToken)
     {
@@ -280,7 +281,7 @@ public sealed class SharpSnmpClient : ISnmpClient
         var descriptions = await Index(session, Oids.LldpRemSysDesc, cancellationToken).ConfigureAwait(false);
         var portDescriptions = await Index(session, Oids.LldpRemPortDesc, cancellationToken).ConfigureAwait(false);
 
-        var found = new List<SnmpNeighbor>();
+        var found = new List<LinkNeighbor>();
 
         foreach (var entry in ports)
         {
@@ -294,7 +295,7 @@ public sealed class SharpSnmpClient : ISnmpClient
                 continue;
             }
 
-            found.Add(new SnmpNeighbor
+            found.Add(new LinkNeighbor
             {
                 Protocol = NeighborProtocol.Lldp,
                 LocalIfIndex = parts[1],
@@ -309,7 +310,7 @@ public sealed class SharpSnmpClient : ISnmpClient
         return found;
     }
 
-    private static async Task<IReadOnlyList<SnmpNeighbor>> Cdp(
+    private static async Task<IReadOnlyList<LinkNeighbor>> Cdp(
         SnmpSession session,
         CancellationToken cancellationToken)
     {
@@ -324,7 +325,7 @@ public sealed class SharpSnmpClient : ISnmpClient
         var ports = await Index(session, Oids.CdpCacheDevicePort, cancellationToken).ConfigureAwait(false);
         var platforms = await Index(session, Oids.CdpCachePlatform, cancellationToken).ConfigureAwait(false);
 
-        var found = new List<SnmpNeighbor>();
+        var found = new List<LinkNeighbor>();
 
         foreach (var entry in devices)
         {
@@ -337,7 +338,7 @@ public sealed class SharpSnmpClient : ISnmpClient
                 continue;
             }
 
-            found.Add(new SnmpNeighbor
+            found.Add(new LinkNeighbor
             {
                 Protocol = NeighborProtocol.Cdp,
                 LocalIfIndex = parts[0],

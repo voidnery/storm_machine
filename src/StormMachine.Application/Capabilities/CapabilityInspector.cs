@@ -1,6 +1,8 @@
 using StormMachine.Application.Abstractions;
+using System.Globalization;
 using StormMachine.Application.Probes;
 using StormMachine.Domain.Capabilities;
+using StormMachine.Domain.Capture;
 
 namespace StormMachine.Application.Capabilities;
 
@@ -21,13 +23,20 @@ public sealed class CapabilityInspector(
     IProbeRegistry probes,
     ISystemCapabilities system,
     IAgentStore agents,
-    INetworkEnvironment environment)
+    INetworkEnvironment environment,
+    ICaptureProvider? capture = null,
+    ISnmpCredentialStore? snmp = null)
 {
     private readonly IProbeRegistry _probes = probes ?? throw new ArgumentNullException(nameof(probes));
     private readonly ISystemCapabilities _system = system ?? throw new ArgumentNullException(nameof(system));
     private readonly IAgentStore _agents = agents ?? throw new ArgumentNullException(nameof(agents));
     private readonly INetworkEnvironment _environment = environment
         ?? throw new ArgumentNullException(nameof(environment));
+
+    /// <summary>Плагин захвата. Может отсутствовать: уровень 2 необязателен целиком.</summary>
+    private readonly ICaptureProvider? _capture = capture;
+
+    private readonly ISnmpCredentialStore? _snmp = snmp;
 
     /// <summary>Адрес, откуда берут Npcap. Продукт его не распространяет.</summary>
     public const string CaptureDriverSite = "https://npcap.com";
@@ -40,7 +49,7 @@ public sealed class CapabilityInspector(
 
         found.AddRange(Probes(paired));
         found.AddRange(Core());
-        found.Add(Snmp());
+        found.Add(await SnmpAsync(cancellationToken).ConfigureAwait(false));
         found.AddRange(Capture());
 
         return new CapabilityReport
@@ -131,8 +140,13 @@ public sealed class CapabilityInspector(
             Level = CapabilityLevel.Core,
             State = CapabilityState.Limited,
             Detail = "Связи второго уровня выводятся эвристиками: кто с каким портом свитча "
-                     + "соединён, без SNMP не узнать.",
-            HowToEnable = "Точная L2-топология появится с уровнем 1.",
+                     + "соединён, само по себе ядро не знает.",
+
+            // До И-17 здесь стояло «появится с уровнем 1». Уровни сделаны, и строка
+            // обязана называть действие, а не срок: обещание, пережившее свой срок,
+            // хуже отсутствия обещания.
+            HowToEnable = "Точную привязку к портам даёт уровень 1: storm snmp creds add. "
+                          + "Свой порт на коммутаторе — уровень 2: storm topology --захват 60.",
         };
 
         yield return new Capability
@@ -177,40 +191,118 @@ public sealed class CapabilityInspector(
         };
     }
 
-    private static Capability Snmp() => new()
+    /// <summary>
+    /// Возможности уровня 1.
+    /// </summary>
+    /// <remarks>
+    /// С И-17 опрос в продукте есть, и состояние определяется одним: заведены ли
+    /// учётные данные. Оставить здесь «запланировано» после того, как возможность
+    /// сделана, — та же ложь, что и спрятать недоступное: экран возможностей ценен
+    /// ровно настолько, насколько ему можно верить.
+    /// </remarks>
+    private async Task<Capability> SnmpAsync(CancellationToken cancellationToken)
     {
-        Id = "snmp",
-        Title = "SNMP: точная топология и счётчики портов",
-        About = "LLDP-MIB даёт, кто с каким портом соединён. BRIDGE-MIB привязывает "
-                + "устройство к порту свитча. Счётчики ошибок находят умирающий патч-корд.",
-        Level = CapabilityLevel.Snmp,
-        State = CapabilityState.Planned,
-        Detail = "В продукте пока нет.",
-        Iteration = "И-17",
-    };
+        var configured = 0;
 
+        if (_snmp is not null)
+        {
+            try
+            {
+                configured = (await _snmp.ListAsync(cancellationToken).ConfigureAwait(false)).Count;
+            }
+            catch (Exception ex) when (ex is InvalidOperationException or IOException)
+            {
+                // Хранилище может быть недоступно — сводка возможностей не тот случай,
+                // ради которого стоит падать.
+                configured = 0;
+            }
+        }
+
+        return new Capability
+        {
+            Id = "snmp",
+            Title = "SNMP: точная топология и счётчики портов",
+            About = "LLDP-MIB даёт, кто с каким портом соединён. BRIDGE-MIB привязывает "
+                    + "устройство к порту коммутатора. Счётчики ошибок находят умирающий патч-корд.",
+            Level = CapabilityLevel.Snmp,
+            State = configured > 0 ? CapabilityState.Available : CapabilityState.NeedsCredentials,
+            Detail = configured > 0
+                ? $"Заведено наборов учётных данных: {configured.ToString(CultureInfo.InvariantCulture)}."
+                : "Учётных данных нет — опрашивать оборудование нечем.",
+            HowToEnable = configured > 0
+                ? null
+                : "Завести набор: storm snmp creds add \"свитчи\" --версия v2c. "
+                  + "Пароль спрашивается отдельно и в историю оболочки не попадает.",
+        };
+    }
+
+    /// <summary>
+    /// Возможности уровня 2.
+    /// </summary>
+    /// <remarks>
+    /// С И-18 плагин в продукте есть, и состояние определяется одним: пускает ли нас
+    /// драйвер. Разница между «драйвера нет» и «драйвер есть, но не пускает»
+    /// существенна — это два разных совета, и склеивать их в «недоступно» значит
+    /// заставить человека перебирать оба варианта вслепую.
+    /// </remarks>
     private IEnumerable<Capability> Capture()
     {
-        var installed = _system.IsCaptureDriverInstalled;
+        var refusal = _capture?.Availability ?? CaptureRefusal.NoDriver;
+        var driver = _capture?.DriverDescription;
+
+        var state = refusal switch
+        {
+            CaptureRefusal.None => CapabilityState.Available,
+            CaptureRefusal.NeedsElevation => CapabilityState.NeedsElevation,
+            CaptureRefusal.NoAdapters => CapabilityState.Limited,
+            _ => CapabilityState.NeedsDriver,
+        };
 
         yield return new Capability
         {
-            Id = "capture.plugin",
-            Title = "Захват пакетов: LLDP/CDP, пассивный анализ",
-            About = "Приём кадров второго уровня напрямую: соседство по LLDP и CDP, "
-                    + "обнаружение постороннего DHCP по широковещательным пакетам.",
+            Id = "capture.neighbors",
+            Title = "Соседство по LLDP и CDP из эфира",
+            About = "Кто с каким портом соединён — по кадрам, которые устройства "
+                    + "объявляют сами. Учётных данных не требует.",
             Level = CapabilityLevel.Capture,
-            State = CapabilityState.Planned,
-            Detail = installed
-                ? $"Драйвер захвата на машине есть ({_system.CaptureDriverDescription}), "
-                  + "но плагина в продукте пока нет."
-                : "В продукте пока нет плагина, и драйвер захвата на этой машине не установлен.",
-            HowToEnable = installed
-                ? null
-                : "Npcap ставится отдельно и вручную: продукт его не распространяет "
-                  + "ни при каких условиях — лицензия NPSL это запрещает.",
-            Where = installed ? null : CaptureDriverSite,
-            Iteration = "И-18",
+            State = state,
+            Detail = Detail(refusal, driver),
+            HowToEnable = HowToEnable(refusal),
+            Where = refusal == CaptureRefusal.NoDriver ? CaptureDriverSite : null,
+        };
+
+        yield return new Capability
+        {
+            Id = "capture.dhcp",
+            Title = "Обнаружение постороннего DHCP",
+            About = "Ответы DHCP широковещательны: продукт слушает их и показывает, "
+                    + "сколько серверов в сегменте и какой шлюз каждый объявляет.",
+            Level = CapabilityLevel.Capture,
+            State = state,
+            Detail = Detail(refusal, driver),
+            HowToEnable = HowToEnable(refusal),
+            Where = refusal == CaptureRefusal.NoDriver ? CaptureDriverSite : null,
         };
     }
+
+    private static string Detail(CaptureRefusal refusal, string? driver) => refusal switch
+    {
+        CaptureRefusal.None => $"Драйвер захвата работает: {driver ?? "версия не определена"}. "
+                               + "Продукт слушает без неразборчивого режима — только то, "
+                               + "что адресовано нам или разослано всем.",
+        CaptureRefusal.NeedsElevation => "Драйвер установлен, но не пускает: Npcap умеет "
+                                         + "ставиться с ограничением доступа администраторами.",
+        CaptureRefusal.NoAdapters => "Драйвер есть, но подходящих адаптеров он не показывает.",
+        _ => "Драйвер захвата на этой машине не установлен.",
+    };
+
+    private static string? HowToEnable(CaptureRefusal refusal) => refusal switch
+    {
+        CaptureRefusal.None => null,
+        CaptureRefusal.NeedsElevation => "Перезапустить продукт от имени администратора "
+                                         + "либо переустановить Npcap без ограничения доступа.",
+        CaptureRefusal.NoAdapters => "Проверить, что адаптер включён и виден системе.",
+        _ => "Npcap ставится отдельно и вручную: продукт его не распространяет "
+             + "ни при каких условиях — лицензия NPSL это запрещает.",
+    };
 }

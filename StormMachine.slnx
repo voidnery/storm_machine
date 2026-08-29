@@ -13,7 +13,11 @@
     <Project Path="src/StormMachine.Probes/StormMachine.Probes.csproj" />
     <Project Path="src/StormMachine.Protocol/StormMachine.Protocol.csproj" />
     <Project Path="src/StormMachine.Reporting/StormMachine.Reporting.csproj" />
+    <Project Path="src/StormMachine.Snmp/StormMachine.Snmp.csproj" />
     <Project Path="src/StormMachine.Storage/StormMachine.Storage.csproj" />
+  </Folder>
+  <Folder Name="/plugins/">
+    <Project Path="plugins/StormMachine.Capture.Npcap/StormMachine.Capture.Npcap.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/StormMachine.ArchTests/StormMachine.ArchTests.csproj" />
@@ -25,6 +29,8 @@
     <Project Path="tests/StormMachine.Probes.UnitTests/StormMachine.Probes.UnitTests.csproj" />
     <Project Path="tests/StormMachine.Protocol.UnitTests/StormMachine.Protocol.UnitTests.csproj" />
     <Project Path="tests/StormMachine.Reporting.UnitTests/StormMachine.Reporting.UnitTests.csproj" />
+    <Project Path="tests/StormMachine.Snmp.UnitTests/StormMachine.Snmp.UnitTests.csproj" />
+    <Project Path="tests/StormMachine.Capture.UnitTests/StormMachine.Capture.UnitTests.csproj" />
     <Project Path="tests/StormMachine.Storage.UnitTests/StormMachine.Storage.UnitTests.csproj" />
   </Folder>
 </Solution>

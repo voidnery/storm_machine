@@ -42,8 +42,8 @@ The product degrades honestly rather than demanding everything up front:
 | Level | Requires | Provides |
 |-------|----------|----------|
 | **0 — Core** | Nothing. No admin rights, no drivers | ~80% of the value: probes, monitoring, traceroute, inventory with MAC addresses, L3 topology, presets, scheduling, reports |
-| **1 — SNMP** | Device credentials | Accurate L2 topology, switch port mapping, interface error counters |
-| **2 — Capture** | Npcap installed by the user | LLDP/CDP frames, passive analysis, rogue DHCP detection |
+| **1 — SNMP** | Device credentials | Accurate L2 topology, switch port mapping, interface error counters. **Done in iteration 17** |
+| **2 — Capture** | Npcap installed by the user | LLDP/CDP frames, our own switch port, rogue DHCP detection. **Done in iteration 18** |
 
 Npcap is **never redistributed** — its license forbids it. The application detects an
 existing installation and explains what is unavailable without one.

@@ -165,6 +165,119 @@
 
             <Border Height="1" Background="#2E3746" Margin="0,6" />
 
+            <Grid ColumnDefinitions="*,Auto">
+              <TextBlock Grid.Column="0" Text="Учётные данные SNMP" FontSize="13" FontWeight="SemiBold" />
+              <Button Grid.Column="1" Content="Завести" Padding="10,3" FontSize="11"
+                      Command="{Binding ToggleCredentialEditorCommand}" />
+            </Grid>
+
+            <TextBlock Text="{x:Static vm:SettingsPageViewModel.SnmpNote}" FontSize="10" Opacity="0.5"
+                       TextWrapping="Wrap" LineHeight="15" />
+
+            <TextBlock Text="Наборов нет — опрашивать оборудование нечем." FontSize="11" Opacity="0.5"
+                       IsVisible="{Binding !Credentials.Count}" />
+
+            <ListBox ItemsSource="{Binding Credentials}" SelectedItem="{Binding SelectedCredential}"
+                     Background="Transparent" BorderThickness="0" MaxHeight="160"
+                     IsVisible="{Binding Credentials.Count}">
+              <ListBox.ItemTemplate>
+                <DataTemplate x:DataType="vm:CredentialRow">
+                  <Grid ColumnDefinitions="*,Auto" Margin="0,3">
+                    <StackPanel Grid.Column="0" Spacing="1">
+                      <TextBlock Text="{Binding Name}" FontSize="12" TextTrimming="CharacterEllipsis" />
+                      <TextBlock Text="{Binding About}" FontSize="10" Opacity="0.5"
+                                 TextTrimming="CharacterEllipsis" />
+                    </StackPanel>
+
+                    <!-- Защищает набор что-нибудь или нет — видно сразу: строка сообщества
+                         идёт открытым текстом и защитой не является. -->
+                    <TextBlock Grid.Column="1" Text="открыто" FontSize="10" VerticalAlignment="Center"
+                               Foreground="{StaticResource WarningBrush}"
+                               IsVisible="{Binding !IsProtected}" />
+                  </Grid>
+                </DataTemplate>
+              </ListBox.ItemTemplate>
+            </ListBox>
+
+            <!-- Форма набора -->
+            <Border Padding="12,10" CornerRadius="4" Background="#232B3B"
+                    IsVisible="{Binding IsCredentialEditorOpen}">
+              <StackPanel Spacing="8" DataContext="{Binding Editor}">
+                <StackPanel x:DataType="vm:SnmpCredentialEditorViewModel" Spacing="8">
+
+                  <TextBox PlaceholderText="имя набора: «свитчи», «ядро»" Text="{Binding Name}" />
+
+                  <ComboBox ItemsSource="{Binding Versions}" SelectedItem="{Binding Version}"
+                            HorizontalAlignment="Stretch" />
+
+                  <StackPanel Spacing="4" IsVisible="{Binding IsCommunity}">
+                    <TextBox PlaceholderText="строка сообщества" Text="{Binding Community}"
+                             PasswordChar="•" />
+                    <TextBlock Text="{x:Static vm:SnmpCredentialEditorViewModel.CommunityNote}"
+                               FontSize="10" Opacity="0.5" TextWrapping="Wrap" LineHeight="15" />
+                  </StackPanel>
+
+                  <StackPanel Spacing="6" IsVisible="{Binding IsV3}">
+                    <TextBox PlaceholderText="имя пользователя" Text="{Binding UserName}" />
+
+                    <ComboBox ItemsSource="{Binding Auths}" SelectedItem="{Binding Auth}"
+                              HorizontalAlignment="Stretch" />
+                    <TextBox PlaceholderText="пароль проверки подлинности" Text="{Binding AuthPassword}"
+                             PasswordChar="•" IsVisible="{Binding NeedsAuthPassword}" />
+
+                    <ComboBox ItemsSource="{Binding Privacies}" SelectedItem="{Binding Privacy}"
+                              HorizontalAlignment="Stretch" />
+                    <TextBox PlaceholderText="пароль шифрования" Text="{Binding PrivacyPassword}"
+                             PasswordChar="•" IsVisible="{Binding NeedsPrivacyPassword}" />
+                  </StackPanel>
+
+                  <Grid ColumnDefinitions="*,8,*">
+                    <StackPanel Grid.Column="0" Spacing="2">
+                      <TextBlock Text="Порт" FontSize="10" Opacity="0.6" />
+                      <NumericUpDown Value="{Binding Port}" Minimum="1" Maximum="65535" Increment="1"
+                                     FormatString="0" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="2" Spacing="2">
+                      <TextBlock Text="Порядок перебора" FontSize="10" Opacity="0.6" />
+                      <NumericUpDown Value="{Binding Order}" Minimum="0" Maximum="99" Increment="1"
+                                     FormatString="0" />
+                    </StackPanel>
+                  </Grid>
+
+                  <TextBlock Text="{x:Static vm:SnmpCredentialEditorViewModel.PasswordNote}"
+                             FontSize="10" Opacity="0.5" TextWrapping="Wrap" LineHeight="15" />
+
+                  <Border Padding="10,8" CornerRadius="3" Background="#1B2230">
+                    <TextBlock Text="{Binding Preview}" FontSize="11" TextWrapping="Wrap" LineHeight="16" />
+                  </Border>
+                </StackPanel>
+              </StackPanel>
+            </Border>
+
+            <Grid ColumnDefinitions="*,Auto" IsVisible="{Binding IsCredentialEditorOpen}">
+              <Button Grid.Column="0" Content="Отмена" Padding="12,5" HorizontalAlignment="Left"
+                      Command="{Binding ToggleCredentialEditorCommand}" />
+              <Button Grid.Column="1" Content="Завести набор" Padding="14,5"
+                      Background="{StaticResource AccentBrush}" Foreground="White"
+                      Command="{Binding AddCredentialCommand}" />
+            </Grid>
+
+            <Grid ColumnDefinitions="*,Auto,Auto">
+              <TextBox Grid.Column="0" PlaceholderText="адрес устройства для проверки"
+                       Text="{Binding ProbeHost}" />
+              <Button Grid.Column="1" Content="Проверить" Padding="12,5" Margin="6,0,6,0"
+                      Command="{Binding ProbeCommand}" />
+              <Button Grid.Column="2" Content="Удалить" Padding="12,5"
+                      Command="{Binding DeleteCredentialCommand}" />
+            </Grid>
+
+            <Border Padding="10,8" CornerRadius="4" Background="#232B3B"
+                    IsVisible="{Binding ProbeResult, Converter={x:Static ObjectConverters.IsNotNull}}">
+              <TextBlock Text="{Binding ProbeResult}" FontSize="11" TextWrapping="Wrap" LineHeight="16" />
+            </Border>
+
+            <Border Height="1" Background="#2E3746" Margin="0,6" />
+
             <TextBlock Text="Хранилище" FontSize="13" FontWeight="SemiBold" />
 
             <SelectableTextBlock Text="{Binding DatabasePath}" FontSize="11" TextWrapping="Wrap"

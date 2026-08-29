@@ -15,7 +15,7 @@
     <Border Grid.Row="1" Margin="0,12,0,0" Padding="14,10" CornerRadius="6"
             Background="{StaticResource PanelBrush}">
       <StackPanel Spacing="8">
-        <Grid ColumnDefinitions="Auto,Auto,Auto,Auto,*,Auto,Auto,Auto">
+        <Grid ColumnDefinitions="Auto,Auto,Auto,Auto,Auto,*,Auto,Auto,Auto">
           <CheckBox Grid.Column="0" IsChecked="{Binding IncludeExternalPaths}" FontSize="12"
                     Content="Внешние пути" Margin="0,0,14,0"
                     ToolTip.Tip="Узлы из сохранённых трассировок" />
@@ -26,19 +26,31 @@
                     Content="Все устройства" Margin="0,0,14,0"
                     ToolTip.Tip="Не сворачивать конечные узлы в счётчик" />
 
-          <Button Grid.Column="3" Content="Развернуть выбранное" Command="{Binding ExpandCommand}"
+          <!-- Опрос по SNMP выключен по умолчанию: он идёт по чужой сети и занимает
+               секунды на устройство. Слать трафик к оборудованию заказчика при каждом
+               взгляде на карту продукт не станет. -->
+          <CheckBox Grid.Column="3" IsChecked="{Binding UseSnmp}" FontSize="12"
+                    Content="Опросить SNMP" Margin="0,0,14,0"
+                    ToolTip.Tip="Порты коммутаторов и соседей по LLDP. Требует заведённых учётных данных" />
+
+          <Button Grid.Column="4" Content="Развернуть выбранное" Command="{Binding ExpandCommand}"
                   FontSize="12" Padding="10,4" Margin="0,0,10,0" />
 
-          <TextBlock Grid.Column="4" Text="{Binding StatusLine}" FontSize="12" Opacity="0.65"
+          <TextBlock Grid.Column="5" Text="{Binding StatusLine}" FontSize="12" Opacity="0.65"
                      VerticalAlignment="Center" Margin="10,0" TextTrimming="CharacterEllipsis" />
 
-          <Button Grid.Column="5" Content="PNG" Command="{Binding ExportPngCommand}"
+          <Button Grid.Column="6" Content="PNG" Command="{Binding ExportPngCommand}"
                   FontSize="12" Padding="12,4" Margin="0,0,6,0" />
-          <Button Grid.Column="6" Content="SVG" Command="{Binding ExportSvgCommand}"
+          <Button Grid.Column="7" Content="SVG" Command="{Binding ExportSvgCommand}"
                   FontSize="12" Padding="12,4" Margin="0,0,6,0" />
-          <Button Grid.Column="7" Content="JSON" Command="{Binding ExportJsonCommand}"
+          <Button Grid.Column="8" Content="JSON" Command="{Binding ExportJsonCommand}"
                   FontSize="12" Padding="12,4" />
         </Grid>
+
+        <!-- Опрос идёт секундами на устройство: молчащий в это время инструмент
+             выглядит зависшим. -->
+        <TextBlock Text="{Binding Note}" FontSize="11" Opacity="0.6" TextWrapping="Wrap"
+                   IsVisible="{Binding Note, Converter={x:Static ObjectConverters.IsNotNull}}" />
 
         <TextBlock Text="{Binding ErrorMessage}" FontSize="12"
                    Foreground="{StaticResource DangerBrush}" TextWrapping="Wrap"

@@ -8,6 +8,7 @@ using StormMachine.Application.Capabilities;
 using StormMachine.Application.Probes;
 using StormMachine.Application.Presets;
 using StormMachine.Application.Profiles;
+using StormMachine.Application.Capture;
 using StormMachine.Application.Snmp;
 using StormMachine.Application.Runs;
 using StormMachine.Application.Scenarios;
@@ -18,6 +19,7 @@ using StormMachine.Platform;
 using StormMachine.Platform.Geo;
 using StormMachine.Probes;
 using StormMachine.Reporting;
+using StormMachine.Capture.Npcap;
 using StormMachine.Snmp;
 using StormMachine.Storage;
 
@@ -69,6 +71,11 @@ public static class StormMachineServiceCollectionExtensions
 
         services.AddSingleton<ISnmpClient, SharpSnmpClient>();
         services.AddSingleton<SnmpService>();
+
+        // Уровень 2. Драйвер захвата продукт не распространяет — плагин обязан
+        // уметь честно сказать «меня нет» и не упасть при этом. Проверено спайком-09.
+        services.AddSingleton<ICaptureProvider, NpcapCaptureProvider>();
+        services.AddSingleton<CaptureService>();
 
         // Библиотека пресетов делит базу с журналом, поэтому строится поверх него.
         services.AddSingleton<IPresetStore>(provider => new SqlitePresetStore(

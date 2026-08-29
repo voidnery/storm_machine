@@ -1,7 +1,9 @@
 using StormMachine.Application.Abstractions;
+using StormMachine.Application.Capture;
 using StormMachine.Application.Snmp;
 using StormMachine.Domain.Measurements;
 using StormMachine.Domain.Results;
+using StormMachine.Domain.Discovery;
 using StormMachine.Domain.Snmp;
 using StormMachine.Domain.Topology;
 
@@ -61,6 +63,20 @@ public sealed record TopologyOptions
     /// уже не диагностика.
     /// </remarks>
     public IReadOnlyList<string> SnmpTargets { get; init; } = [];
+
+    /// <summary>
+    /// Слушать ли эфир, чтобы узнать, в чей порт воткнуты мы сами.
+    /// </summary>
+    /// <remarks>
+    /// Выключено по умолчанию по той же причине, что и опрос: прослушивание занимает
+    /// десятки секунд, и делать его при каждом взгляде на карту незачем. Но ответ
+    /// оно даёт такой, какого не даёт больше никто: свой порт на коммутаторе видно
+    /// без всяких учётных данных.
+    /// </remarks>
+    public bool UseCapture { get; init; }
+
+    /// <summary>Сколько слушать. Меньше минуты — сосед может не успеть объявиться.</summary>
+    public TimeSpan CaptureDuration { get; init; } = TimeSpan.FromSeconds(60);
 }
 
 /// <summary>
@@ -76,12 +92,14 @@ public sealed class TopologyService(
     IDeviceStore devices,
     IRunStore runs,
     INetworkEnvironment environment,
-    SnmpService? snmp = null)
+    SnmpService? snmp = null,
+    CaptureService? capture = null)
 {
     private readonly IDeviceStore _devices = devices ?? throw new ArgumentNullException(nameof(devices));
     private readonly IRunStore _runs = runs ?? throw new ArgumentNullException(nameof(runs));
     private readonly INetworkEnvironment _environment = environment ?? throw new ArgumentNullException(nameof(environment));
     private readonly SnmpService? _snmp = snmp;
+    private readonly CaptureService? _capture = capture;
 
     /// <param name="note">
     /// Куда сообщать о ходе опроса. Опрос идёт секундами на устройство, и молчащий
@@ -106,6 +124,9 @@ public sealed class TopologyService(
             Switches = options.UseSnmp
                 ? await PollAsync(options, subnets, note, cancellationToken).ConfigureAwait(false)
                 : [],
+            Neighbors = options.UseCapture
+                ? await ListenAsync(options, note, cancellationToken).ConfigureAwait(false)
+                : [],
             Paths = options.IncludeExternalPaths
                 ? await ReadPathsAsync(options.PathHistory, cancellationToken).ConfigureAwait(false)
                 : [],
@@ -115,6 +136,50 @@ public sealed class TopologyService(
                 ? await _devices.ListTopologyEditsAsync(cancellationToken).ConfigureAwait(false)
                 : [],
         });
+    }
+
+    /// <summary>Доступен ли захват — чтобы предложить его, а не молчать.</summary>
+    public bool CanUseCapture => _capture?.IsAvailable == true;
+
+    /// <summary>
+    /// Слушает эфир и отдаёт услышанных соседей.
+    /// </summary>
+    /// <remarks>
+    /// Отсутствие драйвера здесь не отказ, а обычное дело: уровень 2 необязателен,
+    /// и карта без него строится ровно как строилась.
+    /// </remarks>
+    private async Task<IReadOnlyList<LinkNeighbor>> ListenAsync(
+        TopologyOptions options,
+        Action<string>? note,
+        CancellationToken cancellationToken)
+    {
+        if (_capture is null || !_capture.IsAvailable)
+        {
+            note?.Invoke(_capture?.Explain() ?? "Плагин захвата недоступен.");
+
+            return [];
+        }
+
+        if (_capture.Primary() is not { } adapter)
+        {
+            note?.Invoke("Драйвер захвата не показывает подходящего адаптера.");
+
+            return [];
+        }
+
+        note?.Invoke($"Слушаю {adapter.DisplayName} — "
+                     + $"{options.CaptureDuration.TotalSeconds.ToString("0", System.Globalization.CultureInfo.InvariantCulture)} с. "
+                     + "Ничего в сеть не отправляется.");
+
+        var result = await _capture
+            .ListenAsync(adapter, new CaptureOptions { Duration = options.CaptureDuration }, cancellationToken)
+            .ConfigureAwait(false);
+
+        note?.Invoke(result.Neighbors.Count == 0
+            ? "  соседей не услышано" + (result.Caveat is null ? "." : $": {result.Caveat}")
+            : $"  услышано соседей: {result.Neighbors.Count.ToString(System.Globalization.CultureInfo.InvariantCulture)}.");
+
+        return result.Neighbors;
     }
 
     /// <summary>Есть ли чем опрашивать — чтобы предложить это оператору, а не молчать.</summary>

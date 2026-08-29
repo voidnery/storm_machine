@@ -7,8 +7,10 @@ using StormMachine.Application;
 using StormMachine.Application.Abstractions;
 using StormMachine.Application.Capabilities;
 using StormMachine.Application.Profiles;
+using StormMachine.Application.Snmp;
 using StormMachine.Domain.Capabilities;
 using StormMachine.Domain.Profiles;
+using StormMachine.Domain.Snmp;
 using StormMachine.Domain.Results;
 
 namespace StormMachine.App.ViewModels;
@@ -37,6 +39,19 @@ public sealed record CapabilityRow(Capability Capability)
 public sealed record CapabilityGroup(string Title, string About, string StateText, IReadOnlyList<CapabilityRow> Items)
 {
     public bool HasItems => Items.Count > 0;
+}
+
+/// <summary>Строка списка учётных данных SNMP.</summary>
+public sealed record CredentialRow(SnmpCredential Credential)
+{
+    public string Name => Credential.Name;
+
+    public string About => Credential.Describe();
+
+    public string Order => Credential.Order.ToString(CultureInfo.InvariantCulture);
+
+    /// <summary>Защищает ли набор хоть что-нибудь — видно сразу, без чтения подробностей.</summary>
+    public bool IsProtected => Credential.IsProtected;
 }
 
 /// <summary>Строка списка профилей.</summary>
@@ -89,20 +104,44 @@ public sealed partial class SettingsPageViewModel : PageViewModel
     private readonly CapabilityInspector _capabilities;
     private readonly ProfileService _profiles;
     private readonly IRunStore _runs;
+    private readonly ISnmpCredentialStore _credentials;
+    private readonly SnmpService _snmp;
 
     public SettingsPageViewModel(
         NavigationSection section,
         CapabilityInspector capabilities,
         ProfileService profiles,
         IRunStore runs,
-        UpdateService updates)
+        UpdateService updates,
+        ISnmpCredentialStore credentials,
+        SnmpService snmp)
         : base(section)
     {
         _capabilities = capabilities ?? throw new ArgumentNullException(nameof(capabilities));
         _profiles = profiles ?? throw new ArgumentNullException(nameof(profiles));
         _runs = runs ?? throw new ArgumentNullException(nameof(runs));
+        _credentials = credentials ?? throw new ArgumentNullException(nameof(credentials));
+        _snmp = snmp ?? throw new ArgumentNullException(nameof(snmp));
         Updates = updates ?? throw new ArgumentNullException(nameof(updates));
     }
+
+    /// <summary>Форма набора учётных данных SNMP.</summary>
+    public SnmpCredentialEditorViewModel Editor { get; } = new();
+
+    public ObservableCollection<CredentialRow> Credentials { get; } = [];
+
+    [ObservableProperty]
+    private CredentialRow? _selectedCredential;
+
+    [ObservableProperty]
+    private bool _isCredentialEditorOpen;
+
+    /// <summary>Узел, на котором проверяют набор.</summary>
+    [ObservableProperty]
+    private string _probeHost = string.Empty;
+
+    [ObservableProperty]
+    private string? _probeResult;
 
     /// <summary>
     /// Обновление продукта.
@@ -147,6 +186,93 @@ public sealed partial class SettingsPageViewModel : PageViewModel
         $"Другой файл базы задаётся переменной {StorageEnvironment.PathVariable} или ключом "
         + "--база у консоли. Путь показан не для полноты: когда журнал выглядит не так, "
         + "как ожидалось, первый вопрос всегда один — с каким файлом мы разговариваем.";
+
+    [RelayCommand]
+    private void ToggleCredentialEditor() => IsCredentialEditorOpen = !IsCredentialEditorOpen;
+
+    /// <summary>Заводит набор учётных данных.</summary>
+    [RelayCommand]
+    private async Task AddCredentialAsync(CancellationToken cancellationToken)
+    {
+        ErrorMessage = null;
+        Message = null;
+
+        if (Editor.Build(out var problem) is not { } credential)
+        {
+            ErrorMessage = problem;
+
+            return;
+        }
+
+        await _credentials.SaveAsync(credential, cancellationToken).ConfigureAwait(true);
+
+        Message = $"Набор «{credential.Name}» заведён: {credential.Describe()}";
+        IsCredentialEditorOpen = false;
+
+        Editor.Clear();
+
+        await RefreshAsync(cancellationToken).ConfigureAwait(true);
+    }
+
+    [RelayCommand]
+    private async Task DeleteCredentialAsync(CancellationToken cancellationToken)
+    {
+        if (SelectedCredential is not { } row)
+        {
+            return;
+        }
+
+        await _credentials.DeleteAsync(row.Credential.Id, cancellationToken).ConfigureAwait(true);
+
+        Message = $"Набор «{row.Name}» удалён.";
+
+        await RefreshAsync(cancellationToken).ConfigureAwait(true);
+    }
+
+    /// <summary>
+    /// Проверяет, отвечает ли узел хоть одним из заведённых наборов.
+    /// </summary>
+    /// <remarks>
+    /// Различить «SNMP выключен» и «учётные данные не те» снаружи нельзя: устройство,
+    /// отвергающее запрос, по RFC 3414 §3.2 просто молчит — так задумано, чтобы
+    /// молчание не подсказывало подбирающему.
+    /// </remarks>
+    [RelayCommand]
+    private async Task ProbeAsync(CancellationToken cancellationToken)
+    {
+        ErrorMessage = null;
+        ProbeResult = null;
+
+        if (string.IsNullOrWhiteSpace(ProbeHost))
+        {
+            ErrorMessage = "Не задан адрес устройства.";
+
+            return;
+        }
+
+        ProbeResult = "Спрашиваю…";
+
+        try
+        {
+            var reach = await _snmp.ProbeAsync(ProbeHost.Trim(), cancellationToken).ConfigureAwait(true);
+
+            ProbeResult = reach is null
+                ? "Не ответил ни одним из заведённых наборов. Различить «SNMP выключен» "
+                  + "и «учётные данные не те» снаружи нельзя: отвергнутый запрос устройство "
+                  + "оставляет без ответа."
+                : $"Отвечает набором «{reach.Credential.Name}»: {reach.System.Name ?? "имя не задано"}, "
+                  + $"{reach.System.ShortDescription}, работает {reach.System.DescribeUpTime()}.";
+        }
+        catch (SnmpException ex)
+        {
+            ProbeResult = ex.Message;
+        }
+    }
+
+    public static string SnmpNote =>
+        "Наборы пробуются по возрастанию порядка, пока какой-нибудь не подойдёт — "
+        + "и только против узла, который назвали вы. Ни словарей, ни обхода подсети "
+        + "в продукте нет: это граница, за которой диагностика становится взломом.";
 
     [RelayCommand]
     private Task CheckUpdateAsync(CancellationToken cancellationToken) => Updates.CheckAsync(cancellationToken);
@@ -207,6 +333,16 @@ public sealed partial class SettingsPageViewModel : PageViewModel
                               ?? Profiles.FirstOrDefault(p => p.IsActive);
 
             CurrentSignature = _profiles.CurrentSignature().Describe();
+
+            var credentials = await _credentials.ListAsync(cancellationToken).ConfigureAwait(true);
+
+            Credentials.Clear();
+
+            foreach (var credential in credentials)
+            {
+                Credentials.Add(new CredentialRow(credential));
+            }
+
             OnPropertyChanged(nameof(DatabasePath));
         }
         catch (Exception ex) when (ex is InvalidOperationException or IOException)

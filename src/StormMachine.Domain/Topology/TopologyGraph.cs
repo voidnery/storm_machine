@@ -172,6 +172,17 @@ public sealed record TopologyInput
     public IReadOnlyList<SnmpDevice> Switches { get; init; } = [];
 
     /// <summary>
+    /// Соседи, услышанные нашим адаптером.
+    /// </summary>
+    /// <remarks>
+    /// Уровень 2, и он отвечает на вопрос, который не берёт ни один другой источник:
+    /// <b>в какой порт какого коммутатора воткнуты мы сами</b>. SNMP на это ответить
+    /// не может, пока к коммутатору нет учётных данных, а ARP и трассировка не знают
+    /// про порты вовсе.
+    /// </remarks>
+    public IReadOnlyList<LinkNeighbor> Neighbors { get; init; } = [];
+
+    /// <summary>
     /// Правки оператора: связи, которых инструмент не увидел, и связи, которые он
     /// вывел ошибочно.
     /// </summary>
@@ -231,6 +242,7 @@ public sealed record TopologyGraph
         // коммутатора, цепляется к нему, а не к подсети, и коммутатор к этому
         // моменту уже должен быть на карте.
         builder.AddSwitches();
+        builder.AddHeardNeighbors();
         builder.AddDevices();
         builder.AddPaths();
         builder.ApplyEdits();
@@ -459,7 +471,7 @@ public sealed record TopologyGraph
         }
 
         /// <summary>Узел соседа среди уже опрошенных: по имени или по адресу управления.</summary>
-        private string? FindNeighbor(SnmpNeighbor neighbor)
+        private string? FindNeighbor(LinkNeighbor neighbor)
         {
             foreach (var known in _input.Switches)
             {
@@ -476,6 +488,47 @@ public sealed record TopologyGraph
             }
 
             return null;
+        }
+
+        /// <summary>
+        /// Соседи, услышанные своим адаптером.
+        /// </summary>
+        /// <remarks>
+        /// Связь идёт от <b>этой машины</b>, а не от подсети: кадр пришёл к нам,
+        /// и он утверждает ровно одно — вот к этому устройству и вот в этот его порт
+        /// мы подключены. Это единственный источник, который отвечает на такой вопрос
+        /// без учётных данных к оборудованию.
+        /// </remarks>
+        public void AddHeardNeighbors()
+        {
+            foreach (var neighbor in _input.Neighbors
+                         .OrderBy(n => n.DisplayName, StringComparer.CurrentCulture)
+                         .ThenBy(n => n.RemotePort, StringComparer.Ordinal))
+            {
+                var id = FindNeighbor(neighbor) ?? SwitchId(neighbor.DisplayName);
+
+                if (!_nodes.ContainsKey(id))
+                {
+                    Add(new TopologyNode
+                    {
+                        Id = id,
+                        Kind = TopologyNodeKind.Switch,
+                        Label = neighbor.DisplayName,
+                        Address = neighbor.RemoteAddress,
+                        MacAddress = neighbor.RemoteChassisId,
+                        Detail = neighbor.RemoteDescription is { } about
+                            ? $"{about}; услышан своим адаптером"
+                            : "услышан своим адаптером, сам не опрошен",
+                    });
+                }
+
+                _links.Add(new TopologyLink(
+                    ThisMachineId,
+                    id,
+                    LinkKind.Layer2,
+                    LinkConfidence.Confirmed,
+                    neighbor.Because + " — этим проводом подключены мы сами"));
+            }
         }
 
         public void AddDevices()

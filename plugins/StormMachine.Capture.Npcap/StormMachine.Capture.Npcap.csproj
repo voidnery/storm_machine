@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Плагин захвата. ЕДИНСТВЕННОЕ место в продукте со ссылкой на SharpPcap —
+       это проверяется архитектурным тестом.
+
+       Живёт в plugins/, а не в src/, потому что уровень 2 необязателен: продукт
+       обязан работать полностью и без драйвера захвата. Npcap в поставку не входит
+       ни при каких условиях — лицензия NPSL это запрещает.
+
+       Загружается обычной ссылкой, а не во время работы. Исходный план предполагал
+       динамическую загрузку из-за LGPL у SharpPcap, но с версии 6 он распространяется
+       по MIT, а спайк-09 показал, что типы поднимаются и без драйвера. Городить
+       AssemblyLoadContext поверх однофайлового обрезанного хоста стало нечем
+       оправдать — см. spikes/spike-09-capture. -->
+
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <Description>Захват кадров поверх уже установленного Npcap: LLDP, CDP, ответы DHCP.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\StormMachine.Application\StormMachine.Application.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="SharpPcap" Version="6.3.1" />
+  </ItemGroup>
+
+</Project>
