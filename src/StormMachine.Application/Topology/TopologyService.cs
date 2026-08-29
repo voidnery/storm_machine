@@ -1,4 +1,4 @@
-using StormMachine.Application.Abstractions;
+﻿using StormMachine.Application.Abstractions;
 using StormMachine.Application.Capture;
 using StormMachine.Application.Snmp;
 using StormMachine.Domain.Measurements;
@@ -93,13 +93,108 @@ public sealed class TopologyService(
     IRunStore runs,
     INetworkEnvironment environment,
     SnmpService? snmp = null,
-    CaptureService? capture = null)
+    CaptureService? capture = null,
+    ISettingsStore? settings = null)
 {
+    /// <summary>Ключ настройки со списком устройств, названных оператором.</summary>
+    public const string RememberedDevicesKey = "topology.snmp.devices";
+
     private readonly IDeviceStore _devices = devices ?? throw new ArgumentNullException(nameof(devices));
     private readonly IRunStore _runs = runs ?? throw new ArgumentNullException(nameof(runs));
     private readonly INetworkEnvironment _environment = environment ?? throw new ArgumentNullException(nameof(environment));
     private readonly SnmpService? _snmp = snmp;
     private readonly CaptureService? _capture = capture;
+
+    /// <summary>
+    /// Настройки. Нужны ради одного списка — устройств, названных однажды.
+    /// </summary>
+    /// <remarks>
+    /// Долг И-17: топология опрашивает шлюзы из маршрута, а коммутатор без адреса
+    /// управления в этом маршруте приходилось называть ключом при <b>каждом</b> вызове.
+    /// Обходить подсеть с учётными данными продукт не станет — это уже не диагностика, —
+    /// но помнить названное однажды обязан.
+    /// </remarks>
+    private readonly ISettingsStore? _settings = settings;
+
+    /// <summary>Устройства, которые оператор назвал и просил помнить.</summary>
+    public async Task<IReadOnlyList<string>> RememberedDevicesAsync(
+        CancellationToken cancellationToken = default)
+    {
+        if (_settings is null)
+        {
+            return [];
+        }
+
+        try
+        {
+            var stored = await _settings.GetAsync(RememberedDevicesKey, cancellationToken).ConfigureAwait(false);
+
+            return stored is null
+                ? []
+                : [.. stored.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)];
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or IOException)
+        {
+            // Список — удобство, а не условие работы: карта строится и без него.
+            return [];
+        }
+    }
+
+    /// <summary>
+    /// Запоминает названное устройство.
+    /// </summary>
+    /// <remarks>
+    /// Порядок сохраняется: оператор перечисляет устройства в том порядке, в каком
+    /// думает о своей сети, и пересортировывать их по алфавиту значило бы менять
+    /// его картину на свою.
+    /// </remarks>
+    public async Task RememberDeviceAsync(string address, CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(address);
+
+        if (_settings is null)
+        {
+            return;
+        }
+
+        var known = (await RememberedDevicesAsync(cancellationToken).ConfigureAwait(false)).ToList();
+        var trimmed = address.Trim();
+
+        if (known.Contains(trimmed, StringComparer.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        known.Add(trimmed);
+
+        await _settings
+            .SetAsync(RememberedDevicesKey, string.Join(',', known), secret: false, cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    /// <summary>Забывает устройство. <c>false</c> — его и не помнили.</summary>
+    public async Task<bool> ForgetDeviceAsync(string address, CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(address);
+
+        if (_settings is null)
+        {
+            return false;
+        }
+
+        var known = (await RememberedDevicesAsync(cancellationToken).ConfigureAwait(false)).ToList();
+
+        if (known.RemoveAll(d => string.Equals(d, address.Trim(), StringComparison.OrdinalIgnoreCase)) == 0)
+        {
+            return false;
+        }
+
+        await _settings
+            .SetAsync(RememberedDevicesKey, string.Join(',', known), secret: false, cancellationToken)
+            .ConfigureAwait(false);
+
+        return true;
+    }
 
     /// <param name="note">
     /// Куда сообщать о ходе опроса. Опрос идёт секундами на устройство, и молчащий
@@ -205,15 +300,35 @@ public sealed class TopologyService(
             return [];
         }
 
+        // Названное оператором добавляется к шлюзам, а не заменяет их: коммутатор
+        // без адреса управления в маршруте по умолчанию не отменяет сам маршрут.
+        // Явно переданное в этом вызове идёт первым — оно и есть то, о чём спросили
+        // прямо сейчас.
+        var remembered = await RememberedDevicesAsync(cancellationToken).ConfigureAwait(false);
+
         var targets = options.SnmpTargets.Count > 0
-            ? options.SnmpTargets
-            : [.. subnets.SelectMany(s => s.Gateways).Distinct(StringComparer.Ordinal)];
+            ? [.. options.SnmpTargets]
+            : new List<string>();
+
+        foreach (var address in subnets.SelectMany(s => s.Gateways).Concat(remembered))
+        {
+            if (!targets.Contains(address, StringComparer.OrdinalIgnoreCase))
+            {
+                targets.Add(address);
+            }
+        }
 
         if (targets.Count == 0)
         {
             note?.Invoke("Опрашивать некого: шлюзов не найдено, адреса не заданы.");
 
             return [];
+        }
+
+        if (remembered.Count > 0 && options.SnmpTargets.Count == 0)
+        {
+            note?.Invoke($"Помню устройства: {string.Join(", ", remembered)}. "
+                         + "Забыть — storm topology forget <адрес>.");
         }
 
         var found = new List<SnmpDevice>();
