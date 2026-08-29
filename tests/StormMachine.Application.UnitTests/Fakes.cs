@@ -57,6 +57,35 @@ internal sealed class FakeMonitorStore : IMonitorStore
         return Task.CompletedTask;
     }
 
+    /// <summary>
+    /// Захват срока: тот же смысл, что в базе, — сдвинуть, только если срок ещё тот.
+    /// </summary>
+    /// <remarks>
+    /// Реализация не «всегда true»: именно на ней проверяется, что два планировщика
+    /// над одной базой не выполнят одну проверку дважды. Заглушка, соглашающаяся
+    /// всегда, сделала бы такую проверку бессмысленной.
+    /// </remarks>
+    public Task<bool> TryClaimDueAsync(
+        Guid id,
+        DateTimeOffset expectedDueUtc,
+        DateTimeOffset? nextDueUtc,
+        CancellationToken cancellationToken = default)
+    {
+        Claims++;
+
+        if (!_monitors.TryGetValue(id, out var monitor) || monitor.NextDueUtc != expectedDueUtc)
+        {
+            return Task.FromResult(false);
+        }
+
+        _monitors[id] = monitor with { NextDueUtc = nextDueUtc };
+
+        return Task.FromResult(true);
+    }
+
+    /// <summary>Сколько раз пытались забрать срок — включая проигранные попытки.</summary>
+    public int Claims { get; private set; }
+
     public Task<MonitorStatus> GetStatusAsync(Guid id, CancellationToken cancellationToken = default) =>
         Task.FromResult(_statuses.GetValueOrDefault(id, MonitorStatus.Fresh));
 

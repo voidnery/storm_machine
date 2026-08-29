@@ -47,6 +47,12 @@
 
   <ItemGroup>
     <PackageReference Include="System.CommandLine" Version="2.0.11" />
+
+    <!-- Служба мониторов: планировщик, живущий без открытого окна (И-21).
+         Те же два пакета, что у службы агента, и по той же причине — управление
+         службами и журнал событий в базовую библиотеку не входят. -->
+    <PackageReference Include="System.ServiceProcess.ServiceController" Version="10.0.0" />
+    <PackageReference Include="System.Diagnostics.EventLog" Version="10.0.0" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.11" />
     <PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.11" />
     <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="10.0.11" />

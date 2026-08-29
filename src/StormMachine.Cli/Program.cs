@@ -1,5 +1,6 @@
-using System.CommandLine;
+﻿using System.CommandLine;
 using System.Runtime;
+using System.ServiceProcess;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using StormMachine.Application;
@@ -48,6 +49,18 @@ internal static class Program
         // аргументов — цена за то, чтобы ключ работал, а не только значился в справке.
         ApplyDatabaseOverride(args);
 
+        // Служба запускается диспетчером без консоли, и ветка отделена до разбора
+        // командной строки: диспетчер ждёт отклика считаные секунды. Путь к базе
+        // при этом уже применён выше — он вписан в командную строку службы при
+        // установке и вычислению из профиля не подлежит, потому что профиль у службы
+        // свой. Так же сделано у агента.
+        if (args.Contains(MonitorServiceCommands.ServiceSwitch, StringComparer.Ordinal))
+        {
+            ServiceBase.Run(new MonitorService());
+
+            return 0;
+        }
+
         await using var services = BuildServiceProvider();
         var root = BuildRootCommand(services);
 
@@ -80,26 +93,41 @@ internal static class Program
         }
     }
 
-    private static ServiceProvider BuildServiceProvider()
+    /// <summary>
+    /// Собирает службы клиента.
+    /// </summary>
+    /// <param name="console">
+    /// Есть ли консоль. У службы Windows её нет, и оба потребителя консоли —
+    /// журнал и канал оповещения — теряют смысл: писать некуда. Хуже того, канал,
+    /// пишущий в несуществующую консоль, считался бы доставившим сообщение.
+    /// </param>
+    internal static ServiceProvider BuildServiceProvider(bool console = true)
     {
         var services = new ServiceCollection();
 
         services.AddLogging(builder =>
         {
-            builder.AddSimpleConsole(options =>
+            if (console)
             {
-                options.SingleLine = true;
-                options.TimestampFormat = "HH:mm:ss.fff ";
-            });
+                builder.AddSimpleConsole(options =>
+                {
+                    options.SingleLine = true;
+                    options.TimestampFormat = "HH:mm:ss.fff ";
+                });
+            }
+
             builder.SetMinimumLevel(LogLevel.Warning);
         });
 
         services.AddStormMachine();
 
-        // Канал терминала регистрируется клиентом, а не корнем композиции: писать
-        // в консоль имеет смысл только там, где она есть. У графического клиента
-        // по той же причине свои каналы — звук и значок в трее.
-        services.AddSingleton<IAlertChannel, ConsoleAlertChannel>();
+        if (console)
+        {
+            // Канал терминала регистрируется клиентом, а не корнем композиции: писать
+            // в консоль имеет смысл только там, где она есть. У графического клиента
+            // по той же причине свои каналы — звук и значок в трее.
+            services.AddSingleton<IAlertChannel, ConsoleAlertChannel>();
+        }
 
         return services.BuildServiceProvider();
     }

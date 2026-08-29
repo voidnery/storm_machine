@@ -1,4 +1,4 @@
-using Microsoft.Data.Sqlite;
+﻿using Microsoft.Data.Sqlite;
 using StormMachine.Application.Abstractions;
 using StormMachine.Domain.Monitors;
 using StormMachine.Domain.Results;
@@ -184,6 +184,32 @@ public sealed class SqliteMonitorStore(SqliteRunStore runStore) : IMonitorStore
         command.Parameters.AddWithValue("$due", (object?)nextDueUtc?.UtcTicks ?? DBNull.Value);
 
         await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task<bool> TryClaimDueAsync(
+        Guid id,
+        DateTimeOffset expectedDueUtc,
+        DateTimeOffset? nextDueUtc,
+        CancellationToken cancellationToken = default)
+    {
+        await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
+        await using var command = connection.CreateCommand();
+
+        // Условие в WHERE и есть весь захват: SQLite выполняет UPDATE атомарно,
+        // и второй планировщик, пришедший с тем же ожидаемым сроком, изменит
+        // ноль строк, потому что срок уже сдвинут.
+        command.CommandText = """
+            UPDATE monitors
+               SET next_due_ticks = $next
+             WHERE id = $id
+               AND next_due_ticks = $expected;
+            """;
+
+        command.Parameters.AddWithValue("$id", id.ToString());
+        command.Parameters.AddWithValue("$expected", expectedDueUtc.UtcTicks);
+        command.Parameters.AddWithValue("$next", (object?)nextDueUtc?.UtcTicks ?? DBNull.Value);
+
+        return await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false) == 1;
     }
 
     public async Task<MonitorStatus> GetStatusAsync(Guid id, CancellationToken cancellationToken = default)

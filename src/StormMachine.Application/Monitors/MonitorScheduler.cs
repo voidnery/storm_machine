@@ -1,4 +1,4 @@
-using Microsoft.Extensions.Logging;
+﻿using Microsoft.Extensions.Logging;
 using StormMachine.Application.Abstractions;
 using StormMachine.Domain.Monitors;
 using Monitor = StormMachine.Domain.Monitors.Monitor;
@@ -259,6 +259,25 @@ public sealed class MonitorScheduler(
                 }
             }
 
+            // Второй барьер, и он в базе. Первый живёт в памяти этого экземпляра
+            // и про соседний процесс не знает, а со службой мониторов (И-21) два
+            // планировщика над одной базой — обычная конфигурация: служба наблюдает
+            // всегда, клиент открывают, когда надо посмотреть. Без захвата оба увидели
+            // бы один срок и оба выполнили бы проверку.
+            var claimed = await _store
+                .TryClaimDueAsync(monitor.Id, due, NextSlot(monitor, due, now), cancellationToken)
+                .ConfigureAwait(false);
+
+            if (!claimed)
+            {
+                lock (_gate)
+                {
+                    _running.Remove(monitor.Id);
+                }
+
+                continue;
+            }
+
             _ = ExecuteAsync(monitor, due, cancellationToken);
         }
     }
@@ -290,7 +309,7 @@ public sealed class MonitorScheduler(
         }
         finally
         {
-            await AdvanceAsync(monitor, due).ConfigureAwait(false);
+            Advance(monitor, due);
 
             lock (_gate)
             {
@@ -300,17 +319,21 @@ public sealed class MonitorScheduler(
     }
 
     /// <summary>
-    /// Назначает следующий срок.
+    /// Следующий срок после наступившего.
     /// </summary>
     /// <remarks>
     /// Сетка отсчитывается от назначенного срока, а не от момента завершения: иначе
     /// «каждый день в 3:00» уползало бы на длительность проверки каждые сутки.
     /// Но и догонять пропущенное из-за затянувшейся проверки нельзя — поэтому сроки,
     /// оставшиеся позади, пролистываются до первого будущего.
+    /// <para>
+    /// Считается в одном месте и используется дважды: при захвате срока и при правке
+    /// кэша после проверки. Два разных вычисления одного и того же разошлись бы —
+    /// и разошлись бы незаметно, потому что оба дают правдоподобный момент.
+    /// </para>
     /// </remarks>
-    private async Task AdvanceAsync(Monitor monitor, DateTimeOffset due)
+    private static DateTimeOffset? NextSlot(Monitor monitor, DateTimeOffset due, DateTimeOffset now)
     {
-        var now = _time.GetUtcNow();
         var next = monitor.Schedule.NextAfter(due);
 
         for (var guard = 0; guard < 10_000 && next is { } moment && moment <= now; guard++)
@@ -318,17 +341,29 @@ public sealed class MonitorScheduler(
             next = monitor.Schedule.NextAfter(moment);
         }
 
-        try
-        {
-            await _store.SetNextDueAsync(monitor.Id, next, CancellationToken.None).ConfigureAwait(false);
+        return next;
+    }
 
-            // Кэш правится на месте: до следующего перечитывания монитор иначе
-            // остался бы с прошедшим сроком и запустился бы снова через секунду.
-            _cache = [.. _cache.Select(m => m.Id == monitor.Id ? m with { NextDueUtc = next } : m)];
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Монитор {Monitor}: не удалось записать следующий срок.", monitor.Name);
-        }
+    /// <summary>
+    /// Приводит кэш в соответствие с базой после проверки.
+    /// </summary>
+    /// <remarks>
+    /// В базу писать уже нечего: срок сдвинут захватом <b>до</b> проверки, а не после
+    /// неё. Порядок именно такой из-за второго планировщика — иначе оба успели бы
+    /// увидеть срок наступившим, пока первый мерил.
+    /// <para>
+    /// Цена известна и принята: процесс, погибший посреди проверки, оставит срок уже
+    /// сдвинутым, и эта одна проверка не запишется даже пропуском. Систематический
+    /// двойной запуск обошёлся бы дороже — он удваивает измерения в журнале и заставляет
+    /// правило оповещения считать два отказа там, где случился один.
+    /// </para>
+    /// </remarks>
+    private void Advance(Monitor monitor, DateTimeOffset due)
+    {
+        var next = NextSlot(monitor, due, _time.GetUtcNow());
+
+        // Кэш правится на месте: до следующего перечитывания монитор иначе
+        // остался бы с прошедшим сроком и запустился бы снова через секунду.
+        _cache = [.. _cache.Select(m => m.Id == monitor.Id ? m with { NextDueUtc = next } : m)];
     }
 }

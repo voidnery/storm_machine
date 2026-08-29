@@ -1,4 +1,4 @@
-using System.CommandLine;
+﻿using System.CommandLine;
 using System.Globalization;
 using Microsoft.Extensions.DependencyInjection;
 using StormMachine.Application.Abstractions;
@@ -38,6 +38,7 @@ internal static class MonitorsCommand
         command.Subcommands.Add(BuildChecks(services));
         command.Subcommands.Add(BuildSla(services));
         command.Subcommands.Add(BuildWatch(services));
+        command.Subcommands.Add(MonitorServiceCommands.Create(services));
 
         command.SetAction(async (_, cancellationToken) =>
         {
