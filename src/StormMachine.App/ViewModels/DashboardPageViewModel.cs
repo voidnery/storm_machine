@@ -1,4 +1,4 @@
-using System.Collections.ObjectModel;
+﻿using System.Collections.ObjectModel;
 using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -148,11 +148,13 @@ public sealed partial class DashboardPageViewModel(
                 RecentRuns.Add(run);
             }
 
-            var (size, count, samples) = await _store.GetUsageAsync(cancellationToken).ConfigureAwait(true);
+            var usage = await _store.GetUsageAsync(cancellationToken).ConfigureAwait(true);
 
-            JournalInfo = count == 0
+            JournalInfo = usage.RunCount == 0
                 ? "Журнал пуст. Запусти измерение — прогоны сохраняются автоматически."
-                : $"В журнале {count} прогонов, {samples.ToString("N0", CultureInfo.InvariantCulture)} сэмплов, {size / 1024.0 / 1024.0:0.00} МБ";
+                : $"В журнале {usage.RunCount} прогонов, "
+                  + $"{usage.SampleCount.ToString("N0", CultureInfo.InvariantCulture)} сэмплов, "
+                  + $"{usage.SizeBytes / 1024.0 / 1024.0:0.00} МБ";
         }
         catch (Exception ex)
         {

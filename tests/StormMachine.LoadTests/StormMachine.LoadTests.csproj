@@ -1,0 +1,39 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Нагрузочный прогон И-19: 4096 узлов на карте и год работы монитора в журнале.
+
+       Проект входит в решение НАМЕРЕННО, хотя в обычном прогоне тестов не нужен:
+       так он собирается вместе со всем остальным и не может тихо сломаться.
+       Проект вне решения не собирается ничем — именно так сборка релизных
+       артефактов была сломана с И-3 и никто не замечал этого семь итераций.
+
+       Из обычного прогона он исключается признаком, а не отсутствием в решении:
+
+           dotnet test с фильтром «Категория!=Нагрузка» — обычный прогон, секунды
+           dotnet test tests/StormMachine.LoadTests -c Release   нагрузка, ~1 минута
+
+       Замеры складываются в artifacts/load-*.txt — числа нужны не как «прошло»,
+       а как то, с чем сравнивать через год. -->
+
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <TargetFramework>net10.0-windows</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\StormMachine.Domain\StormMachine.Domain.csproj" />
+    <ProjectReference Include="..\..\src\StormMachine.Storage\StormMachine.Storage.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+</Project>

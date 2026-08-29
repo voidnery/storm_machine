@@ -1,4 +1,4 @@
-using System.Collections.ObjectModel;
+﻿using System.Collections.ObjectModel;
 using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -99,10 +99,17 @@ public sealed partial class RunsPageViewModel(
                 Runs.Add(run);
             }
 
-            var (size, count, samples) = await _store.GetUsageAsync(cancellationToken).ConfigureAwait(true);
+            var usage = await _store.GetUsageAsync(cancellationToken).ConfigureAwait(true);
 
-            Usage = $"Журнал: {count} прогонов, {samples.ToString("N0", CultureInfo.InvariantCulture)} сэмплов, "
-                    + $"{size / 1024.0 / 1024.0:0.00} МБ · {_store.Location}";
+            // Свободное место названо отдельно и только когда его заметно: после уборки
+            // размер файла не меняется, и без этой строки уборка выглядит не сработавшей.
+            var free = usage.HasNotableFreeSpace
+                ? $" (свободно внутри файла {usage.ReusableBytes / 1024.0 / 1024.0:0.00} МБ — уйдёт под новые записи)"
+                : string.Empty;
+
+            Usage = $"Журнал: {usage.RunCount} прогонов, "
+                    + $"{usage.SampleCount.ToString("N0", CultureInfo.InvariantCulture)} сэмплов, "
+                    + $"{usage.SizeBytes / 1024.0 / 1024.0:0.00} МБ{free} · {_store.Location}";
 
             ErrorMessage = null;
         }

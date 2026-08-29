@@ -1,4 +1,4 @@
-using StormMachine.Domain.Measurements;
+﻿using StormMachine.Domain.Measurements;
 using StormMachine.Domain.Results;
 using StormMachine.Domain.Targets;
 
@@ -66,6 +66,53 @@ public interface IRunWriter : IAsyncDisposable
         CancellationToken cancellationToken = default);
 }
 
+/// <summary>
+/// Сколько места занимает журнал.
+/// </summary>
+/// <remarks>
+/// Свободное место внутри файла названо отдельно, и это не мелочь показа.
+/// SQLite не отдаёт место операционной системе при удалении: страницы освобождаются
+/// внутри файла и переиспользуются под новые записи, а сам файл не уменьшается.
+/// <para>
+/// Найдено нагрузочным прогоном И-19. Уборка удалила 1 051 200 сэмплов — всё, что
+/// накопил монитор за год, — и размер файла не сдвинулся: 153.2 МБ до и 153.3 МБ после.
+/// Оператор, запустивший уборку и увидевший то же число, сделает единственный
+/// возможный вывод: уборка не сработала. Показывать один размер значит поощрять этот
+/// вывод, а он неверен — место освобождено и будет переиспользовано.
+/// </para>
+/// <para>
+/// Сжимать файл продукт не берётся: <c>VACUUM</c> на базе в сотни мегабайт требует
+/// столько же свободного места на диске и заметного времени, а делать это при запуске
+/// значило бы менять понятную задержку на непонятную. Правильный ответ здесь —
+/// сказать правду, а не спрятать её.
+/// </para>
+/// </remarks>
+public sealed record StorageUsage
+{
+    /// <summary>Размер файла базы на диске.</summary>
+    public required long SizeBytes { get; init; }
+
+    /// <summary>Освобождённое место внутри файла: оно уйдёт под новые записи.</summary>
+    public required long ReusableBytes { get; init; }
+
+    public required int RunCount { get; init; }
+
+    public required long SampleCount { get; init; }
+
+    /// <summary>Сколько файл занят по существу.</summary>
+    public long UsedBytes => Math.Max(0, SizeBytes - ReusableBytes);
+
+    /// <summary>
+    /// Стоит ли вообще упоминать свободное место.
+    /// </summary>
+    /// <remarks>
+    /// Пока его мало, отдельная строка только загромождает показ. Десятая часть файла —
+    /// та граница, после которой расхождение между «размером» и «занятым» начинает
+    /// сбивать с толку.
+    /// </remarks>
+    public bool HasNotableFreeSpace => SizeBytes > 0 && ReusableBytes * 10 > SizeBytes;
+}
+
 /// <summary>Хранилище прогонов.</summary>
 /// <summary>
 /// Как снаружи указать другой файл базы.
@@ -118,6 +165,6 @@ public interface IRunStore
         bool dryRun = false,
         CancellationToken cancellationToken = default);
 
-    /// <summary>Размер файла базы в байтах и число прогонов — для показа в настройках.</summary>
-    Task<(long SizeBytes, int RunCount, long SampleCount)> GetUsageAsync(CancellationToken cancellationToken = default);
+    /// <summary>Что занимает база — для показа в настройках.</summary>
+    Task<StorageUsage> GetUsageAsync(CancellationToken cancellationToken = default);
 }

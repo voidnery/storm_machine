@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Logging;
 using StormMachine.Application.Abstractions;
@@ -350,22 +350,36 @@ public sealed class SqliteRunStore : IRunStore, IStorageLocation
         return ApplyRetention(connection, policy, dryRun);
     }
 
-    public async Task<(long SizeBytes, int RunCount, long SampleCount)> GetUsageAsync(
-        CancellationToken cancellationToken = default)
+    public async Task<StorageUsage> GetUsageAsync(CancellationToken cancellationToken = default)
     {
         await using var connection = await OpenAsync(cancellationToken).ConfigureAwait(false);
         await using var command = connection.CreateCommand();
 
-        command.CommandText = "SELECT (SELECT COUNT(*) FROM runs), (SELECT COUNT(*) FROM samples);";
+        // freelist_count и page_size дают освобождённое место внутри файла. Без него
+        // размер базы после уборки выглядит неизменившимся, и уборка — не сработавшей:
+        // SQLite не отдаёт место системе, а переиспользует его под новые записи.
+        command.CommandText = """
+            SELECT (SELECT COUNT(*) FROM runs),
+                   (SELECT COUNT(*) FROM samples),
+                   (SELECT * FROM pragma_freelist_count()),
+                   (SELECT * FROM pragma_page_size());
+            """;
 
         await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
         await reader.ReadAsync(cancellationToken).ConfigureAwait(false);
 
         var runs = reader.GetInt32(0);
         var samples = reader.GetInt64(1);
-        var size = File.Exists(Location) ? new FileInfo(Location).Length : 0;
+        var freePages = reader.GetInt64(2);
+        var pageSize = reader.GetInt64(3);
 
-        return (size, runs, samples);
+        return new StorageUsage
+        {
+            SizeBytes = File.Exists(Location) ? new FileInfo(Location).Length : 0,
+            ReusableBytes = freePages * pageSize,
+            RunCount = runs,
+            SampleCount = samples,
+        };
     }
 
     // ------------------------------------------------------------------ детали

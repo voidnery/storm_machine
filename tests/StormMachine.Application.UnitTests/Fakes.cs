@@ -185,8 +185,14 @@ internal sealed class NullRunStore : IRunStore
         bool dryRun = false,
         CancellationToken cancellationToken = default) => throw new NotSupportedException();
 
-    public Task<(long SizeBytes, int RunCount, long SampleCount)> GetUsageAsync(
-        CancellationToken cancellationToken = default) => Task.FromResult((0L, 0, 0L));
+    public Task<StorageUsage> GetUsageAsync(CancellationToken cancellationToken = default) =>
+        Task.FromResult(new StorageUsage
+        {
+            SizeBytes = 0,
+            ReusableBytes = 0,
+            RunCount = 0,
+            SampleCount = 0,
+        });
 }
 
 /// <summary>Запись прогона, которая ничего не пишет, но выдаёт идентификатор.</summary>

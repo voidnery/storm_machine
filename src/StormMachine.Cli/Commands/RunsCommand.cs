@@ -1,4 +1,4 @@
-using System.CommandLine;
+﻿using System.CommandLine;
 using System.Globalization;
 using Microsoft.Extensions.DependencyInjection;
 using StormMachine.Application.Abstractions;
@@ -332,12 +332,21 @@ internal static class RunsCommand
             var store = services.GetRequiredService<IRunStore>();
             await store.InitializeAsync(cancellationToken).ConfigureAwait(false);
 
-            var (size, runs, samples) = await store.GetUsageAsync(cancellationToken).ConfigureAwait(false);
+            var usage = await store.GetUsageAsync(cancellationToken).ConfigureAwait(false);
 
             Console.WriteLine($"Файл базы : {store.Location}");
-            Console.WriteLine($"Размер    : {size / 1024.0 / 1024.0:0.00} МБ");
-            Console.WriteLine($"Прогонов  : {runs}");
-            Console.WriteLine($"Сэмплов   : {samples.ToString("N0", CultureInfo.InvariantCulture)}");
+            Console.WriteLine($"Размер    : {Megabytes(usage.SizeBytes)} МБ");
+            Console.WriteLine($"Прогонов  : {usage.RunCount}");
+            Console.WriteLine($"Сэмплов   : {usage.SampleCount.ToString("N0", CultureInfo.InvariantCulture)}");
+
+            if (usage.HasNotableFreeSpace)
+            {
+                // Иначе уборка выглядит не сработавшей: размер файла после неё тот же.
+                Console.WriteLine(
+                    $"Свободно  : {Megabytes(usage.ReusableBytes)} МБ внутри файла — "
+                    + "место освобождено уборкой и уйдёт под новые записи. "
+                    + "Файл при этом не уменьшается: так устроена SQLite.");
+            }
 
             return 0;
         });
@@ -393,4 +402,7 @@ internal static class RunsCommand
                 return null;
         }
     }
+    private static string Megabytes(long bytes) =>
+        (bytes / 1024.0 / 1024.0).ToString("0.00", CultureInfo.InvariantCulture);
+
 }

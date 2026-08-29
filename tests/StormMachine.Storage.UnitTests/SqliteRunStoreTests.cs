@@ -1,4 +1,4 @@
-using StormMachine.Application.Abstractions;
+﻿using StormMachine.Application.Abstractions;
 using StormMachine.Domain.Measurements;
 using StormMachine.Domain.Results;
 using StormMachine.Domain.Targets;
@@ -343,6 +343,73 @@ public sealed class SqliteRunStoreTests : IDisposable
         Assert.Equal(3.0, run.Series[0].Statistics.MaxMs, 6);
     }
 
+    /// <summary>
+    /// После уборки видно, что место освободилось.
+    /// </summary>
+    /// <remarks>
+    /// Найдено нагрузочным прогоном И-19: уборка удалила 1 051 200 сэмплов — всё,
+    /// что монитор накопил за год, — и размер файла не сдвинулся, 153.2 МБ до и
+    /// 153.3 МБ после. SQLite не отдаёт место системе: страницы освобождаются внутри
+    /// файла и переиспользуются. Оператор, увидевший то же число, сделает единственный
+    /// возможный вывод — уборка не сработала, — и вывод будет неверным.
+    /// <para>
+    /// Отсюда предмет проверки: хранилище обязано <b>называть</b> освобождённое место,
+    /// а не только общий размер. Сжимать файл продукт не берётся, и это отдельное
+    /// решение: VACUUM на сотнях мегабайт требует столько же свободного места
+    /// и заметного времени.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public async Task Retention_ReportsFreedSpaceInsteadOfLookingLikeItDidNothing()
+    {
+        var store = CreateStore();
+        await store.InitializeAsync();
+
+        // Нужен объём: на паре сэмплов освободится меньше страницы, и разницу
+        // не увидит ни оператор, ни эта проверка.
+        for (var run = 0; run < 40; run++)
+        {
+            await using var writer = await store.BeginRunAsync(Descriptor());
+
+            for (var i = 0; i < 200; i++)
+            {
+                await writer.AppendAsync(Ok(i, 1.0 + (i % 30) / 10.0));
+            }
+
+            await writer.CompleteAsync([], null, wasCancelled: false);
+        }
+
+        var before = await store.GetUsageAsync();
+
+        Assert.Equal(8000, before.SampleCount);
+
+        var report = await store.ApplyRetentionAsync(new RetentionPolicy
+        {
+            RawSampleHorizon = TimeSpan.Zero,
+            RunHorizon = TimeSpan.FromDays(365),
+        });
+
+        Assert.Equal(8000, report.SamplesDeleted);
+
+        var after = await store.GetUsageAsync();
+
+        Assert.Equal(0, after.SampleCount);
+
+        // Размер файла при этом не обязан уменьшиться — и обычно не уменьшается.
+        // Утверждение здесь ровно одно: освободившееся место названо.
+        Assert.True(
+            after.ReusableBytes > before.ReusableBytes,
+            "Уборка удалила 8000 сэмплов, а свободного места внутри файла не прибавилось. "
+            + "Оператор увидит прежний размер и решит, что уборка не сработала.");
+
+        Assert.True(
+            after.HasNotableFreeSpace,
+            $"Свободно {after.ReusableBytes} из {after.SizeBytes} байт — это стоит показать, "
+            + "иначе размер файла остаётся необъяснённым.");
+
+        Assert.True(after.UsedBytes < after.SizeBytes);
+    }
+
     [Fact]
     public async Task Retention_DryRunChangesNothing()
     {
@@ -387,10 +454,10 @@ public sealed class SqliteRunStoreTests : IDisposable
         Assert.True(await store.DeleteAsync(id));
         Assert.Null(await store.GetAsync(id));
 
-        var (_, runs, samples) = await store.GetUsageAsync();
+        var usage = await store.GetUsageAsync();
 
-        Assert.Equal(0, runs);
-        Assert.Equal(0, samples);
+        Assert.Equal(0, usage.RunCount);
+        Assert.Equal(0, usage.SampleCount);
     }
 
     [Fact]
