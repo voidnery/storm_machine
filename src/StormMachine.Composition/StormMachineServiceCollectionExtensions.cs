@@ -145,6 +145,10 @@ public static class StormMachineServiceCollectionExtensions
         services.AddSingleton<IBaselineStore>(provider => new SqliteBaselineStore(
             (SqliteRunStore)provider.GetRequiredService<IRunStore>()));
 
+        // Перенос настроек между машинами (И-22): один механизм на профили, мониторы
+        // и эталоны — три отдельные выгрузки разошлись бы по формату и по поведению.
+        services.AddSingleton<SettingsTransfer>();
+
         // История наблюдений за оборудованием (И-21): счётчики портов и услышанное
         // в эфире. До неё оба вида данных продукт читал и забывал, а спрашивают у него
         // «что было ночью» и «когда этот сервер появился».

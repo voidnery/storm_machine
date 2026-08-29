@@ -161,6 +161,7 @@ internal static class Program
         root.Subcommands.Add(AgentsCommand.Create(services));
         root.Subcommands.Add(PresetsCommand.Create(services));
         root.Subcommands.Add(MonitorsCommand.Create(services));
+        root.Subcommands.Add(SettingsTransferCommands.Create(services));
         root.Subcommands.Add(AlertsCommand.Create(services));
         root.Subcommands.Add(RunsCommand.Create(services));
         root.Subcommands.Add(ReportCommand.Create(services));

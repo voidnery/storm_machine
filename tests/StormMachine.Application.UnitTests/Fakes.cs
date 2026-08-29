@@ -5,6 +5,7 @@ using StormMachine.Application.Probes;
 using StormMachine.Domain.Measurements;
 using StormMachine.Domain.Monitors;
 using StormMachine.Domain.Profiles;
+using StormMachine.Domain.Reports;
 using StormMachine.Domain.Results;
 using StormMachine.Domain.Targets;
 using Monitor = StormMachine.Domain.Monitors.Monitor;
@@ -368,4 +369,71 @@ internal sealed class EmptyAgentStore : IAgentStore
 
     public Task<bool> ForgetAsync(string thumbprint, CancellationToken cancellationToken = default) =>
         Task.FromResult(false);
+}
+
+/// <summary>Профили в памяти.</summary>
+internal sealed class FakeProfileStore : IProfileStore
+{
+    private readonly Dictionary<Guid, NetworkProfile> _profiles = [];
+
+    public Task<IReadOnlyList<NetworkProfile>> ListAsync(CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<NetworkProfile>>([.. _profiles.Values]);
+
+    public Task<NetworkProfile?> GetAsync(Guid id, CancellationToken cancellationToken = default) =>
+        Task.FromResult(_profiles.GetValueOrDefault(id));
+
+    public Task<NetworkProfile?> FindAsync(string nameOrId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(_profiles.Values.FirstOrDefault(p =>
+            string.Equals(p.Name, nameOrId, StringComparison.OrdinalIgnoreCase)));
+
+    public Task<NetworkProfile?> GetActiveAsync(CancellationToken cancellationToken = default) =>
+        Task.FromResult(_profiles.Values.FirstOrDefault(p => p.IsActive));
+
+    public Task SaveAsync(NetworkProfile profile, CancellationToken cancellationToken = default)
+    {
+        _profiles[profile.Id] = profile;
+
+        return Task.CompletedTask;
+    }
+
+    public Task ActivateAsync(Guid? id, CancellationToken cancellationToken = default)
+    {
+        foreach (var (key, value) in _profiles.ToList())
+        {
+            _profiles[key] = value with { IsActive = id == key };
+        }
+
+        return Task.CompletedTask;
+    }
+
+    public Task<bool> DeleteAsync(Guid id, CancellationToken cancellationToken = default) =>
+        Task.FromResult(_profiles.Remove(id));
+}
+
+/// <summary>Эталоны в памяти.</summary>
+internal sealed class FakeBaselineStore : IBaselineStore
+{
+    private readonly Dictionary<Guid, Baseline> _baselines = [];
+
+    public Task<IReadOnlyList<Baseline>> ListAsync(
+        BaselineQuery query,
+        CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<Baseline>>([.. _baselines.Values]);
+
+    public Task<Baseline?> GetAsync(Guid id, CancellationToken cancellationToken = default) =>
+        Task.FromResult(_baselines.GetValueOrDefault(id));
+
+    public Task<Baseline?> FindAsync(string nameOrId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(_baselines.Values.FirstOrDefault(b =>
+            string.Equals(b.Name, nameOrId, StringComparison.OrdinalIgnoreCase)));
+
+    public Task SaveAsync(Baseline baseline, CancellationToken cancellationToken = default)
+    {
+        _baselines[baseline.Id] = baseline;
+
+        return Task.CompletedTask;
+    }
+
+    public Task<bool> DeleteAsync(Guid id, CancellationToken cancellationToken = default) =>
+        Task.FromResult(_baselines.Remove(id));
 }
