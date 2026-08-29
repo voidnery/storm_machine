@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using QuestPDF.Fluent;
 using QuestPDF.Helpers;
 using QuestPDF.Infrastructure;
@@ -141,7 +141,7 @@ public sealed class PdfReportRenderer(ITopologyLayout layout) : IReportRenderer
 
             if (diagram is not null)
             {
-                column.Item().Element(x => ComposeTopology(x, diagram));
+                column.Item().Element(x => ComposeTopology(x, diagram, request.Topology?.Caveats ?? []));
             }
 
             ComposeRuns(column, request);
@@ -197,7 +197,7 @@ public sealed class PdfReportRenderer(ITopologyLayout layout) : IReportRenderer
         }
     }
 
-    private static void ComposeTopology(IContainer container, byte[] diagram)
+    private static void ComposeTopology(IContainer container, byte[] diagram, IReadOnlyList<string> caveats)
     {
         container.Column(column =>
         {
@@ -212,6 +212,15 @@ public sealed class PdfReportRenderer(ITopologyLayout layout) : IReportRenderer
                     + "из наблюдений; точечная — допущение. Схема показывает то, что продукт "
                     + "увидел с этой машины, а не паспортную схему сети.")
                 .FontSize(7.5f).Italic().FontColor(Colors.Grey.Darken1);
+
+            // Оговорки идут в отчёт наравне со схемой. Отчёт читают без продукта
+            // под рукой, и «эти узлы в разных VLAN» — то, чего по картинке не видно
+            // и о чём спросить будет некого.
+            foreach (var caveat in caveats)
+            {
+                column.Item().PaddingTop(3).Text(caveat)
+                    .FontSize(7.5f).SemiBold().FontColor(Colors.Orange.Darken2);
+            }
         });
     }
 

@@ -93,6 +93,23 @@ public sealed record TopologyNode
 
     /// <summary>Строка подробностей для подсказки.</summary>
     public string? Detail { get; init; }
+
+    /// <summary>
+    /// VLAN, в которой узел виден коммутатору. <c>null</c> — неизвестна.
+    /// </summary>
+    /// <remarks>
+    /// Появилась в И-23. До неё номер VLAN читался из таблицы пересылки, показывался
+    /// в выводе SNMP и <b>терялся на карте</b>: два устройства в разных VLAN на одном
+    /// коммутаторе выглядели соседями. Это не пробел показа, а неверное утверждение:
+    /// разные VLAN — разные широковещательные домены, и увидеть друг друга эти два
+    /// устройства не могут.
+    /// <para>
+    /// Пусто там, где номер неизвестен, и это не то же самое, что «VLAN 1». Устройство
+    /// на коммутаторе без Q-BRIDGE-MIB и устройство в первой VLAN различимы, и сводить
+    /// их к одному значению значило бы выдумать сведения.
+    /// </para>
+    /// </remarks>
+    public int? Vlan { get; init; }
 }
 
 /// <summary>
@@ -221,6 +238,24 @@ public sealed record TopologyGraph
 
     public required IReadOnlyList<TopologyLink> Links { get; init; }
 
+    /// <summary>
+    /// Оговорки к карте: где её нельзя читать буквально.
+    /// </summary>
+    /// <remarks>
+    /// Появились в И-23 ради VLAN, и это первый случай, когда карта обязана сказать
+    /// о себе то, чего не видно из её рисунка. Уровень уверенности отвечает на вопрос
+    /// «эта связь настоящая»; оговорка — на другой: «связи нарисованы верно, а вот
+    /// соседями эти узлы не являются».
+    /// <para>
+    /// Разные VLAN на одном коммутаторе — разные широковещательные домены. Устройства
+    /// в них не видят друг друга, но на карте висят на одном узле и читаются соседями.
+    /// Перестроить рисунок так, чтобы это было видно, значило бы завести отдельный узел
+    /// на каждую VLAN — и потерять главное, что карта показывает: физическую структуру.
+    /// Сказать словами дешевле и честнее.
+    /// </para>
+    /// </remarks>
+    public IReadOnlyList<string> Caveats { get; init; } = [];
+
     public bool IsEmpty => Nodes.Count == 0;
 
     public int ConfirmedLinks => Links.Count(l => l.Confidence == LinkConfidence.Confirmed);
@@ -269,8 +304,8 @@ public sealed record TopologyGraph
         /// <summary>Связи, которые оператор объявил ошибочными, — в обе стороны.</summary>
         private readonly HashSet<(string From, string To)> _removed = [];
 
-        /// <summary>MAC-адрес → порт коммутатора, в который он воткнут.</summary>
-        private readonly Dictionary<string, (string SwitchId, string Port)> _wired =
+        /// <summary>MAC-адрес → порт коммутатора, в который он воткнут, и его VLAN.</summary>
+        private readonly Dictionary<string, (string SwitchId, string Port, int? Vlan)> _wired =
             new(StringComparer.OrdinalIgnoreCase);
 
         private readonly TopologyInput _input = input;
@@ -427,7 +462,9 @@ public sealed record TopologyGraph
                     continue;
                 }
 
-                _wired[mac] = (switchId, port.Interface.DisplayName);
+                // Номер VLAN берётся из той же записи таблицы пересылки, что и адрес:
+                // он есть, только если таблица читалась через Q-BRIDGE-MIB.
+                _wired[mac] = (switchId, port.Interface.DisplayName, port.Addresses[0].Vlan);
             }
         }
 
@@ -607,18 +644,28 @@ public sealed record TopologyGraph
                 Detail = device.ExtraAddresses.Count > 0
                     ? "ещё адреса: " + string.Join(", ", device.ExtraAddresses)
                     : null,
+                Vlan = device.MacAddress is { } known && _wired.TryGetValue(known, out var seen)
+                    ? seen.Vlan
+                    : null,
             });
 
             // Порт коммутатора весит больше принадлежности подсети: он называет
             // не «где-то в этом домене», а «вот в этом гнезде».
             if (device.MacAddress is { } mac && _wired.TryGetValue(mac, out var wired))
             {
+                // VLAN дописывается в причину, а не только в поле узла: строку «почему»
+                // читают, когда связь вызывает сомнение, и номер домена — первое,
+                // что там нужно.
+                var vlan = wired.Vlan is { } number
+                    ? $", VLAN {number.ToString(CultureInfo.InvariantCulture)}"
+                    : string.Empty;
+
                 _links.Add(new TopologyLink(
                     wired.SwitchId,
                     device.Identity,
                     LinkKind.Layer2,
                     LinkConfidence.Confirmed,
-                    $"порт {wired.Port}: адрес выучен таблицей пересылки коммутатора (BRIDGE-MIB)"));
+                    $"порт {wired.Port}: адрес выучен таблицей пересылки коммутатора (BRIDGE-MIB){vlan}"));
 
                 return;
             }
@@ -921,7 +968,55 @@ public sealed record TopologyGraph
                     .OrderBy(l => l.From, StringComparer.Ordinal)
                     .ThenBy(l => l.To, StringComparer.Ordinal)
                     .ThenBy(l => (int)l.Kind)],
+                Caveats = VlanCaveats(),
             };
+        }
+
+        /// <summary>
+        /// Оговорки про VLAN.
+        /// </summary>
+        /// <remarks>
+        /// Карта показывает физическую структуру: устройства висят на портах того
+        /// коммутатора, в который воткнуты. Это верно и в сети с VLAN — но читается там
+        /// неверно, потому что разные VLAN на одном коммутаторе суть разные
+        /// широковещательные домены, и устройства в них друг друга не видят.
+        /// <para>
+        /// Оговорка появляется, только когда VLAN <b>известны и различаются</b>.
+        /// На коммутаторе без Q-BRIDGE-MIB номера нет вовсе, и молчать здесь честнее,
+        /// чем предупреждать о том, чего не наблюдали.
+        /// </para>
+        /// </remarks>
+        private List<string> VlanCaveats()
+        {
+            var caveats = new List<string>();
+
+            var bySwitch = _wired.Values
+                .Where(w => w.Vlan is not null)
+                .GroupBy(w => w.SwitchId, StringComparer.Ordinal);
+
+            foreach (var group in bySwitch.OrderBy(g => g.Key, StringComparer.Ordinal))
+            {
+                var vlans = group
+                    .Select(w => w.Vlan!.Value)
+                    .Distinct()
+                    .OrderBy(v => v)
+                    .ToList();
+
+                if (vlans.Count < 2)
+                {
+                    continue;
+                }
+
+                var label = _nodes.TryGetValue(group.Key, out var node) ? node.Label : group.Key;
+
+                caveats.Add(
+                    $"На «{label}» устройства в разных VLAN: "
+                    + string.Join(", ", vlans.Select(v => v.ToString(CultureInfo.InvariantCulture)))
+                    + ". Они висят на одном узле карты, но соседями не являются: разные VLAN — "
+                    + "разные широковещательные домены, и друг друга эти устройства не видят.");
+            }
+
+            return caveats;
         }
 
         private void Add(TopologyNode node) => _nodes.TryAdd(node.Id, node);

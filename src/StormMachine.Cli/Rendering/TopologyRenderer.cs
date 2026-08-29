@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using StormMachine.Domain.Discovery;
 using StormMachine.Domain.Topology;
 
@@ -275,6 +275,15 @@ internal static class TopologyRenderer
                 : "  без SNMP и захвата пакетов часть связей приходится выводить по правилам.");
 
             Console.WriteLine("  Каждая выведенная связь названа причиной — её можно проверить и оспорить.");
+        }
+
+        // Оговорки печатаются последними и отдельно: они говорят не о достоверности
+        // связей, а о том, что карту нельзя читать буквально. Связи при этом верны —
+        // неверно было бы прочесть их как соседство.
+        foreach (var caveat in graph.Caveats)
+        {
+            Console.WriteLine();
+            Console.WriteLine($"  ВНИМАНИЕ: {caveat}");
         }
     }
 }

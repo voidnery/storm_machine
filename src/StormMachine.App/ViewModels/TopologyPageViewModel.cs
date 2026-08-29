@@ -1,4 +1,4 @@
-using System.Collections.ObjectModel;
+﻿using System.Collections.ObjectModel;
 using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -59,6 +59,17 @@ public sealed partial class TopologyPageViewModel(
 
     [ObservableProperty]
     private string _summary = string.Empty;
+
+    /// <summary>
+    /// Оговорки к карте: где её нельзя читать буквально.
+    /// </summary>
+    /// <remarks>
+    /// Отдельно от сводки намеренно. Сводка говорит, насколько связям можно верить;
+    /// оговорка — о другом: связи верны, а вот соседями эти узлы не являются.
+    /// Смешать их значило бы утопить второе в первом.
+    /// </remarks>
+    [ObservableProperty]
+    private string? _caveats;
 
     [ObservableProperty]
     private string? _errorMessage;
@@ -411,6 +422,11 @@ public sealed partial class TopologyPageViewModel(
                   + $"подтверждённых {graph.ConfirmedLinks}, выведенных {graph.InferredLinks} "
                   + $"({Share(graph)} %). Выведенное — не ошибки: без SNMP и захвата пакетов "
                   + "часть связей приходится выводить по правилам, и каждая названа причиной.";
+
+            // Оговорки отдельной строкой и заметно: они говорят не о достоверности
+            // связей, а о том, что карту нельзя читать буквально. Связи верны —
+            // неверно было бы прочесть их как соседство.
+            Caveats = graph.Caveats.Count == 0 ? null : string.Join(Environment.NewLine, graph.Caveats);
 
             await LoadEditsAsync(cancellationToken).ConfigureAwait(true);
 
