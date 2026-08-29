@@ -32,5 +32,8 @@
     <Project Path="tests/StormMachine.Snmp.UnitTests/StormMachine.Snmp.UnitTests.csproj" />
     <Project Path="tests/StormMachine.Capture.UnitTests/StormMachine.Capture.UnitTests.csproj" />
     <Project Path="tests/StormMachine.Storage.UnitTests/StormMachine.Storage.UnitTests.csproj" />
+    <Project Path="tests/StormMachine.Cli.UnitTests/StormMachine.Cli.UnitTests.csproj" />
+    <Project Path="tests/StormMachine.Agents.UnitTests/StormMachine.Agents.UnitTests.csproj" />
+    <Project Path="tests/StormMachine.Alerting.UnitTests/StormMachine.Alerting.UnitTests.csproj" />
   </Folder>
 </Solution>

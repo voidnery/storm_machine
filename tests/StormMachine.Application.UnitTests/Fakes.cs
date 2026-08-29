@@ -1,5 +1,6 @@
 ﻿using System.Runtime.CompilerServices;
 using StormMachine.Application.Abstractions;
+using StormMachine.Domain.Agents;
 using StormMachine.Application.Probes;
 using StormMachine.Domain.Measurements;
 using StormMachine.Domain.Monitors;
@@ -297,4 +298,39 @@ internal sealed class BrokenProfileStore : IProfileStore
 
     public Task<bool> DeleteAsync(Guid id, CancellationToken cancellationToken = default) =>
         throw new IOException("база профилей недоступна");
+}
+
+/// <summary>Система, у которой можно задать наличие драйвера захвата.</summary>
+internal sealed class FakeSystem(bool driverInstalled = false) : ISystemCapabilities
+{
+    public bool IsElevated => false;
+
+    public bool IsCaptureDriverInstalled { get; } = driverInstalled;
+
+    public string? CaptureDriverDescription => IsCaptureDriverInstalled ? "Npcap 1.79" : null;
+
+    public bool CanOpenRawSockets => false;
+}
+
+/// <summary>Хранилище агентов без единого сопряжения.</summary>
+internal sealed class EmptyAgentStore : IAgentStore
+{
+    public Task InitializeAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+    public Task<byte[]?> LoadIdentityAsync(CancellationToken cancellationToken = default) =>
+        Task.FromResult<byte[]?>(null);
+
+    public Task SaveIdentityAsync(byte[] container, CancellationToken cancellationToken = default) =>
+        Task.CompletedTask;
+
+    public Task<IReadOnlyList<RemoteAgent>> ListAsync(CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<RemoteAgent>>([]);
+
+    public Task<RemoteAgent?> FindAsync(string thumbprintOrName, CancellationToken cancellationToken = default) =>
+        Task.FromResult<RemoteAgent?>(null);
+
+    public Task SaveAsync(RemoteAgent agent, CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+    public Task<bool> ForgetAsync(string thumbprint, CancellationToken cancellationToken = default) =>
+        Task.FromResult(false);
 }
