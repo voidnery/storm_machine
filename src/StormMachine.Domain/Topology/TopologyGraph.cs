@@ -264,6 +264,109 @@ public sealed record TopologyGraph
 
     public static TopologyGraph Empty { get; } = new() { Nodes = [], Links = [] };
 
+    /// <summary>
+    /// Сколько узлов ещё читаемо на одном листе A4.
+    /// </summary>
+    /// <remarks>
+    /// Полсотни ложатся читаемо, две сотни — уже нет: схема вписывается в ширину
+    /// страницы целиком, и подписи на ней становятся мельче того, что глаз разбирает.
+    /// Порог измерен глазами на печати, а не выведен из размеров шрифта.
+    /// </remarks>
+    public const int ReadableNodes = 60;
+
+    /// <summary>Схема не помещается на лист читаемо.</summary>
+    public bool IsTooLargeForOnePage => Nodes.Count > ReadableNodes;
+
+    /// <summary>
+    /// Делит карту по подсетям — по листу на подсеть.
+    /// </summary>
+    /// <remarks>
+    /// Долг И-15: схема сети в отчёте не масштабировалась под большие сети. Разбиение
+    /// именно по подсетям, а не механической нарезкой на плитки: оператор думает о своей
+    /// сети подсетями, и лист, на котором половина одной и четверть другой, читается
+    /// хуже целого.
+    /// <para>
+    /// Узлы, не принадлежащие ни одной подсети — интернет, внешние хопы, сама машина, —
+    /// попадают на каждый лист: без них лист теряет то, ради чего карта и рисуется,
+    /// а именно куда эта подсеть выходит.
+    /// </para>
+    /// <para>
+    /// Карта, помещающаяся на лист, не делится: разбиение полезно ровно тогда, когда
+    /// без него не прочесть, и дробить читаемое значило бы усложнить без причины.
+    /// </para>
+    /// </remarks>
+    public IReadOnlyList<(string Title, TopologyGraph Graph)> SplitBySubnet()
+    {
+        if (!IsTooLargeForOnePage)
+        {
+            return [];
+        }
+
+        var subnets = Nodes.Where(n => n.Kind == TopologyNodeKind.Subnet).ToList();
+
+        if (subnets.Count < 2)
+        {
+            return [];
+        }
+
+        // Узлы вне подсетей едут на каждый лист: без интернета и своей машины
+        // лист не отвечает на вопрос «куда эта подсеть выходит».
+        var shared = Nodes
+            .Where(n => n.Kind is TopologyNodeKind.Internet or TopologyNodeKind.ThisMachine
+                                or TopologyNodeKind.ExternalHop or TopologyNodeKind.Router)
+            .ToList();
+
+        var sheets = new List<(string Title, TopologyGraph Graph)>();
+
+        foreach (var subnet in subnets)
+        {
+            // Соседи подсети — то, что к ней подключено напрямую, плюс она сама.
+            var attached = Links
+                .Where(l => l.From == subnet.Id || l.To == subnet.Id)
+                .Select(l => l.From == subnet.Id ? l.To : l.From)
+                .ToHashSet(StringComparer.Ordinal);
+
+            attached.Add(subnet.Id);
+
+            // Коммутаторы тянут за собой то, что воткнуто в них: иначе лист покажет
+            // коммутатор без единого устройства и соврёт про пустой порт.
+            foreach (var id in attached.ToList())
+            {
+                if (_nodeKind(id) != TopologyNodeKind.Switch)
+                {
+                    continue;
+                }
+
+                foreach (var link in Links.Where(l => l.From == id || l.To == id))
+                {
+                    attached.Add(link.From == id ? link.To : link.From);
+                }
+            }
+
+            foreach (var node in shared)
+            {
+                attached.Add(node.Id);
+            }
+
+            var nodes = Nodes.Where(n => attached.Contains(n.Id)).ToList();
+
+            sheets.Add((
+                subnet.Label,
+                new TopologyGraph
+                {
+                    Nodes = nodes,
+                    Links = [.. Links.Where(l => attached.Contains(l.From) && attached.Contains(l.To))],
+                    Caveats = Caveats,
+                }));
+        }
+
+        return sheets;
+
+        TopologyNodeKind _nodeKind(string id) =>
+            Nodes.FirstOrDefault(n => string.Equals(n.Id, id, StringComparison.Ordinal))?.Kind
+            ?? TopologyNodeKind.Host;
+    }
+
     public static TopologyGraph Build(TopologyInput input)
     {
         ArgumentNullException.ThrowIfNull(input);

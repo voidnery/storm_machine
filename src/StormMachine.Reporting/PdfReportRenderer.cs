@@ -51,9 +51,30 @@ public sealed class PdfReportRenderer(ITopologyLayout layout) : IReportRenderer
                 "Отчёт не из чего строить: нет ни прогонов, ни данных о доступности.");
         }
 
-        var diagram = request.Topology is { IsEmpty: false } topology
-            ? TopologyDiagramImage.TryRender(_layout.Arrange(topology))
-            : null;
+        // Большая сеть рисуется по листу на подсеть, а не одной схемой во всю ширину:
+        // две сотни узлов, вписанные в страницу целиком, дают подписи мельче того,
+        // что глаз разбирает, — то есть картинку, которую нельзя прочесть (долг И-15).
+        var sheets = new List<(string Title, byte[] Image)>();
+
+        if (request.Topology is { IsEmpty: false } topology)
+        {
+            var split = topology.SplitBySubnet();
+
+            if (split.Count > 0)
+            {
+                foreach (var (title, part) in split)
+                {
+                    if (TopologyDiagramImage.TryRender(_layout.Arrange(part)) is { } image)
+                    {
+                        sheets.Add((title, image));
+                    }
+                }
+            }
+            else if (TopologyDiagramImage.TryRender(_layout.Arrange(topology)) is { } whole)
+            {
+                sheets.Add((string.Empty, whole));
+            }
+        }
 
         var document = Document.Create(container =>
         {
@@ -64,7 +85,7 @@ public sealed class PdfReportRenderer(ITopologyLayout layout) : IReportRenderer
                 page.DefaultTextStyle(x => x.FontSize(9).FontFamily(Fonts.Calibri));
 
                 page.Header().Element(header => ComposeHeader(header, request));
-                page.Content().Element(content => ComposeContent(content, request, diagram));
+                page.Content().Element(content => ComposeContent(content, request, sheets));
                 page.Footer().Element(footer => ComposeFooter(footer, request));
             });
         });
@@ -113,7 +134,10 @@ public sealed class PdfReportRenderer(ITopologyLayout layout) : IReportRenderer
 
     // --------------------------------------------------------------- содержимое
 
-    private static void ComposeContent(IContainer container, ReportRequest request, byte[]? diagram)
+    private static void ComposeContent(
+        IContainer container,
+        ReportRequest request,
+        List<(string Title, byte[] Image)> sheets)
     {
         container.PaddingVertical(12).Column(column =>
         {
@@ -139,9 +163,9 @@ public sealed class PdfReportRenderer(ITopologyLayout layout) : IReportRenderer
                 column.Item().Element(x => BaselineSection.Compose(x, request.Baselines));
             }
 
-            if (diagram is not null)
+            if (sheets.Count > 0)
             {
-                column.Item().Element(x => ComposeTopology(x, diagram, request.Topology?.Caveats ?? []));
+                column.Item().Element(x => ComposeTopology(x, sheets, request.Topology?.Caveats ?? []));
             }
 
             ComposeRuns(column, request);
@@ -197,13 +221,34 @@ public sealed class PdfReportRenderer(ITopologyLayout layout) : IReportRenderer
         }
     }
 
-    private static void ComposeTopology(IContainer container, byte[] diagram, IReadOnlyList<string> caveats)
+    private static void ComposeTopology(
+        IContainer container,
+        List<(string Title, byte[] Image)> sheets,
+        IReadOnlyList<string> caveats)
     {
         container.Column(column =>
         {
             column.Item().Text("Схема сети").FontSize(12).SemiBold();
 
-            column.Item().PaddingTop(4).Image(diagram).FitWidth();
+            if (sheets.Count > 1)
+            {
+                // Сказать, почему листов несколько: читатель отчёта не знает про порог
+                // и решит, что схема разъехалась сама.
+                column.Item().PaddingTop(2).Text(
+                        "Сеть велика для одного листа — схема разбита по подсетям. "
+                        + "Свои узлы и выход наружу повторяются на каждом листе.")
+                    .FontSize(7.5f).Italic().FontColor(Colors.Grey.Darken1);
+            }
+
+            foreach (var (title, image) in sheets)
+            {
+                if (title.Length > 0 && sheets.Count > 1)
+                {
+                    column.Item().PaddingTop(6).Text(title).FontSize(9).SemiBold();
+                }
+
+                column.Item().PaddingTop(4).Image(image).FitWidth();
+            }
 
             // Легенда обязательна: различие достоверности — главное, что карта
             // сообщает, и без объяснения три вида линий читаются как оформление.
