@@ -25,7 +25,8 @@ namespace StormMachine.Application.Profiles;
 public sealed class SettingsTransfer(
     IProfileStore profiles,
     IMonitorStore monitors,
-    IBaselineStore baselines)
+    IBaselineStore baselines,
+    IScenarioStore scenarios)
 {
     private static readonly SettingsJsonContext Context =
         new(new JsonSerializerOptions(JsonSerializerDefaults.General)
@@ -42,6 +43,16 @@ public sealed class SettingsTransfer(
     private readonly IProfileStore _profiles = profiles ?? throw new ArgumentNullException(nameof(profiles));
     private readonly IMonitorStore _monitors = monitors ?? throw new ArgumentNullException(nameof(monitors));
     private readonly IBaselineStore _baselines = baselines ?? throw new ArgumentNullException(nameof(baselines));
+
+    /// <summary>
+    /// Собранные оператором сценарии.
+    /// </summary>
+    /// <remarks>
+    /// Переносятся охотнее профиля: профиль описывает место и на другой машине скорее
+    /// всего другой, а цепочка проверок — способ работы, и он у оператора один.
+    /// Шаблоны при этом не выгружаются: они часть продукта и есть на любой машине.
+    /// </remarks>
+    private readonly IScenarioStore _scenarios = scenarios ?? throw new ArgumentNullException(nameof(scenarios));
 
     /// <summary>
     /// Что нельзя выгрузить и почему.
@@ -66,6 +77,8 @@ public sealed class SettingsTransfer(
             .ListAsync(new BaselineQuery { Limit = 10_000 }, cancellationToken)
             .ConfigureAwait(false);
 
+        var allScenarios = await _scenarios.ListAsync(cancellationToken).ConfigureAwait(false);
+
         return new SettingsBundle
         {
             ProductVersion = ProductInfo.Version,
@@ -84,6 +97,10 @@ public sealed class SettingsTransfer(
             // вопросом: журнал туда не едет. Обнулять нельзя: если базу перенесли
             // целиком, ссылка рабочая, и терять её было бы обидно.
             Baselines = [.. allBaselines],
+
+            // Шаблоны не выгружаются: они часть продукта и есть на любой машине.
+            // Едет только собранное руками.
+            Scenarios = [.. allScenarios],
         };
     }
 
@@ -212,6 +229,39 @@ public sealed class SettingsTransfer(
             }
 
             await _baselines.SaveAsync(baseline, cancellationToken).ConfigureAwait(false);
+
+            if (existing is null)
+            {
+                added++;
+            }
+            else
+            {
+                updated++;
+            }
+        }
+
+        foreach (var scenario in bundle.Scenarios)
+        {
+            if (scenario.Steps.Count == 0)
+            {
+                // Пустая цепочка — не настройка, а заготовка: переносить её незачем,
+                // но и молчать нельзя, иначе оператор будет искать её на новой машине.
+                problems.Add($"сценарий «{scenario.Name}»: шагов нет, переносить нечего");
+                skipped++;
+
+                continue;
+            }
+
+            var existing = await _scenarios.GetAsync(scenario.Id, cancellationToken).ConfigureAwait(false);
+
+            if (existing is not null && !overwrite)
+            {
+                skipped++;
+
+                continue;
+            }
+
+            await _scenarios.SaveAsync(scenario, cancellationToken).ConfigureAwait(false);
 
             if (existing is null)
             {

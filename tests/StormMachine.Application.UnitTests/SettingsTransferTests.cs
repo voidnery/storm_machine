@@ -34,8 +34,11 @@ public sealed class SettingsTransferTests
         IsActive = active,
     };
 
-    private static SettingsTransfer Build(FakeMonitorStore monitors, FakeProfileStore profiles) =>
-        new(profiles, monitors, new FakeBaselineStore());
+    private static SettingsTransfer Build(
+        FakeMonitorStore monitors,
+        FakeProfileStore profiles,
+        FakeScenarioStore? scenarios = null) =>
+        new(profiles, monitors, new FakeBaselineStore(), scenarios ?? new FakeScenarioStore());
 
     // ------------------------------------------------------------------ выгрузка
 
@@ -287,4 +290,72 @@ public sealed class SettingsTransferTests
         Assert.Contains("SNMP", SettingsTransfer.SecretsNote, StringComparison.Ordinal);
         Assert.Contains("не расшифруются", SettingsTransfer.SecretsNote, StringComparison.Ordinal);
     }
+
+    // ---------------------------------------------------------------- сценарии
+
+    /// <summary>
+    /// Собранные сценарии переносятся вместе с настройками.
+    /// </summary>
+    /// <remarks>
+    /// В И-22 их завели, а в перенос включить забыли — обнаружилось на приёмке:
+    /// выгрузка сообщила «1 профиль» там, где рядом лежали два собранных сценария.
+    /// Цепочка проверок переносится даже охотнее профиля: профиль описывает место
+    /// и на другой машине скорее всего другой, а способ работы у оператора один.
+    /// </remarks>
+    [Fact]
+    public async Task Scenarios_TravelWithTheSettings()
+    {
+        var source = new FakeScenarioStore();
+        await source.SaveAsync(Chain("моя проверка"));
+
+        var bundle = await Build(new FakeMonitorStore(), new FakeProfileStore(), source).ExportAsync();
+
+        Assert.Single(bundle.Scenarios);
+        Assert.Contains("сценарий", bundle.Describe(), StringComparison.Ordinal);
+
+        var target = new FakeScenarioStore();
+        await Build(new FakeMonitorStore(), new FakeProfileStore(), target).ImportAsync(bundle);
+
+        var arrived = Assert.Single(await target.ListAsync());
+
+        Assert.Equal("моя проверка", arrived.Name);
+        Assert.Single(arrived.Steps);
+    }
+
+    /// <summary>
+    /// Пустая заготовка не переносится, но и не замалчивается.
+    /// </summary>
+    /// <remarks>
+    /// Сценарий без шагов — не настройка, а начатое и брошенное. Перенести его значит
+    /// засорить новую машину; промолчать — заставить оператора искать его там.
+    /// </remarks>
+    [Fact]
+    public async Task EmptyScenario_IsSkippedAndNamed()
+    {
+        var bundle = new SettingsBundle { Scenarios = [Chain("пустой", steps: 0)] };
+
+        var target = new FakeScenarioStore();
+        var report = await Build(new FakeMonitorStore(), new FakeProfileStore(), target).ImportAsync(bundle);
+
+        Assert.Equal(0, report.Added);
+        Assert.Equal(1, report.Skipped);
+        Assert.Single(report.Problems);
+        Assert.Empty(await target.ListAsync());
+    }
+
+    private static Domain.Scenarios.Scenario Chain(string name, int steps = 1) => new()
+    {
+        Id = Guid.NewGuid(),
+        Name = name,
+        Steps =
+        [
+            .. Enumerable.Range(0, steps).Select(i => new Domain.Scenarios.ScenarioStep
+            {
+                Name = $"шаг {i + 1}",
+                ProbeName = "ping",
+                Target = Target.Ip("127.0.0.1"),
+            }),
+        ],
+    };
 }
+

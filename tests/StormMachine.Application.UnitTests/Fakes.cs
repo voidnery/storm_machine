@@ -7,6 +7,7 @@ using StormMachine.Domain.Monitors;
 using StormMachine.Domain.Profiles;
 using StormMachine.Domain.Reports;
 using StormMachine.Domain.Results;
+using StormMachine.Domain.Scenarios;
 using StormMachine.Domain.Targets;
 using Monitor = StormMachine.Domain.Monitors.Monitor;
 
@@ -436,4 +437,32 @@ internal sealed class FakeBaselineStore : IBaselineStore
 
     public Task<bool> DeleteAsync(Guid id, CancellationToken cancellationToken = default) =>
         Task.FromResult(_baselines.Remove(id));
+}
+
+/// <summary>Сценарии в памяти.</summary>
+internal sealed class FakeScenarioStore : IScenarioStore
+{
+    private readonly Dictionary<Guid, Scenario> _scenarios = [];
+
+    public Task InitializeAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+
+    public Task<IReadOnlyList<Scenario>> ListAsync(CancellationToken cancellationToken = default) =>
+        Task.FromResult<IReadOnlyList<Scenario>>([.. _scenarios.Values]);
+
+    public Task<Scenario?> GetAsync(Guid id, CancellationToken cancellationToken = default) =>
+        Task.FromResult(_scenarios.GetValueOrDefault(id));
+
+    public Task<Scenario?> FindAsync(string nameOrId, CancellationToken cancellationToken = default) =>
+        Task.FromResult(_scenarios.Values.FirstOrDefault(s =>
+            string.Equals(s.Name, nameOrId, StringComparison.OrdinalIgnoreCase)));
+
+    public Task SaveAsync(Scenario scenario, CancellationToken cancellationToken = default)
+    {
+        _scenarios[scenario.Id] = scenario;
+
+        return Task.CompletedTask;
+    }
+
+    public Task<bool> DeleteAsync(Guid id, CancellationToken cancellationToken = default) =>
+        Task.FromResult(_scenarios.Remove(id));
 }

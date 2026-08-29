@@ -1,5 +1,6 @@
 using StormMachine.Domain.Monitors;
 using StormMachine.Domain.Reports;
+using StormMachine.Domain.Scenarios;
 using Monitor = StormMachine.Domain.Monitors.Monitor;
 
 namespace StormMachine.Domain.Profiles;
@@ -58,9 +59,22 @@ public sealed record SettingsBundle
     /// </remarks>
     public List<Baseline> Baselines { get; init; } = [];
 
-    public bool IsEmpty => Profiles.Count == 0 && Monitors.Count == 0 && Baselines.Count == 0;
+    /// <summary>
+    /// Сценарии, собранные оператором.
+    /// </summary>
+    /// <remarks>
+    /// Добавлены в И-23. В И-22 их завели, а в перенос включить забыли — и обнаружилось
+    /// это на приёмке: выгрузка сообщила «1 профиль» там, где рядом лежали два
+    /// собранных сценария. Собранная цепочка переносится даже охотнее профиля:
+    /// профиль описывает место и на другой машине скорее всего другой, а цепочка
+    /// проверок — способ работы, и он у оператора один.
+    /// </remarks>
+    public List<Scenario> Scenarios { get; init; } = [];
 
-    public int Total => Profiles.Count + Monitors.Count + Baselines.Count;
+    public bool IsEmpty =>
+        Profiles.Count == 0 && Monitors.Count == 0 && Baselines.Count == 0 && Scenarios.Count == 0;
+
+    public int Total => Profiles.Count + Monitors.Count + Baselines.Count + Scenarios.Count;
 
     /// <summary>Что лежит в файле, одной строкой.</summary>
     public string Describe()
@@ -85,6 +99,11 @@ public sealed record SettingsBundle
         if (Baselines.Count > 0)
         {
             parts.Add(Text.Plural.With(Baselines.Count, "эталон", "эталона", "эталонов"));
+        }
+
+        if (Scenarios.Count > 0)
+        {
+            parts.Add(Text.Plural.With(Scenarios.Count, "сценарий", "сценария", "сценариев"));
         }
 
         return string.Join(", ", parts);
