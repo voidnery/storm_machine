@@ -2,6 +2,7 @@
 using System.Globalization;
 using StormMachine.Application.Abstractions;
 using StormMachine.Application.Probes;
+using StormMachine.Application.Runs;
 using StormMachine.Cli.Commands;
 using StormMachine.Domain.Measurements;
 using StormMachine.Domain.Results;
@@ -68,6 +69,35 @@ internal static class ProbeRenderer
     /// на час наблюдения. Поэтому вместо статического метода — замыкание с состоянием
     /// на один прогон.
     /// </remarks>
+    /// <summary>
+    /// Показывает оценку по порогам активного профиля.
+    /// </summary>
+    /// <remarks>
+    /// Отдельной строкой и после сводки: пороги — суждение о числах, а не сами числа,
+    /// и смешивать их со сводкой значило бы выдать мнение за измерение. Профиль
+    /// называется явно — «хорошо» зависит от места, и оператор должен видеть, по чьей
+    /// мерке вынесен вердикт.
+    /// </remarks>
+    public static void WriteProfileVerdict(RunOutcome outcome)
+    {
+        ArgumentNullException.ThrowIfNull(outcome);
+
+        if (outcome.ProfileVerdict is not { } verdict)
+        {
+            return;
+        }
+
+        Console.WriteLine();
+        Console.WriteLine($"По порогам профиля «{outcome.ProfileName}»: "
+                          + $"{VerdictWording.Mark(verdict.Level)} {VerdictWording.Outcome(verdict.Level)}");
+        Console.WriteLine($"  {verdict.Summary}");
+
+        if (verdict.Explanation is { Length: > 0 } explanation)
+        {
+            Console.WriteLine($"  {explanation}");
+        }
+    }
+
     public static Action<Sample> CreateLiveWriter(ProbeDescriptor descriptor)
     {
         ArgumentNullException.ThrowIfNull(descriptor);

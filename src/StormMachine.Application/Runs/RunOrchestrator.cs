@@ -2,6 +2,8 @@
 using StormMachine.Application.Probes;
 using StormMachine.Domain.Measurements;
 using StormMachine.Domain.Results;
+using StormMachine.Domain.Scenarios;
+using StormMachine.Domain.Profiles;
 
 namespace StormMachine.Application.Runs;
 
@@ -38,6 +40,30 @@ public sealed record RunOutcome
 
     /// <summary>Идентификатор записи в журнале, если прогон сохранялся.</summary>
     public Guid? RunId { get; init; }
+
+    /// <summary>
+    /// Оценка по порогам активного профиля. <c>null</c> — оценивать было нечем.
+    /// </summary>
+    /// <remarks>
+    /// Появилась в И-22 и закрывает долг И-16: профиль хранил свои пороги и показывал
+    /// их, а подставлять в измерение приходилось руками. Пороги для того и заводят
+    /// отдельно на каждое место, что «хорошо» от места зависит: 5 мс до шлюза в офисе —
+    /// норма, 5 мс до филиала за тысячу километров — физически невозможно.
+    /// <para>
+    /// Считается здесь, а не в клиентах, по той же причине, что и всё прочее общее:
+    /// два места оценки разошлись бы, и консоль с окном объявили бы одно измерение
+    /// нормой и отказом.
+    /// </para>
+    /// <para>
+    /// Пусто, когда активного профиля нет, когда у него нет порогов или когда мерить
+    /// оказалось нечего. Последнее существенно: проба без единого годного ответа
+    /// порогами не оценивается — у неё нет величины, с которой их сравнивать.
+    /// </para>
+    /// </remarks>
+    public Verdict? ProfileVerdict { get; init; }
+
+    /// <summary>Имя профиля, чьи пороги применялись.</summary>
+    public string? ProfileName { get; init; }
 }
 
 /// <summary>
@@ -83,11 +109,13 @@ public sealed class RunOrchestrator(
         await _clock.CalibrateAsync(cancellationToken).ConfigureAwait(false);
 
         var adapter = _environment.GetPrimaryAdapter();
+        var profile = await ActiveProfileAsync(cancellationToken).ConfigureAwait(false);
+
         var context = MeasurementConditions.Build(
             adapter,
             _clock,
             descriptor.Methodology,
-            await MeasurementConditions.ActiveProfileAsync(_profiles, cancellationToken).ConfigureAwait(false));
+            profile?.Name);
         var collector = new ProbeCollector(options.OnProgress);
         var samples = new List<Sample>();
 
@@ -160,7 +188,13 @@ public sealed class RunOrchestrator(
                     .ConfigureAwait(false);
             }
 
-            return new RunOutcome { Result = result, RunId = writer?.RunId };
+            return new RunOutcome
+            {
+                Result = result,
+                RunId = writer?.RunId,
+                ProfileName = profile?.Name,
+                ProfileVerdict = Judge(result, profile, descriptor.Shape),
+            };
         }
         finally
         {
@@ -169,5 +203,42 @@ public sealed class RunOrchestrator(
                 await writer.DisposeAsync().ConfigureAwait(false);
             }
         }
+    }
+    /// <summary>Активный профиль целиком — нужны и имя, и его пороги.</summary>
+    private async Task<NetworkProfile?> ActiveProfileAsync(CancellationToken cancellationToken)
+    {
+        if (_profiles is null)
+        {
+            return null;
+        }
+
+        try
+        {
+            return await _profiles.GetActiveAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or IOException)
+        {
+            // Профили необязательны: продукт полностью работоспособен без них,
+            // и срывать измерение из-за нечитаемого хранилища незачем.
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Оценивает прогон порогами профиля.
+    /// </summary>
+    /// <remarks>
+    /// Проба без единого годного ответа порогами не оценивается: у неё нет величины,
+    /// с которой их сравнивать, и вердикт «не прошло по порогу» подменил бы причину.
+    /// Недоступная цель — это недоступная цель, а не превышенная задержка.
+    /// </remarks>
+    private static Verdict? Judge(ProbeResult result, NetworkProfile? profile, ProbeResultShape shape)
+    {
+        if (profile is not { Thresholds.Count: > 0 } || result.SuccessCount == 0)
+        {
+            return null;
+        }
+
+        return ThresholdEvaluator.Evaluate(result, profile.Thresholds, shape);
     }
 }

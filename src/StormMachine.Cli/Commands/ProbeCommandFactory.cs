@@ -198,6 +198,7 @@ internal static class ProbeCommandFactory
         }
 
         ProbeRenderer.WriteSummary(descriptor, outcome.Result, clock);
+        ProbeRenderer.WriteProfileVerdict(outcome);
 
         if (outcome.RunId is { } runId)
         {
