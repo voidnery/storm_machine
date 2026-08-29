@@ -405,4 +405,49 @@ internal static class MonitorRenderer
 
     private static string Cut(string text, int width) =>
         text.Length <= width ? text : text[..(width - 1)] + "…";
+    /// <summary>
+    /// Показывает сравнение двух соседних периодов.
+    /// </summary>
+    /// <remarks>
+    /// Оговорка о покрытии печатается раньше чисел, а не после них. Доступность 100 %
+    /// при покрытии 4 % — это не отличный период, а период, который почти не смотрели,
+    /// и увидеть предупреждение оператор должен до того, как прочтёт цифру, а не после.
+    /// </remarks>
+    public static void WriteComparison(AvailabilityComparison comparison)
+    {
+        ArgumentNullException.ThrowIfNull(comparison);
+
+        Console.WriteLine();
+        Console.WriteLine("--- против предыдущего такого же периода ---");
+        Console.WriteLine();
+
+        if (comparison.Caveat is { } caveat)
+        {
+            Console.WriteLine($"ВНИМАНИЕ: {caveat}");
+            Console.WriteLine();
+        }
+
+        var before = comparison.Before;
+        var after = comparison.After;
+
+        Console.WriteLine($"  Было : доступность {Percent(before.UptimePercent)}, "
+                          + $"простой {Duration(before.Down)}, инцидентов {before.Incidents.Count}, "
+                          + $"покрытие {Percent(before.Coverage * 100)}");
+
+        Console.WriteLine($"  Стало: доступность {Percent(after.UptimePercent)}, "
+                          + $"простой {Duration(after.Down)}, инцидентов {after.Incidents.Count}, "
+                          + $"покрытие {Percent(after.Coverage * 100)}");
+
+        Console.WriteLine();
+        Console.WriteLine($"  {comparison.Describe()}");
+    }
+
+    private static string Duration(TimeSpan value) => value switch
+    {
+        { TotalDays: >= 1 } => $"{value.TotalDays.ToString("0.0", CultureInfo.InvariantCulture)} сут",
+        { TotalHours: >= 1 } => $"{value.TotalHours.ToString("0.0", CultureInfo.InvariantCulture)} ч",
+        { TotalMinutes: >= 1 } => $"{value.TotalMinutes.ToString("0", CultureInfo.InvariantCulture)} мин",
+        _ => $"{value.TotalSeconds.ToString("0", CultureInfo.InvariantCulture)} с",
+    };
+
 }

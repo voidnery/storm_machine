@@ -311,3 +311,97 @@ public static class AvailabilityCalculator
         return values[values.Count / 2];
     }
 }
+
+/// <summary>
+/// Сравнение доступности за два соседних периода.
+/// </summary>
+/// <remarks>
+/// Закрывает долг И-15: эталон снимался с прогона, а сравнить «доступность за этот месяц
+/// против прошлого» было нечем — данные для этого есть с И-14, механики не было.
+/// <para>
+/// Сравнивать доступность напрямую нельзя, и в этом вся тонкость. Доступность считается
+/// от <b>наблюдавшегося</b> времени, поэтому 100 % при покрытии 4 % — это не отличный
+/// месяц, а месяц, который мы почти не смотрели. Сравнение таких двух чисел даёт
+/// правдоподобный и бессмысленный ответ, и продукт обязан сказать об этом раньше,
+/// чем оператор сделает вывод.
+/// </para>
+/// </remarks>
+public sealed record AvailabilityComparison
+{
+    public required Availability Before { get; init; }
+
+    public required Availability After { get; init; }
+
+    /// <summary>Насколько изменилась доступность, в процентных пунктах.</summary>
+    public double DeltaPercent => After.UptimePercent - Before.UptimePercent;
+
+    /// <summary>Насколько изменилось время простоя.</summary>
+    public TimeSpan DeltaDown => After.Down - Before.Down;
+
+    /// <summary>Изменилось ли число инцидентов.</summary>
+    public int DeltaIncidents => After.Incidents.Count - Before.Incidents.Count;
+
+    /// <summary>
+    /// Можно ли вообще сравнивать эти два периода.
+    /// </summary>
+    /// <remarks>
+    /// Порог покрытия — половина. Ниже неё период наблюдался меньше, чем не наблюдался,
+    /// и его доступность говорит скорее о работе продукта, чем о работе сети.
+    /// </remarks>
+    public bool IsComparable => Before.Coverage >= 0.5 && After.Coverage >= 0.5;
+
+    /// <summary>Почему сравнивать нельзя. <c>null</c> — можно.</summary>
+    public string? Caveat
+    {
+        get
+        {
+            if (IsComparable)
+            {
+                return null;
+            }
+
+            var poor = Before.Coverage < After.Coverage ? Before : After;
+            var which = ReferenceEquals(poor, Before) ? "прошлый" : "этот";
+
+            return $"{which} период наблюдался лишь на "
+                   + $"{(poor.Coverage * 100).ToString("0", System.Globalization.CultureInfo.InvariantCulture)} % — "
+                   + "сравнивать доступность с таким покрытием нельзя: она посчитана "
+                   + "по тому немногому, что видели.";
+        }
+    }
+
+    /// <summary>
+    /// Что изменилось, человеческим языком.
+    /// </summary>
+    /// <remarks>
+    /// Порог в одну сотую процентного пункта — не косметика. Доступность считается
+    /// из времени, и два периода не совпадают до нуля почти никогда; называть
+    /// изменением разницу в тысячные значило бы сообщать шум как новость.
+    /// </remarks>
+    public string Describe()
+    {
+        if (Caveat is { } caveat)
+        {
+            return caveat;
+        }
+
+        var delta = DeltaPercent;
+
+        if (Math.Abs(delta) < 0.01)
+        {
+            return "Доступность не изменилась.";
+        }
+
+        var direction = delta > 0 ? "выросла" : "упала";
+        var value = Math.Abs(delta).ToString("0.00", System.Globalization.CultureInfo.InvariantCulture);
+
+        var incidents = DeltaIncidents switch
+        {
+            0 => "число инцидентов то же",
+            > 0 => $"инцидентов больше на {DeltaIncidents.ToString(System.Globalization.CultureInfo.InvariantCulture)}",
+            _ => $"инцидентов меньше на {(-DeltaIncidents).ToString(System.Globalization.CultureInfo.InvariantCulture)}",
+        };
+
+        return $"Доступность {direction} на {value} процентного пункта; {incidents}.";
+    }
+}

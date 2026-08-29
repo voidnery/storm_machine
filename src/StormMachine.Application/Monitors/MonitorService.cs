@@ -1,4 +1,5 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
+using System.Globalization;
 using Microsoft.Extensions.Logging;
 using StormMachine.Application.Abstractions;
 using StormMachine.Application.Probes;
@@ -27,8 +28,27 @@ public sealed class MonitorService(
     ScenarioRunner scenarios,
     IEnumerable<IAlertChannel> channels,
     TimeProvider time,
-    ILogger<MonitorService> logger)
+    ILogger<MonitorService> logger,
+    IObservationStore? observations = null,
+    INetworkEnvironment? environment = null)
 {
+    /// <summary>Сколько наблюдение за портом считается свежим.</summary>
+    /// <remarks>
+    /// Час — с запасом: опрос ведут в лучшем случае раз в несколько минут. Больший
+    /// возраст означает не «порт в порядке», а «мы перестали смотреть», и молчать
+    /// об этом нельзя.
+    /// </remarks>
+    private static readonly TimeSpan PortStaleAfter = TimeSpan.FromHours(1);
+
+    /// <summary>За какой срок сервер DHCP считается новым.</summary>
+    private static readonly TimeSpan DhcpFreshFor = TimeSpan.FromDays(1);
+
+    /// <summary>Сколько истории смотрит монитор порта.</summary>
+    private static readonly TimeSpan PortWindow = TimeSpan.FromHours(6);
+
+    /// <summary>Сколько истории смотрит монитор DHCP.</summary>
+    private static readonly TimeSpan DhcpWindow = TimeSpan.FromDays(30);
+
     private readonly IMonitorStore _store = store ?? throw new ArgumentNullException(nameof(store));
     private readonly IProbeRegistry _registry = registry ?? throw new ArgumentNullException(nameof(registry));
     private readonly RunOrchestrator _orchestrator = orchestrator ?? throw new ArgumentNullException(nameof(orchestrator));
@@ -36,6 +56,12 @@ public sealed class MonitorService(
     private readonly IReadOnlyList<IAlertChannel> _channels = [.. channels ?? []];
     private readonly TimeProvider _time = time ?? throw new ArgumentNullException(nameof(time));
     private readonly ILogger<MonitorService> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+
+    /// <summary>История наблюдений. Без неё мониторы оборудования не работают.</summary>
+    private readonly IObservationStore? _observations = observations;
+
+    /// <summary>Известные шлюзы — по ним отличают чужой объявленный шлюз от своего.</summary>
+    private readonly INetworkEnvironment? _environment = environment;
 
     /// <summary>Каналы, известные продукту, — для показа списка и проверки настройки.</summary>
     public IReadOnlyList<IAlertChannel> Channels => _channels;
@@ -84,9 +110,16 @@ public sealed class MonitorService(
 
         var watch = Stopwatch.StartNew();
 
-        var check = monitor.Kind == MonitorKind.Scenario
-            ? await RunScenarioAsync(monitor, startedUtc, cancellationToken).ConfigureAwait(false)
-            : await RunProbeAsync(monitor, startedUtc, cancellationToken).ConfigureAwait(false);
+        var check = monitor.Kind switch
+        {
+            MonitorKind.Scenario => await RunScenarioAsync(monitor, startedUtc, cancellationToken)
+                .ConfigureAwait(false),
+            MonitorKind.PortLoad => await WatchPortAsync(monitor, startedUtc, cancellationToken)
+                .ConfigureAwait(false),
+            MonitorKind.Dhcp => await WatchDhcpAsync(monitor, startedUtc, cancellationToken)
+                .ConfigureAwait(false),
+            _ => await RunProbeAsync(monitor, startedUtc, cancellationToken).ConfigureAwait(false),
+        };
 
         watch.Stop();
 
@@ -126,6 +159,95 @@ public sealed class MonitorService(
             },
             null,
             cancellationToken);
+    }
+
+    /// <summary>
+    /// Смотрит за портом оборудования по накопленной истории.
+    /// </summary>
+    /// <remarks>
+    /// Сам ничего не опрашивает: опрос требует учётных данных и паузы между снимками
+    /// в десятки секунд, а проверка обязана отвечать быстро. История наполняется
+    /// опросом — руками или монитором пробы, — и монитор порта её читает.
+    /// </remarks>
+    private async Task<MonitorCheck> WatchPortAsync(
+        Monitor monitor,
+        DateTimeOffset startedUtc,
+        CancellationToken cancellationToken)
+    {
+        var blank = new MonitorCheck
+        {
+            Id = Guid.NewGuid(),
+            MonitorId = monitor.Id,
+            StartedUtc = startedUtc,
+            Summary = string.Empty,
+        };
+
+        if (_observations is null)
+        {
+            return blank with
+            {
+                Level = VerdictLevel.Fail,
+                Summary = "История наблюдений недоступна — монитор порта работать не может.",
+                Error = "Нет хранилища наблюдений.",
+            };
+        }
+
+        int? port = monitor.Parameters.TryGetValue(EquipmentWatch.PortParameter, out var raw)
+                    && int.TryParse(raw, NumberStyles.Integer, CultureInfo.InvariantCulture, out var index)
+            ? index
+            : null;
+
+        var history = await _observations
+            .ListPortLoadAsync(monitor.Subject, port, _time.GetUtcNow() - PortWindow, cancellationToken)
+            .ConfigureAwait(false);
+
+        return EquipmentWatch.EvaluatePort(monitor, history, _time.GetUtcNow(), PortStaleAfter) with
+        {
+            Id = blank.Id,
+            StartedUtc = startedUtc,
+        };
+    }
+
+    /// <summary>Смотрит, не появилось ли в сегменте новых серверов DHCP.</summary>
+    private async Task<MonitorCheck> WatchDhcpAsync(
+        Monitor monitor,
+        DateTimeOffset startedUtc,
+        CancellationToken cancellationToken)
+    {
+        var blank = new MonitorCheck
+        {
+            Id = Guid.NewGuid(),
+            MonitorId = monitor.Id,
+            StartedUtc = startedUtc,
+            Summary = string.Empty,
+        };
+
+        if (_observations is null)
+        {
+            return blank with
+            {
+                Level = VerdictLevel.Fail,
+                Summary = "История наблюдений недоступна — монитор DHCP работать не может.",
+                Error = "Нет хранилища наблюдений.",
+            };
+        }
+
+        var servers = await _observations
+            .ListDhcpAsync(_time.GetUtcNow() - DhcpWindow, cancellationToken)
+            .ConfigureAwait(false);
+
+        var gateways = _environment is null
+            ? []
+            : _environment.GetAdapters()
+                .SelectMany(a => a.Gateways)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+        return EquipmentWatch.EvaluateDhcp(monitor, servers, gateways, _time.GetUtcNow(), DhcpFreshFor) with
+        {
+            Id = blank.Id,
+            StartedUtc = startedUtc,
+        };
     }
 
     private async Task<MonitorCheck> RunProbeAsync(

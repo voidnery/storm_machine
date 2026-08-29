@@ -67,6 +67,23 @@ internal static class MonitorsCommand
 
         var probe = new Option<string?>("--проба", "--probe") { Description = "Имя пробы: ping, dns, http…" };
         var scenario = new Option<string?>("--сценарий", "--scenario") { Description = "Ключ шаблона сценария: web, dns, voice." };
+
+        // Два вида наблюдения за самим оборудованием (И-21). Они смотрят не пакетами
+        // со своей машины, а по накопленной истории опроса и прослушивания.
+        var portOf = new Option<string?>("--порт-устройства", "--port-of")
+        {
+            Description = "Следить за портом оборудования: адрес устройства. Нужен --номер-порта.",
+        };
+
+        var portIndex = new Option<int?>("--номер-порта", "--port-index")
+        {
+            Description = "Номер порта (ifIndex) на устройстве.",
+        };
+
+        var dhcp = new Option<bool>("--dhcp")
+        {
+            Description = "Следить за появлением серверов DHCP в сегменте.",
+        };
         var target = new Option<string?>("--цель", "--target") { Description = "Адрес, имя узла или URL." };
 
         var every = new Option<string?>("--каждые", "--every")
@@ -157,9 +174,9 @@ internal static class MonitorsCommand
 
         var command = new Command("add", "Завести монитор.")
         {
-            name, probe, scenario, target, every, cron, parameters, thresholds, warnings,
-            maintenance, catchUp, alert, channels, raiseAfter, clearAfter, margin, cooldown,
-            repeat, sla, slaWindow, description,
+            name, probe, scenario, portOf, portIndex, dhcp, target, every, cron, parameters,
+            thresholds, warnings, maintenance, catchUp, alert, channels, raiseAfter, clearAfter,
+            margin, cooldown, repeat, sla, slaWindow, description,
         };
 
         command.SetAction(async (parse, cancellationToken) =>
@@ -169,10 +186,25 @@ internal static class MonitorsCommand
 
             var probeName = parse.GetValue(probe);
             var scenarioKey = parse.GetValue(scenario);
+            var device = parse.GetValue(portOf);
+            var watchDhcp = parse.GetValue(dhcp);
 
-            if (probeName is null == scenarioKey is null)
+            var chosen = new[] { probeName is not null, scenarioKey is not null, device is not null, watchDhcp }
+                .Count(x => x);
+
+            if (chosen != 1)
             {
-                Console.Error.WriteLine("Нужно указать ровно одно: --проба или --сценарий.");
+                Console.Error.WriteLine(
+                    "Нужно указать ровно одно: --проба, --сценарий, --порт-устройства или --dhcp.");
+
+                return 1;
+            }
+
+            if (device is not null && parse.GetValue(portIndex) is null)
+            {
+                Console.Error.WriteLine(
+                    "Для наблюдения за портом нужен его номер: «--номер-порта <ifIndex>». "
+                    + "Узнать номера: storm snmp interfaces <устройство>.");
 
                 return 1;
             }
@@ -194,7 +226,12 @@ internal static class MonitorsCommand
                 return 1;
             }
 
-            var targetText = parse.GetValue(target);
+            // У наблюдения за оборудованием цель — само устройство, а у наблюдения
+            // за DHCP её нет вовсе: слушают сегмент, а не узел. Требовать её здесь
+            // значило бы заставить оператора выдумать ответ.
+            var targetText = parse.GetValue(target)
+                             ?? device
+                             ?? (watchDhcp ? "<сегмент>" : null);
 
             if (string.IsNullOrWhiteSpace(targetText))
             {
@@ -247,10 +284,18 @@ internal static class MonitorsCommand
                 Id = Guid.NewGuid(),
                 Name = parse.GetValue(name)!,
                 Description = parse.GetValue(description),
-                Kind = scenarioKey is null ? MonitorKind.Probe : MonitorKind.Scenario,
-                Subject = probeName ?? scenarioKey!,
-                Target = Domain.Targets.Target.Parse(targetText),
-                Parameters = ParseParameters(parse.GetValue(parameters) ?? []),
+                Kind = (probeName, scenarioKey, device, watchDhcp) switch
+                {
+                    (not null, _, _, _) => MonitorKind.Probe,
+                    (_, not null, _, _) => MonitorKind.Scenario,
+                    (_, _, not null, _) => MonitorKind.PortLoad,
+                    _ => MonitorKind.Dhcp,
+                },
+                Subject = probeName ?? scenarioKey ?? device ?? "dhcp",
+                Target = watchDhcp
+                    ? Domain.Targets.Target.Parse("0.0.0.0")
+                    : Domain.Targets.Target.Parse(targetText),
+                Parameters = WithPort(ParseParameters(parse.GetValue(parameters) ?? []), parse.GetValue(portIndex)),
                 Thresholds = limits,
                 Schedule = schedule,
                 Alert = BuildAlert(parse, alert, channels, raiseAfter, clearAfter, margin, cooldown, repeat),
@@ -281,8 +326,14 @@ internal static class MonitorsCommand
             Console.WriteLine($"  {monitor.Schedule.Describe()}, следующая проверка "
                               + $"{monitor.NextDueUtc?.ToLocalTime().ToString("dd.MM HH:mm", CultureInfo.InvariantCulture)}");
             Console.WriteLine();
-            Console.WriteLine("Проверки идут, пока работает планировщик: «storm monitors watch» "
-                              + "или запущенный графический клиент.");
+            // Служба называется первой не для рекламы: монитор — обещание непрерывности,
+            // и способ, при котором наблюдение прекращается с закрытием окна, стоит
+            // назвать вторым, а не единственным.
+            Console.WriteLine("Чтобы проверки шли постоянно — «storm monitors service install»:");
+            Console.WriteLine("служба наблюдает, пока включена машина, и переживает закрытие клиента.");
+            Console.WriteLine();
+            Console.WriteLine("Без неё проверки идут только при работающем планировщике:");
+            Console.WriteLine("«storm monitors watch» или запущенный графический клиент.");
 
             return 0;
         });
@@ -291,6 +342,25 @@ internal static class MonitorsCommand
     }
 
     // ------------------------------------------------------------------ показать
+
+    /// <summary>Добавляет номер порта к параметрам монитора, если он задан.</summary>
+    private static IReadOnlyDictionary<string, string?> WithPort(
+        IReadOnlyDictionary<string, string?> parameters,
+        int? port)
+    {
+        if (port is not { } index)
+        {
+            return parameters;
+        }
+
+        var copy = new Dictionary<string, string?>(parameters, StringComparer.OrdinalIgnoreCase)
+        {
+            [Application.Monitors.EquipmentWatch.PortParameter] =
+                index.ToString(CultureInfo.InvariantCulture),
+        };
+
+        return copy;
+    }
 
     private static Command BuildShow(IServiceProvider services)
     {
@@ -480,7 +550,17 @@ internal static class MonitorsCommand
             Description = "За какой срок считать: 24ч, 7д, 30д. По умолчанию — окно цели или 7д.",
         };
 
-        var command = new Command("sla", "Доступность, инциденты и бюджет ошибок.") { name, window };
+        var compareOption = new Option<bool>("--сравнить", "--compare")
+        {
+            Description = "Сравнить с предыдущим таким же периодом: этот месяц против прошлого.",
+        };
+
+        var command = new Command("sla", "Доступность, инциденты и бюджет ошибок.")
+        {
+            name,
+            window,
+            compareOption,
+        };
 
         command.SetAction(async (parse, cancellationToken) =>
         {
@@ -505,9 +585,35 @@ internal static class MonitorsCommand
                     cancellationToken)
                 .ConfigureAwait(false);
 
-            MonitorRenderer.WriteAvailability(
-                monitor,
-                AvailabilityCalculator.Compute(checks, from, now, monitor.Objective));
+            var current = AvailabilityCalculator.Compute(checks, from, now, monitor.Objective);
+
+            MonitorRenderer.WriteAvailability(monitor, current);
+
+            if (!parse.GetValue(compareOption))
+            {
+                return 0;
+            }
+
+            // Предыдущий период берётся ровно такой же длины и вплотную к текущему:
+            // сравнивать месяц с неделей бессмысленно, а разрыв между периодами
+            // спрятал бы то, что в нём случилось.
+            var previousFrom = from - span;
+
+            var before = await store
+                .ListChecksAsync(
+                    new CheckQuery { MonitorId = monitor.Id, Since = previousFrom, Limit = 100_000 },
+                    cancellationToken)
+                .ConfigureAwait(false);
+
+            MonitorRenderer.WriteComparison(new AvailabilityComparison
+            {
+                Before = AvailabilityCalculator.Compute(
+                    [.. before.Where(c => c.StartedUtc < from)],
+                    previousFrom,
+                    from,
+                    monitor.Objective),
+                After = current,
+            });
 
             return 0;
         });
