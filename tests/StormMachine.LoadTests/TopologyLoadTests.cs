@@ -39,9 +39,16 @@ public sealed class TopologyLoadTests : IDisposable
 
         var input = BuildInput(NodeCount);
 
+        // Прогрев обязателен, и не ради красивого числа. Без него значение зависит
+        // от того, какая проверка класса выполнится первой, — а порядок xunit
+        // не обещает. В первом же протоколе оператора это дало 47 мс здесь и 31 мс
+        // в таблице роста ниже: два разных числа про одно и то же в одном файле.
+        TopologyGraph.Build(input);
+
         var (graph, elapsed, allocated) = Measured.Run("построение графа", () => TopologyGraph.Build(input));
 
         Measured.Note($"  узлов на карте: {graph.Nodes.Count}, связей: {graph.Links.Count}");
+        Measured.Note("  (все замеры — после прогрева: первое построение в процессе платит за раскрутку JIT)");
         Measured.Note(string.Empty);
 
         Assert.True(
