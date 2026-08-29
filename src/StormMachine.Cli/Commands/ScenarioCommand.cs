@@ -1,4 +1,4 @@
-using System.CommandLine;
+﻿using System.CommandLine;
 using Microsoft.Extensions.DependencyInjection;
 using StormMachine.Application.Abstractions;
 using StormMachine.Application.Presets;
@@ -30,10 +30,20 @@ internal static class ScenarioCommand
         command.Subcommands.Add(BuildSets(services));
         command.Subcommands.Add(BuildRun(services));
 
-        command.SetAction((_, _) =>
+        // Сборка своих цепочек (И-22). До неё сценарии существовали только зашитыми.
+        foreach (var editor in ScenarioEditCommands.Create(services))
         {
-            ScenarioRenderer.WriteTemplates();
-            return Task.FromResult(0);
+            command.Subcommands.Add(editor);
+        }
+
+        command.SetAction(async (_, cancellationToken) =>
+        {
+            var library = services.GetRequiredService<ScenarioLibrary>();
+
+            ScenarioRenderer.WriteLibrary(
+                await library.ListAsync(cancellationToken).ConfigureAwait(false));
+
+            return 0;
         });
 
         return command;
@@ -69,7 +79,7 @@ internal static class ScenarioCommand
     {
         var templateArgument = new Argument<string>("шаблон")
         {
-            Description = "web, dns или voice. Список: storm scenario templates.",
+            Description = "Ключ шаблона или имя своего сценария. Список: storm scenario.",
         };
 
         var targetArgument = new Argument<string>("цель")
@@ -88,7 +98,7 @@ internal static class ScenarioCommand
             DefaultValueFactory = _ => string.Empty,
         };
 
-        var command = new Command("run", "Выполнить сценарий по шаблону.")
+        var command = new Command("run", "Выполнить сценарий: шаблон или свой.")
         {
             templateArgument,
             targetArgument,
@@ -99,6 +109,7 @@ internal static class ScenarioCommand
         command.SetAction(async (parseResult, cancellationToken) =>
         {
             var runner = services.GetRequiredService<ScenarioRunner>();
+            var library = services.GetRequiredService<ScenarioLibrary>();
             var clock = services.GetRequiredService<IHighResolutionClock>();
             var environment = services.GetRequiredService<INetworkEnvironment>();
             var store = services.GetRequiredService<IRunStore>();
@@ -150,7 +161,9 @@ internal static class ScenarioCommand
             {
                 foreach (var target in set.Targets)
                 {
-                    var scenario = ScenarioTemplates.Create(template, target);
+                    var scenario = await library
+                        .CreateAsync(template, target, linked.Token)
+                        .ConfigureAwait(false);
 
                     ScenarioRenderer.WriteHeader(scenario, environment.GetPrimaryAdapter(), clock, set);
 

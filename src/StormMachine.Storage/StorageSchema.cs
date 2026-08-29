@@ -12,7 +12,7 @@ namespace StormMachine.Storage;
 internal static class StorageSchema
 {
     /// <summary>Текущая версия схемы. Растёт при каждом изменении структуры.</summary>
-    public const int CurrentVersion = 13;
+    public const int CurrentVersion = 14;
 
     public static void EnsureCreated(SqliteConnection connection)
     {
@@ -137,6 +137,12 @@ internal static class StorageSchema
         {
             UpgradeToVersion13(connection);
             version = 13;
+        }
+
+        if (version == 13)
+        {
+            UpgradeToVersion14(connection);
+            version = 14;
         }
 
         return version;
@@ -424,6 +430,41 @@ internal static class StorageSchema
     /// ровно тем же способом, от которого политика и защищает.
     /// </para>
     /// </remarks>
+    /// <summary>
+    /// Сценарии, собранные оператором.
+    /// </summary>
+    /// <remarks>
+    /// Появились в И-22 и закрыли долг И-11: на экране выбирался готовый шаблон,
+    /// а собрать свою цепочку из произвольных проб можно было только правкой кода.
+    /// Шаблоны при этом никуда не делись — они остаются началом разговора, и половина
+    /// собранных сценариев родится из шаблона, который поправили.
+    /// <para>
+    /// Шаги лежат одним полем JSON, а не отдельной таблицей. Причина та же, по которой
+    /// параметры пресета хранятся строками: их состав задаёт проба своим объявлением,
+    /// и хранилищу незачем знать, что у HTTP есть метод, а у ICMP — TTL. Разложить это
+    /// по колонкам значило бы завести схему, которая устаревает с каждой новой пробой.
+    /// </para>
+    /// </remarks>
+    private static void UpgradeToVersion14(SqliteConnection connection)
+    {
+        Execute(connection, """
+            CREATE TABLE IF NOT EXISTS scenarios (
+                id            TEXT    NOT NULL PRIMARY KEY,
+                name          TEXT    NOT NULL,
+                name_key      TEXT    NOT NULL,
+                description   TEXT,
+                steps_json    TEXT    NOT NULL,
+                version       INTEGER NOT NULL,
+                created_ticks INTEGER NOT NULL,
+                updated_ticks INTEGER NOT NULL
+            );
+            """);
+
+        // Имя уникально в свёрнутом виде: «Веб» и «веб» — один сценарий, и позволить
+        // завести оба значило бы дать оператору перепутать их при первом же запуске.
+        Execute(connection, "CREATE UNIQUE INDEX IF NOT EXISTS ux_scenarios_name ON scenarios (name_key);");
+    }
+
     private static void UpgradeToVersion13(SqliteConnection connection)
     {
         // Счётчики порта. Ключ включает момент: это ряд, а не текущее состояние.

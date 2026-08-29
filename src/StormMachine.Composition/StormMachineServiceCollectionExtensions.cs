@@ -145,6 +145,16 @@ public static class StormMachineServiceCollectionExtensions
         services.AddSingleton<IBaselineStore>(provider => new SqliteBaselineStore(
             (SqliteRunStore)provider.GetRequiredService<IRunStore>()));
 
+        // Сценарии оператора (И-22). Шаблоны остаются зашитыми: они начало разговора,
+        // а не ограничение, и держать их в базе значило бы дать испортить то,
+        // к чему всегда можно вернуться.
+        services.AddSingleton<IScenarioStore>(provider => new SqliteScenarioStore(
+            (SqliteRunStore)provider.GetRequiredService<IRunStore>()));
+
+        // Шаблоны и собранное оператором в одном месте: иначе консоль знала бы про
+        // шаблоны, а окно — про своё, и один ключ означал бы разное.
+        services.AddSingleton<ScenarioLibrary>();
+
         // Перенос настроек между машинами (И-22): один механизм на профили, мониторы
         // и эталоны — три отдельные выгрузки разошлись бы по формату и по поведению.
         services.AddSingleton<SettingsTransfer>();

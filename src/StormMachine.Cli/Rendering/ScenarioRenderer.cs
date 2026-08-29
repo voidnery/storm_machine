@@ -423,4 +423,100 @@ internal static class ScenarioRenderer
                               + "Порогами они не проверяются — это не числа.");
         }
     }
+    /// <summary>
+    /// Показывает всё, что можно запустить: шаблоны и собранное оператором.
+    /// </summary>
+    /// <remarks>
+    /// Шаблоны идут первыми не по алфавиту, а по смыслу: они проверены и объяснены,
+    /// а своё оператор собрал сам и знает про него всё. Начинающему нужны первые.
+    /// </remarks>
+    public static void WriteLibrary(IReadOnlyList<ScenarioEntry> entries)
+    {
+        ArgumentNullException.ThrowIfNull(entries);
+
+        var templates = entries.Where(e => e.IsTemplate).ToList();
+        var custom = entries.Where(e => !e.IsTemplate).ToList();
+
+        Console.WriteLine("Готовые сценарии:");
+        Console.WriteLine();
+
+        foreach (var entry in templates)
+        {
+            Console.WriteLine($"  {entry.Key,-10} {entry.Title}");
+            Console.WriteLine($"             {entry.About}");
+        }
+
+        Console.WriteLine();
+
+        if (custom.Count == 0)
+        {
+            Console.WriteLine("Своих сценариев нет. Собрать:");
+            Console.WriteLine("  storm scenario new «моя проверка»        пустой");
+            Console.WriteLine("  storm scenario from web «моя проверка»   копией шаблона");
+
+            return;
+        }
+
+        Console.WriteLine("Ваши сценарии:");
+        Console.WriteLine();
+
+        foreach (var entry in custom)
+        {
+            Console.WriteLine($"  {entry.Key,-10} {entry.About}");
+        }
+    }
+
+    /// <summary>
+    /// Показывает сценарий по шагам — то, что редактируют.
+    /// </summary>
+    /// <remarks>
+    /// Порядок шагов пронумерован, потому что именно номерами их переставляют
+    /// и удаляют. Цель шага печатается всегда: у сравнения резолверов она у каждого
+    /// шага своя, и не показать её значило бы скрыть главное отличие такого сценария.
+    /// </remarks>
+    public static void WriteDefinition(Scenario scenario)
+    {
+        ArgumentNullException.ThrowIfNull(scenario);
+
+        Console.WriteLine($"Сценарий  : {scenario.Name}");
+
+        if (scenario.Description is { Length: > 0 } about)
+        {
+            Console.WriteLine($"Описание  : {about}");
+        }
+
+        Console.WriteLine($"Редакция  : {scenario.Version.ToString(CultureInfo.InvariantCulture)}");
+        Console.WriteLine();
+
+        if (scenario.Steps.Count == 0)
+        {
+            Console.WriteLine("Шагов нет. Добавить: storm scenario step «имя» --проба ping --цель <адрес>");
+
+            return;
+        }
+
+        for (var i = 0; i < scenario.Steps.Count; i++)
+        {
+            var step = scenario.Steps[i];
+
+            Console.WriteLine($"  {(i + 1).ToString(CultureInfo.InvariantCulture)}. {step.Name}"
+                              + $"  ({step.ProbeName} → {step.Target.DisplayName})");
+
+            if (step.Parameters.Count > 0)
+            {
+                Console.WriteLine("       параметры: "
+                                  + string.Join(", ", step.Parameters.Select(p => $"{p.Key}={p.Value}")));
+            }
+
+            if (step.Thresholds.Count > 0)
+            {
+                Console.WriteLine("       пороги   : "
+                                  + string.Join(", ", step.Thresholds.Select(t => t.Describe())));
+            }
+        }
+
+        Console.WriteLine();
+        Console.WriteLine("Порядок важен: шаги идут сверху вниз. Переставить — storm scenario move.");
+    }
+
 }
