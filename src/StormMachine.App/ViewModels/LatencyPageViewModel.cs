@@ -443,7 +443,7 @@ public sealed partial class LatencyPageViewModel : PageViewModel, ITargetAware
         }
         catch (Exception ex)
         {
-            ErrorMessage = $"Журнал недоступен: {ex.Message}";
+            ErrorMessage = "История прогонов не прочиталась: " + (StorageProblem.ExplainCorruption(ex) ?? ex.Message);
         }
     }
 

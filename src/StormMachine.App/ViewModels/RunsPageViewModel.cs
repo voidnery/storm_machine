@@ -99,6 +99,19 @@ public sealed partial class RunsPageViewModel(
                 Runs.Add(run);
             }
 
+            ErrorMessage = null;
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = "Журнал не прочитался: " + (StorageProblem.ExplainCorruption(ex) ?? ex.Message);
+            return;
+        }
+
+        // Сводка считается отдельно от списка: её отказ — это отказ сводки.
+        // На повреждённой базе счётчик сэмплов падал и объявлял недоступным журнал,
+        // который был загружен и виден прямо под этой надписью (И-24).
+        try
+        {
             var usage = await _store.GetUsageAsync(cancellationToken).ConfigureAwait(true);
 
             // Свободное место названо отдельно и только когда его заметно: после уборки
@@ -110,12 +123,10 @@ public sealed partial class RunsPageViewModel(
             Usage = $"Журнал: {usage.RunCount} прогонов, "
                     + $"{usage.SampleCount.ToString("N0", CultureInfo.InvariantCulture)} сэмплов, "
                     + $"{usage.SizeBytes / 1024.0 / 1024.0:0.00} МБ{free} · {_store.Location}";
-
-            ErrorMessage = null;
         }
         catch (Exception ex)
         {
-            ErrorMessage = $"Журнал недоступен: {ex.Message}";
+            Usage = "Сводка не посчиталась: " + (StorageProblem.ExplainCorruption(ex) ?? ex.Message);
         }
     }
 

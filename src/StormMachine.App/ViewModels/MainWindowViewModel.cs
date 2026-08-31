@@ -13,7 +13,7 @@ namespace StormMachine.App.ViewModels;
 /// Оболочка главного окна: навигация, строка состояния и панель выполняющихся операций.
 /// </summary>
 /// <remarks>
-/// Разделы, которых ещё нет, показываются с честной пометкой об итерации, а не прячутся
+/// Разделы без экранной формы показываются с честной пометкой «консоль», а не прячутся
 /// (UX-принцип 6, docs/01-analysis.md §9.5). Готовые разделы подставляют свои страницы.
 /// </remarks>
 public sealed partial class MainWindowViewModel : ObservableObject
@@ -28,6 +28,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         INetworkEnvironment environment,
         IHighResolutionClock clock,
         NotificationCenter notifications,
+        IDatabaseMaintenance maintenance,
         Func<NavigationSection, PageViewModel> pageFactory)
     {
         Runner = runner ?? throw new ArgumentNullException(nameof(runner));
@@ -50,6 +51,46 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
         UpdateStatus();
         Navigate(Sections[0]);
+
+        _ = WarnIfDatabaseDamagedAsync(maintenance ?? throw new ArgumentNullException(nameof(maintenance)));
+    }
+
+    /// <summary>
+    /// Фоновая проверка целостности базы при старте.
+    /// </summary>
+    /// <remarks>
+    /// Повреждение всплывало только когда оператор сам натыкался на упавший экран —
+    /// и выглядело как «SQLite Error 11» (И-24). Проверка идёт в фоне и не задерживает
+    /// запуск; её собственный отказ клиента не роняет — он не важнее возможности
+    /// работать с целыми частями базы.
+    /// </remarks>
+    private async Task WarnIfDatabaseDamagedAsync(IDatabaseMaintenance maintenance)
+    {
+        try
+        {
+            if (!File.Exists(maintenance.DatabasePath))
+            {
+                return;
+            }
+
+            var health = await Task.Run(() => maintenance.CheckAsync()).ConfigureAwait(true);
+
+            if (health.IsHealthy)
+            {
+                return;
+            }
+
+            Notifications.ShowSystem(
+                "База повреждена",
+                "файл читается не весь; целые части работают. Закройте клиент и выполните "
+                + "storm db repair — читаемое перенесётся в новый файл, повреждённый "
+                + "сохранится в резервной папке.");
+        }
+        catch (Exception)
+        {
+            // Отказ фоновой проверки не сообщается: он не отличим от «базы ещё нет»
+            // и не мешает работе. Настоящая ошибка чтения всплывёт на первом же экране.
+        }
     }
 
     public RunnerService Runner { get; }

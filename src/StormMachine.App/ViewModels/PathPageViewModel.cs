@@ -549,7 +549,7 @@ public sealed partial class PathPageViewModel : PageViewModel, ITargetAware
         }
         catch (Exception ex)
         {
-            ErrorMessage = $"Журнал недоступен: {ex.Message}";
+            ErrorMessage = "История прогонов не прочиталась: " + (StorageProblem.ExplainCorruption(ex) ?? ex.Message);
         }
     }
 

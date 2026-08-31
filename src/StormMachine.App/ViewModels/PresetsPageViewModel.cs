@@ -404,7 +404,7 @@ public sealed partial class PresetsPageViewModel(
         }
         catch (Exception ex)
         {
-            ErrorMessage = $"Журнал недоступен: {ex.Message}";
+            ErrorMessage = "История прогонов не прочиталась: " + (StorageProblem.ExplainCorruption(ex) ?? ex.Message);
         }
     }
 

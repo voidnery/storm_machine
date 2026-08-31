@@ -57,15 +57,34 @@ public sealed partial class NotificationCenter : ObservableObject
     {
         ArgumentNullException.ThrowIfNull(notification);
 
-        Text = $"{notification.Monitor.Name}: {notification.Event.Reason}";
-        IsAlarming = notification.Event.Action != AlertAction.Cleared;
+        Show(
+            notification.Event.AtUtc,
+            notification.Monitor.Name,
+            notification.Event.Reason,
+            notification.Event.Action != AlertAction.Cleared);
+    }
+
+    /// <summary>
+    /// Уведомление от самого продукта, а не от монитора.
+    /// </summary>
+    /// <remarks>
+    /// Появилось для повреждения базы (И-24): о нём нельзя молчать до тех пор,
+    /// пока оператор сам не откроет журнал и не наткнётся на ошибку.
+    /// </remarks>
+    public void ShowSystem(string title, string text, bool alarming = true) =>
+        Show(DateTimeOffset.UtcNow, title, text, alarming);
+
+    private void Show(DateTimeOffset atUtc, string title, string text, bool alarming)
+    {
+        Text = $"{title}: {text}";
+        IsAlarming = alarming;
         OnPropertyChanged(nameof(IsVisible));
 
         Recent.Insert(0, new AlertNotice(
-            notification.Event.AtUtc.ToLocalTime().ToString("dd.MM HH:mm", CultureInfo.InvariantCulture),
-            notification.Monitor.Name,
-            notification.Event.Reason,
-            IsAlarming));
+            atUtc.ToLocalTime().ToString("dd.MM HH:mm", CultureInfo.InvariantCulture),
+            title,
+            text,
+            alarming));
 
         while (Recent.Count > Capacity)
         {

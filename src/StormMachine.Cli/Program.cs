@@ -164,6 +164,7 @@ internal static class Program
         root.Subcommands.Add(SettingsTransferCommands.Create(services));
         root.Subcommands.Add(AlertsCommand.Create(services));
         root.Subcommands.Add(RunsCommand.Create(services));
+        root.Subcommands.Add(DbCommand.Create(services));
         root.Subcommands.Add(ReportCommand.Create(services));
         root.Subcommands.Add(BaselineCommand.Create(services));
         root.Subcommands.Add(EnvCommand.Create(services));

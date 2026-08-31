@@ -54,6 +54,12 @@ public static class StormMachineServiceCollectionExtensions
         // Отвечать на него должен сам продукт, а не догадки.
         services.AddSingleton<IStorageLocation>(p => (SqliteRunStore)p.GetRequiredService<IRunStore>());
 
+        // Проверка и лечение файла базы: повреждение — событие, к которому продукт
+        // обязан быть готов, а не повод показать оператору «SQLite Error 11».
+        services.AddSingleton<IDatabaseMaintenance>(provider => new SqliteMaintenance(
+            provider.GetRequiredService<IStorageLocation>(),
+            provider.GetService<ILogger<SqliteMaintenance>>()));
+
         // Профили сетевого окружения: где мы находимся. Пишутся в условия каждого
         // измерения — замер у заказчика и замер в офисе несопоставимы.
         services.AddSingleton<IProfileStore>(provider => new SqliteProfileStore(

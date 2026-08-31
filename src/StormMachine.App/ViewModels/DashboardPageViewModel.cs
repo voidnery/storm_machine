@@ -147,7 +147,18 @@ public sealed partial class DashboardPageViewModel(
             {
                 RecentRuns.Add(run);
             }
+        }
+        catch (Exception ex)
+        {
+            JournalInfo = "Журнал не прочитался: " + (StorageProblem.ExplainCorruption(ex) ?? ex.Message);
+            return;
+        }
 
+        // Сводка считается отдельно от списка: её отказ — это отказ сводки.
+        // Однажды упавший счётчик объявил недоступным журнал, который был загружен
+        // и виден на экране, — надпись врала (И-24).
+        try
+        {
             var usage = await _store.GetUsageAsync(cancellationToken).ConfigureAwait(true);
 
             JournalInfo = usage.RunCount == 0
@@ -158,7 +169,7 @@ public sealed partial class DashboardPageViewModel(
         }
         catch (Exception ex)
         {
-            JournalInfo = $"Журнал недоступен: {ex.Message}";
+            JournalInfo = "Сводка журнала не посчиталась: " + (StorageProblem.ExplainCorruption(ex) ?? ex.Message);
         }
     }
 
