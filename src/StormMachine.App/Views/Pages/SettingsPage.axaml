@@ -19,14 +19,17 @@
                  IsVisible="{Binding ErrorMessage, Converter={x:Static ObjectConverters.IsNotNull}}" />
     </StackPanel>
 
-    <Grid Grid.Row="1" ColumnDefinitions="*,*">
+    <ScrollViewer Grid.Row="1">
+      <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto" Margin="0,0,10,20">
 
-      <!-- Слева — профили и учётные данные, справа — агенты, хранилище и о продукте.
-           Сводка возможностей машины ушла во временный раздел «Разработка» (И-24):
-           оператору в настройках нужны настройки, а не отчёт о состоянии продукта. -->
-      <Border Grid.Column="0" Background="{StaticResource PanelBrush}" CornerRadius="6" Padding="16">
-        <ScrollViewer>
-          <StackPanel Spacing="10" Margin="0,0,10,0">
+        <!-- Карточки по смыслу (перестановка И-24 по замечанию оператора): сверху то,
+             что определяет измерения (профили) и опрос (SNMP); ниже — агенты и данные;
+             «О продукте» — отдельной полосой внизу. Сводка возможностей машины ушла
+             во временный раздел «Разработка»: в настройках — настройки. -->
+        <Border Grid.Row="0" Grid.Column="0" Margin="0,0,7,14"
+                Background="{StaticResource PanelBrush}" CornerRadius="6" Padding="16"
+                VerticalAlignment="Top">
+          <StackPanel Spacing="10">
 
             <TextBlock Text="Профили окружения" FontSize="13" FontWeight="SemiBold" />
 
@@ -82,7 +85,13 @@
             <TextBlock FontSize="10" Opacity="0.5" TextWrapping="Wrap" LineHeight="15"
                        Text="Продукт узнаёт сеть, но не переключает профиль сам: смена профиля меняет пороги и состав работающих мониторов, а делать это молча значит поменять смысл измерений за спиной оператора." />
 
-            <Border Height="1" Background="#2E3746" Margin="0,6" />
+          </StackPanel>
+        </Border>
+
+        <Border Grid.Row="0" Grid.Column="1" Margin="7,0,0,14"
+                Background="{StaticResource PanelBrush}" CornerRadius="6" Padding="16"
+                VerticalAlignment="Top">
+          <StackPanel Spacing="10">
 
             <Grid ColumnDefinitions="*,Auto">
               <TextBlock Grid.Column="0" Text="Учётные данные SNMP" FontSize="13" FontWeight="SemiBold" />
@@ -196,13 +205,12 @@
             </Border>
 
           </StackPanel>
-        </ScrollViewer>
-      </Border>
+        </Border>
 
-      <Border Grid.Column="1" Margin="14,0,0,0" Background="{StaticResource PanelBrush}" CornerRadius="6"
-              Padding="16">
-        <ScrollViewer>
-          <StackPanel Spacing="10" Margin="0,0,10,0">
+        <Border Grid.Row="1" Grid.Column="0" Margin="0,0,7,14"
+                Background="{StaticResource PanelBrush}" CornerRadius="6" Padding="16"
+                VerticalAlignment="Top">
+          <StackPanel Spacing="10">
 
             <!-- Агенты.
 
@@ -325,7 +333,13 @@
               </StackPanel>
             </StackPanel>
 
-            <Border Height="1" Background="#2E3746" Margin="0,6" />
+          </StackPanel>
+        </Border>
+
+        <Border Grid.Row="1" Grid.Column="1" Margin="7,0,0,14"
+                Background="{StaticResource PanelBrush}" CornerRadius="6" Padding="16"
+                VerticalAlignment="Top">
+          <StackPanel Spacing="10">
 
             <TextBlock Text="Хранилище" FontSize="13" FontWeight="SemiBold" />
 
@@ -408,7 +422,13 @@
               </StackPanel>
             </StackPanel>
 
-            <Border Height="1" Background="#2E3746" Margin="0,6" />
+          </StackPanel>
+        </Border>
+
+        <!-- О продукте — полосой на всю ширину: это справка, а не настройка. -->
+        <Border Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2"
+                Background="{StaticResource PanelBrush}" CornerRadius="6" Padding="16">
+          <StackPanel Spacing="10">
 
             <TextBlock Text="О продукте" FontSize="13" FontWeight="SemiBold" />
 
@@ -444,8 +464,8 @@
                        TextWrapping="Wrap" LineHeight="15" />
 
           </StackPanel>
-        </ScrollViewer>
-      </Border>
-    </Grid>
+        </Border>
+      </Grid>
+    </ScrollViewer>
   </Grid>
 </UserControl>

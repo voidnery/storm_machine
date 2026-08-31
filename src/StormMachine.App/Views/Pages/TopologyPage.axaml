@@ -117,6 +117,9 @@
             <TextBlock Text="{Binding SelectedNode.Vendor}" FontSize="12" Opacity="0.7"
                        TextWrapping="Wrap"
                        IsVisible="{Binding SelectedNode.Vendor, Converter={x:Static ObjectConverters.IsNotNull}}" />
+            <TextBlock Text="{Binding SelectedNode.Role}" FontSize="12"
+                       Foreground="{StaticResource AccentBrush}"
+                       IsVisible="{Binding SelectedNode.Role, Converter={x:Static ObjectConverters.IsNotNull}}" />
             <TextBlock Text="{Binding SelectedNode.Detail}" FontSize="11" Opacity="0.55"
                        TextWrapping="Wrap"
                        IsVisible="{Binding SelectedNode.Detail, Converter={x:Static ObjectConverters.IsNotNull}}" />

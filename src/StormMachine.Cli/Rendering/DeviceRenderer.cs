@@ -190,7 +190,11 @@ internal static class DeviceRenderer
             ? " · порт " + string.Join(", ", device.OpenPorts)
             : string.Empty;
 
-        return sources.Count == 0 ? "не отвечает" : string.Join(", ", sources) + ports;
+        // Тег категории (И-24): догадка классификатора приходит с вопросом,
+        // и «сервер?» с «сервер» читаются по-разному — так и задумано.
+        var role = device.RoleDisplay is { } tag && tag != "шлюз" ? $" · {tag}" : string.Empty;
+
+        return (sources.Count == 0 ? "не отвечает" : string.Join(", ", sources) + ports) + role;
     }
 
     private static string Name(EvidenceSource source) => source switch
@@ -222,10 +226,14 @@ internal static class DeviceRenderer
         {
             var marker = device.Role == "шлюз" ? "→" : device.IsOnline ? " " : "·";
 
+            // Тег категории после времени: колонка с фиксированной шириной резала бы
+            // «маршрутизатор» ровно на том, что несёт сведения.
+            var role = device.RoleDisplay is { } tag && tag != "шлюз" ? $"  {tag}" : string.Empty;
+
             Console.WriteLine($" {marker}{device.Address,-15} {device.MacAddress ?? "—",-17} "
                               + $"{Shorten(device.HostName, NameWidth),-NameWidth} "
                               + $"{Vendor(device),-VendorWidth} "
-                              + $"{device.LastSeenUtc.ToLocalTime():dd.MM HH:mm}");
+                              + $"{device.LastSeenUtc.ToLocalTime():dd.MM HH:mm}{role}");
 
             WriteExtraAddresses(device);
         }

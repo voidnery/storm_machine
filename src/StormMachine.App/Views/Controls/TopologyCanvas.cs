@@ -326,14 +326,21 @@ public sealed class TopologyCanvas : Control
 
     private static string? Secondary(TopologyNode node)
     {
+        // Тег категории (И-24) идёт первым: «сервер?» говорит о узле больше вендора.
+        var role = node.Role is { Length: > 0 } tag ? tag : null;
+
         if (node.Address is { } address && !string.Equals(address, node.Label, StringComparison.Ordinal))
         {
-            return node.Vendor is { Length: > 0 } vendor && vendor != "—" && vendor != node.Label
+            var line = node.Vendor is { Length: > 0 } vendor && vendor != "—" && vendor != node.Label
                 ? $"{address} · {vendor}"
                 : address;
+
+            return role is null ? line : $"{role} · {line}";
         }
 
-        return node.Vendor is { Length: > 0 } v && v != "—" && v != node.Label ? v : node.Detail;
+        var fallback = node.Vendor is { Length: > 0 } v && v != "—" && v != node.Label ? v : node.Detail;
+
+        return role is null ? fallback : fallback is null ? role : $"{role} · {fallback}";
     }
 
     private void DrawEmpty(DrawingContext context)

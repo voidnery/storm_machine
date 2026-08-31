@@ -16,6 +16,7 @@ public sealed record InventoryRow(
     string HostName,
     string Vendor,
     string LastSeen,
+    string? Role,
     bool IsGateway,
     bool IsOnline,
     bool IsNamedByOperator)
@@ -40,6 +41,9 @@ public sealed record InventoryRow(
             // у локального адреса производителя нет вовсе. Решает домен.
             device.VendorDisplay,
             device.LastSeenUtc.ToLocalTime().ToString("dd.MM HH:mm", CultureInfo.InvariantCulture),
+
+            // Тег категории (И-24). Догадка классификатора приходит с вопросом.
+            device.RoleDisplay,
             device.Role == "шлюз",
             device.IsOnline,
             device.Evidence.Any(e => e.Source == EvidenceSource.Manual && e.Kind == EvidenceKind.HostName));
@@ -84,6 +88,13 @@ public sealed partial class DevicesPageViewModel(
     /// <summary>Имя, которое оператор присваивает выбранному устройству.</summary>
     [ObservableProperty]
     private string _newName = string.Empty;
+
+    /// <summary>Роль, которую оператор присваивает выбранному устройству.</summary>
+    [ObservableProperty]
+    private string _newRole = string.Empty;
+
+    /// <summary>Известные роли для подстановки. Своя строка тоже годится.</summary>
+    public static IReadOnlyList<string> RoleOptions => DeviceClassifier.KnownRoles;
 
     [ObservableProperty]
     private InventoryRow? _selected;
@@ -130,6 +141,52 @@ public sealed partial class DevicesPageViewModel(
                          + "Правка переживёт пересканирование: она сильнее любого наблюдения.";
 
             NewName = string.Empty;
+
+            await LoadAsync().ConfigureAwait(true);
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = $"Не сохранено: {ex.Message}";
+        }
+    }
+
+    /// <summary>
+    /// Присваивает выбранному устройству роль.
+    /// </summary>
+    /// <remarks>
+    /// Тот же механизм, что у имени и у <c>storm devices role</c>: правка — свидетельство
+    /// с наивысшим весом. Она перекрывает и догадку классификатора, и наблюдения,
+    /// и переживает пересканирование; классификатор к устройству с правкой
+    /// больше не прикасается.
+    /// </remarks>
+    [RelayCommand]
+    private async Task AssignRoleAsync()
+    {
+        ErrorMessage = null;
+
+        if (Selected is not { } row)
+        {
+            ErrorMessage = "Выберите устройство в списке.";
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(NewRole))
+        {
+            ErrorMessage = "Укажите роль — из списка или свою.";
+            return;
+        }
+
+        try
+        {
+            await _store.PinAsync(
+                row.Identity,
+                Evidence.Of(EvidenceSource.Manual, EvidenceKind.Role, NewRole.Trim(), DateTimeOffset.UtcNow),
+                CancellationToken.None).ConfigureAwait(true);
+
+            StatusLine = $"Устройству {row.Address} присвоена роль «{NewRole.Trim()}». "
+                         + "Правка сильнее догадки классификатора и переживёт пересканирование.";
+
+            NewRole = string.Empty;
 
             await LoadAsync().ConfigureAwait(true);
         }

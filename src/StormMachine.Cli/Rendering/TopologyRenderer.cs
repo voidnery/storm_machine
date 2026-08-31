@@ -199,6 +199,13 @@ internal static class TopologyRenderer
             parts.Add(vendor);
         }
 
+        // Тег категории (И-24). Догадка приходит уже с вопросом — «сервер?» и «сервер»
+        // обязаны читаться по-разному.
+        if (node.Role is { Length: > 0 } role)
+        {
+            parts.Add(role);
+        }
+
         if (node.Detail is { Length: > 0 } detail)
         {
             parts.Add(detail);

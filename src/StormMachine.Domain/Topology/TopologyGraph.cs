@@ -86,6 +86,16 @@ public sealed record TopologyNode
 
     public string? Vendor { get; init; }
 
+    /// <summary>
+    /// Роль устройства из инвентаря — тег категории на карте (И-24).
+    /// </summary>
+    /// <remarks>
+    /// Догадка классификатора приходит уже с вопросительным знаком
+    /// (<see cref="Discovery.Device.RoleDisplay" />): карта не имеет права
+    /// показать догадку тем же словом, что и правку оператора.
+    /// </remarks>
+    public string? Role { get; init; }
+
     /// <summary>Сколько устройств свёрнуто в этот узел. 0 — узел не свёрнутый.</summary>
     public int GroupSize { get; init; }
 
@@ -472,6 +482,7 @@ public sealed record TopologyGraph
                 Address = address,
                 MacAddress = device?.MacAddress,
                 Vendor = device?.VendorDisplay,
+                Role = device?.RoleDisplay,
                 IsOnline = device?.IsOnline ?? true,
                 Detail = "шлюз по умолчанию",
             });
@@ -743,6 +754,7 @@ public sealed record TopologyGraph
                 Address = device.Address,
                 MacAddress = device.MacAddress,
                 Vendor = device.VendorDisplay,
+                Role = device.RoleDisplay,
                 IsOnline = device.IsOnline,
                 Detail = device.ExtraAddresses.Count > 0
                     ? "ещё адреса: " + string.Join(", ", device.ExtraAddresses)

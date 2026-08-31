@@ -22,16 +22,27 @@
     <Border Grid.Row="1" Margin="0,12,0,0" Padding="14,10" CornerRadius="6"
             Background="{StaticResource PanelBrush}">
       <StackPanel Spacing="8">
-        <Grid ColumnDefinitions="Auto,240,Auto,Auto,*">
+        <Grid ColumnDefinitions="Auto,240,Auto,Auto,190,Auto,Auto,*">
           <TextBlock Grid.Column="0" Text="Назвать выбранное:" FontSize="12" Opacity="0.6"
                      VerticalAlignment="Center" Margin="0,0,10,0" />
           <TextBox Grid.Column="1" Text="{Binding NewName}" PlaceholderText="как называть это устройство"
                    FontSize="12" />
           <Button Grid.Column="2" Content="Сохранить" Command="{Binding RenameCommand}"
                   FontSize="12" Padding="12,5" Margin="8,0,0,0" />
-          <Button Grid.Column="3" Content="Обновить" Command="{Binding RefreshCommand}"
+
+          <!-- Роль: комбо со свободным вводом. Классификатор ошибается — правка
+               оператора весит больше и переживает пересканирование (И-24). -->
+          <TextBlock Grid.Column="3" Text="Роль:" FontSize="12" Opacity="0.6"
+                     VerticalAlignment="Center" Margin="16,0,8,0" />
+          <AutoCompleteBox Grid.Column="4" Text="{Binding NewRole}" ItemsSource="{Binding RoleOptions}"
+                           FilterMode="Contains" MinimumPrefixLength="0" FontSize="12"
+                           Watermark="из списка или своя" />
+          <Button Grid.Column="5" Content="Присвоить" Command="{Binding AssignRoleCommand}"
                   FontSize="12" Padding="12,5" Margin="8,0,0,0" />
-          <TextBlock Grid.Column="4" Text="{Binding StatusLine}" FontSize="12" Opacity="0.65"
+
+          <Button Grid.Column="6" Content="Обновить" Command="{Binding RefreshCommand}"
+                  FontSize="12" Padding="12,5" Margin="8,0,0,0" />
+          <TextBlock Grid.Column="7" Text="{Binding StatusLine}" FontSize="12" Opacity="0.65"
                      VerticalAlignment="Center" Margin="16,0,0,0" TextWrapping="Wrap" />
         </Grid>
 
@@ -70,6 +81,12 @@
                     <TextBlock Text="✎" FontSize="11" Opacity="0.6"
                                ToolTip.Tip="Имя присвоено оператором — переживает пересканирование"
                                IsVisible="{Binding IsNamedByOperator}" />
+                    <!-- Тег категории. Вопрос — догадка классификатора, без — наблюдение
+                         или правка оператора. -->
+                    <Border CornerRadius="3" Padding="6,1" Background="#233046" VerticalAlignment="Center"
+                            IsVisible="{Binding Role, Converter={x:Static ObjectConverters.IsNotNull}}">
+                      <TextBlock Text="{Binding Role}" FontSize="10" Foreground="#8FB8E8" />
+                    </Border>
                   </StackPanel>
                   <TextBlock Grid.Column="3" Text="{Binding Vendor}" FontSize="12" Opacity="0.8"
                              TextTrimming="CharacterEllipsis" />

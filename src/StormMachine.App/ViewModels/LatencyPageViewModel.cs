@@ -47,6 +47,8 @@ public sealed partial class LatencyPageViewModel : PageViewModel, ITargetAware
 
     private ActiveRunViewModel? _current;
 
+    private readonly IDeviceStore _devices;
+
     public LatencyPageViewModel(
         NavigationSection section,
         RunnerService runner,
@@ -54,7 +56,8 @@ public sealed partial class LatencyPageViewModel : PageViewModel, ITargetAware
         IProbeRegistry registry,
         IRunStore store,
         IHighResolutionClock clock,
-        INetworkEnvironment environment)
+        INetworkEnvironment environment,
+        IDeviceStore devices)
         : base(section)
     {
         _runner = runner ?? throw new ArgumentNullException(nameof(runner));
@@ -63,6 +66,7 @@ public sealed partial class LatencyPageViewModel : PageViewModel, ITargetAware
         _store = store ?? throw new ArgumentNullException(nameof(store));
         _clock = clock ?? throw new ArgumentNullException(nameof(clock));
         _environment = environment ?? throw new ArgumentNullException(nameof(environment));
+        _devices = devices ?? throw new ArgumentNullException(nameof(devices));
 
         _timer = new DispatcherTimer
         {
@@ -163,6 +167,20 @@ public sealed partial class LatencyPageViewModel : PageViewModel, ITargetAware
         }
 
         await LoadHistoryAsync(cancellationToken).ConfigureAwait(true);
+        await LoadSuggestionsAsync(cancellationToken).ConfigureAwait(true);
+    }
+
+    /// <summary>Подсказки цели из инвентаря (И-24): сеть просканирована — подставляем.</summary>
+    public System.Collections.ObjectModel.ObservableCollection<TargetSuggestion> Suggestions { get; } = [];
+
+    private async Task LoadSuggestionsAsync(CancellationToken cancellationToken)
+    {
+        Suggestions.Clear();
+
+        foreach (var suggestion in await TargetSuggestions.LoadAsync(_devices, cancellationToken).ConfigureAwait(true))
+        {
+            Suggestions.Add(suggestion);
+        }
     }
 
     public override void Deactivate()

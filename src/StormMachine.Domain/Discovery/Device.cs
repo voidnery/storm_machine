@@ -50,6 +50,19 @@ public sealed record Device
 
     public string? Role { get; init; }
 
+    /// <summary>
+    /// Роль — догадка классификатора, а не наблюдение или правка.
+    /// </summary>
+    /// <remarks>
+    /// Показ обязан различать: тег с вопросом читается как «похоже на», тег без —
+    /// как факт. Догадка, выглядящая фактом, — тот же класс вранья, что связь
+    /// без оговорки на карте.
+    /// </remarks>
+    public bool RoleIsGuessed { get; init; }
+
+    /// <summary>Роль для показа: догадка помечается вопросом.</summary>
+    public string? RoleDisplay => Role is null ? null : RoleIsGuessed ? Role + "?" : Role;
+
     public required DateTimeOffset FirstSeenUtc { get; init; }
 
     public required DateTimeOffset LastSeenUtc { get; init; }
@@ -113,14 +126,28 @@ public sealed record Device
 
         ports.Sort();
 
+        var mac = EvidenceMerge.Resolve(evidence, EvidenceKind.MacAddress);
+        var vendor = EvidenceMerge.Resolve(evidence, EvidenceKind.Vendor);
+        var hostName = EvidenceMerge.Resolve(evidence, EvidenceKind.HostName);
+
+        // Роль из свидетельств весомее догадки: правка оператора, заявление самого
+        // устройства (SSDP), пометка «шлюз» при скане. Догадка вычисляется на лету,
+        // а не хранится: правила уточняются с версиями, и записанная догадка
+        // пережила бы своё правило.
+        var observedRole = EvidenceMerge.Resolve(evidence, EvidenceKind.Role);
+        var guessedRole = observedRole is null
+            ? DeviceClassifier.Guess(mac, vendor, hostName, ports)
+            : null;
+
         return new Device
         {
             Address = address,
             Addresses = [address],
-            MacAddress = EvidenceMerge.Resolve(evidence, EvidenceKind.MacAddress),
-            Vendor = EvidenceMerge.Resolve(evidence, EvidenceKind.Vendor),
-            HostName = EvidenceMerge.Resolve(evidence, EvidenceKind.HostName),
-            Role = EvidenceMerge.Resolve(evidence, EvidenceKind.Role),
+            MacAddress = mac,
+            Vendor = vendor,
+            HostName = hostName,
+            Role = observedRole ?? guessedRole,
+            RoleIsGuessed = observedRole is null && guessedRole is not null,
             FirstSeenUtc = firstSeenUtc,
             LastSeenUtc = lastSeenUtc,
             IsOnline = isOnline,

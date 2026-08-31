@@ -29,8 +29,18 @@
         <Grid ColumnDefinitions="2*,Auto,Auto,Auto,Auto" >
           <StackPanel Grid.Column="0" Spacing="4" Margin="0,0,12,0">
             <TextBlock Text="Цель" FontSize="11" Opacity="0.6" />
-            <TextBox Text="{Binding TargetText}" PlaceholderText="gateway, 192.168.1.1 или example.com"
-                     IsEnabled="{Binding CanStart}" />
+            <!-- Подсказки из инвентаря (И-24): сеть просканирована — адреса подставляются.
+                 Фильтр ищет и по имени с ролью, своя строка по-прежнему годится. -->
+            <AutoCompleteBox Text="{Binding TargetText}" ItemsSource="{Binding Suggestions}"
+                             ItemFilter="{x:Static vm:TargetSuggestions.Filter}"
+                             MinimumPrefixLength="0" Watermark="gateway, 192.168.1.1 или example.com"
+                             IsEnabled="{Binding CanStart}">
+              <AutoCompleteBox.ItemTemplate>
+                <DataTemplate x:DataType="vm:TargetSuggestion">
+                  <TextBlock Text="{Binding Description}" FontSize="12" />
+                </DataTemplate>
+              </AutoCompleteBox.ItemTemplate>
+            </AutoCompleteBox>
           </StackPanel>
 
           <StackPanel Grid.Column="1" Spacing="4" Margin="0,0,12,0" Width="110">

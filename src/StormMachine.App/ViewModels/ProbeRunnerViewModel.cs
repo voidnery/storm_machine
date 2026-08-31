@@ -103,16 +103,20 @@ public sealed partial class ProbeRunnerViewModel : ObservableObject
 
     private ActiveRunViewModel? _current;
 
+    private readonly IDeviceStore _devices;
+
     public ProbeRunnerViewModel(
         RunnerService runner,
         IProbeRegistry registry,
         IRunStore store,
         IAgentDirectory agents,
+        IDeviceStore devices,
         IEnumerable<string> probeNames)
     {
         _runner = runner ?? throw new ArgumentNullException(nameof(runner));
         _store = store ?? throw new ArgumentNullException(nameof(store));
         _agents = agents ?? throw new ArgumentNullException(nameof(agents));
+        _devices = devices ?? throw new ArgumentNullException(nameof(devices));
         ArgumentNullException.ThrowIfNull(registry);
         ArgumentNullException.ThrowIfNull(probeNames);
 
@@ -144,6 +148,9 @@ public sealed partial class ProbeRunnerViewModel : ObservableObject
     public ObservableCollection<ParameterFieldViewModel> Fields { get; } = [];
 
     public ObservableCollection<string> AgentNames { get; } = [];
+
+    /// <summary>Подсказки цели из инвентаря (И-24): сеть просканирована — подставляем.</summary>
+    public ObservableCollection<TargetSuggestion> Suggestions { get; } = [];
 
     public ObservableCollection<SeriesRow> Series { get; } = [];
 
@@ -220,6 +227,13 @@ public sealed partial class ProbeRunnerViewModel : ObservableObject
     /// <summary>Сопряжённые агенты — подставляются в цель одним нажатием.</summary>
     public async Task LoadAgentsAsync(CancellationToken cancellationToken = default)
     {
+        Suggestions.Clear();
+
+        foreach (var suggestion in await TargetSuggestions.LoadAsync(_devices, cancellationToken).ConfigureAwait(true))
+        {
+            Suggestions.Add(suggestion);
+        }
+
         try
         {
             var agents = await _agents.ListAsync(cancellationToken).ConfigureAwait(true);

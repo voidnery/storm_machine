@@ -20,7 +20,16 @@
 
           <StackPanel Grid.Column="1" Spacing="4" Margin="0,0,12,0" IsVisible="{Binding NeedsTarget}">
             <TextBlock Text="{Binding TargetHint}" FontSize="11" Opacity="0.6" />
-            <TextBox Text="{Binding Target}" IsEnabled="{Binding CanStart}" />
+            <!-- Подсказки из инвентаря (И-24): сеть просканирована — адреса подставляются. -->
+            <AutoCompleteBox Text="{Binding Target}" ItemsSource="{Binding Suggestions}"
+                             ItemFilter="{x:Static vm:TargetSuggestions.Filter}"
+                             MinimumPrefixLength="0" IsEnabled="{Binding CanStart}">
+              <AutoCompleteBox.ItemTemplate>
+                <DataTemplate x:DataType="vm:TargetSuggestion">
+                  <TextBlock Text="{Binding Description}" FontSize="12" />
+                </DataTemplate>
+              </AutoCompleteBox.ItemTemplate>
+            </AutoCompleteBox>
           </StackPanel>
 
           <StackPanel Grid.Column="2" Spacing="4" Margin="0,0,12,0" VerticalAlignment="Bottom">

@@ -75,6 +75,10 @@ public sealed partial class ProbesPageViewModel : PageViewModel, ITargetAware, I
     private string _note = string.Empty;
 
     private readonly ScenarioLibrary _library;
+    private readonly IDeviceStore _devices;
+
+    /// <summary>Подсказки цели из инвентаря (И-24): сеть просканирована — подставляем.</summary>
+    public ObservableCollection<TargetSuggestion> Suggestions { get; } = [];
 
     public ProbesPageViewModel(
         NavigationSection section,
@@ -85,9 +89,11 @@ public sealed partial class ProbesPageViewModel : PageViewModel, ITargetAware, I
         RunnerService operations,
         ScenarioLibrary library,
         IScenarioStore scenarios,
-        IProbeRegistry registry)
+        IProbeRegistry registry,
+        IDeviceStore devices)
         : base(section)
     {
+        _devices = devices ?? throw new ArgumentNullException(nameof(devices));
         _runner = runner ?? throw new ArgumentNullException(nameof(runner));
         _operations = operations ?? throw new ArgumentNullException(nameof(operations));
         _clock = clock ?? throw new ArgumentNullException(nameof(clock));
@@ -123,8 +129,17 @@ public sealed partial class ProbesPageViewModel : PageViewModel, ITargetAware, I
 
     partial void OnTemplateChanged(ScenarioTemplateOption? value) => OnPropertyChanged(nameof(CanEditSelected));
 
-    public override Task ActivateAsync(CancellationToken cancellationToken = default) =>
-        RefreshScenariosAsync(cancellationToken);
+    public override async Task ActivateAsync(CancellationToken cancellationToken = default)
+    {
+        await RefreshScenariosAsync(cancellationToken).ConfigureAwait(true);
+
+        Suggestions.Clear();
+
+        foreach (var suggestion in await TargetSuggestions.LoadAsync(_devices, cancellationToken).ConfigureAwait(true))
+        {
+            Suggestions.Add(suggestion);
+        }
+    }
 
     [RelayCommand]
     private void EditSelected()

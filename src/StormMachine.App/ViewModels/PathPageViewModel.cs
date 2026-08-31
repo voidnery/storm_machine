@@ -46,6 +46,8 @@ public sealed partial class PathPageViewModel : PageViewModel, ITargetAware
     private ActiveRunViewModel? _current;
     private string? _resolvedAddress;
 
+    private readonly IDeviceStore _devices;
+
     public PathPageViewModel(
         NavigationSection section,
         RunnerService runner,
@@ -54,7 +56,8 @@ public sealed partial class PathPageViewModel : PageViewModel, ITargetAware
         IRunStore store,
         IHighResolutionClock clock,
         INetworkEnvironment environment,
-        IHopAnnotator annotator)
+        IHopAnnotator annotator,
+        IDeviceStore devices)
         : base(section)
     {
         _runner = runner ?? throw new ArgumentNullException(nameof(runner));
@@ -64,6 +67,7 @@ public sealed partial class PathPageViewModel : PageViewModel, ITargetAware
         _clock = clock ?? throw new ArgumentNullException(nameof(clock));
         _environment = environment ?? throw new ArgumentNullException(nameof(environment));
         _annotator = annotator ?? throw new ArgumentNullException(nameof(annotator));
+        _devices = devices ?? throw new ArgumentNullException(nameof(devices));
 
         _timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1.0 / RefreshHz) };
         _timer.Tick += (_, _) => PumpSamples();
@@ -162,7 +166,17 @@ public sealed partial class PathPageViewModel : PageViewModel, ITargetAware
         }
 
         await LoadHistoryAsync(cancellationToken).ConfigureAwait(true);
+
+        Suggestions.Clear();
+
+        foreach (var suggestion in await TargetSuggestions.LoadAsync(_devices, cancellationToken).ConfigureAwait(true))
+        {
+            Suggestions.Add(suggestion);
+        }
     }
+
+    /// <summary>Подсказки цели из инвентаря (И-24): сеть просканирована — подставляем.</summary>
+    public System.Collections.ObjectModel.ObservableCollection<TargetSuggestion> Suggestions { get; } = [];
 
     public override void Deactivate() => _timer.Stop();
 

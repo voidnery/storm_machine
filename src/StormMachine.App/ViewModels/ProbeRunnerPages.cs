@@ -18,10 +18,11 @@ public sealed class LocalTestsPageViewModel : PageViewModel
         RunnerService runner,
         IProbeRegistry registry,
         IRunStore store,
-        IAgentDirectory agents)
+        IAgentDirectory agents,
+        IDeviceStore devices)
         : base(section)
     {
-        Runner = new ProbeRunnerViewModel(runner, registry, store, agents,
+        Runner = new ProbeRunnerViewModel(runner, registry, store, agents, devices,
             ["throughput", "channel", "bufferbloat", "dns"]);
     }
 
@@ -44,10 +45,11 @@ public sealed class SpeedPageViewModel : PageViewModel
         RunnerService runner,
         IProbeRegistry registry,
         IRunStore store,
-        IAgentDirectory agents)
+        IAgentDirectory agents,
+        IDeviceStore devices)
         : base(section)
     {
-        Runner = new ProbeRunnerViewModel(runner, registry, store, agents,
+        Runner = new ProbeRunnerViewModel(runner, registry, store, agents, devices,
             ["speedtest", "iperf3", "bufferbloat"]);
     }
 

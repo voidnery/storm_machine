@@ -105,5 +105,6 @@ public sealed class ProbeRunnerTests(HeadlessSessionFixture fixture)
             services.GetRequiredService<IProbeRegistry>(),
             services.GetRequiredService<IRunStore>(),
             services.GetRequiredService<IAgentDirectory>(),
+            services.GetRequiredService<IDeviceStore>(),
             probes);
 }
