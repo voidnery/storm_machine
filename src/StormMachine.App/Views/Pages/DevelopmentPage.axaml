@@ -12,7 +12,7 @@
         <Button Grid.Column="1" Content="Обновить" Command="{Binding RefreshCommand}" Padding="12,5" />
       </Grid>
 
-      <TextBlock Text="{x:Static vm:DevelopmentPageViewModel.Note}" FontSize="11" Opacity="0.55"
+      <TextBlock Text="{x:Static vm:DevelopmentPageViewModel.Note}" FontSize="11" Foreground="{StaticResource TextMutedBrush}"
                  TextWrapping="Wrap" LineHeight="16" />
 
       <TextBlock Text="{Binding ErrorMessage}" FontSize="12" Foreground="{StaticResource DangerBrush}"
@@ -26,11 +26,11 @@
 
           <StackPanel Spacing="3">
             <TextBlock Text="Что продукт может на этой машине" FontSize="13" FontWeight="SemiBold" />
-            <TextBlock Text="{Binding Summary}" FontSize="11" Opacity="0.6" TextWrapping="Wrap" />
+            <TextBlock Text="{Binding Summary}" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap" />
 
             <!-- UX-принцип 6: недоступное не прячется, а объясняется -->
             <TextBlock Text="{x:Static vm:DevelopmentPageViewModel.SummaryNote}" FontSize="11"
-                       Opacity="0.5" TextWrapping="Wrap" LineHeight="17" />
+                       Foreground="{StaticResource TextMutedBrush}" TextWrapping="Wrap" LineHeight="17" />
           </StackPanel>
 
           <ItemsControl ItemsSource="{Binding Levels}">
@@ -40,17 +40,17 @@
 
                   <Grid ColumnDefinitions="*,Auto">
                     <TextBlock Grid.Column="0" Text="{Binding Title}" FontSize="12" FontWeight="SemiBold"
-                               Opacity="0.85" />
-                    <TextBlock Grid.Column="1" Text="{Binding StateText}" FontSize="11" Opacity="0.6" />
+                               />
+                    <TextBlock Grid.Column="1" Text="{Binding StateText}" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" />
                   </Grid>
 
-                  <TextBlock Text="{Binding About}" FontSize="10" Opacity="0.5" TextWrapping="Wrap"
+                  <TextBlock Text="{Binding About}" FontSize="10" Foreground="{StaticResource TextMutedBrush}" TextWrapping="Wrap"
                              LineHeight="15" />
 
                   <ItemsControl ItemsSource="{Binding Items}">
                     <ItemsControl.ItemTemplate>
                       <DataTemplate x:DataType="vm:CapabilityRow">
-                        <Border Padding="10,8" CornerRadius="4" Background="#232B3B" Margin="0,3">
+                        <Border Padding="10,8" CornerRadius="4" Background="{StaticResource TileBrush}" Margin="0,3">
                           <Grid ColumnDefinitions="Auto,*">
 
                             <Border Grid.Column="0" Width="8" Height="8" CornerRadius="4"
@@ -62,13 +62,13 @@
                                 <TextBlock Grid.Column="0" Text="{Binding Title}" FontSize="12"
                                            TextWrapping="Wrap" />
                                 <TextBlock Grid.Column="1" Text="{Binding StateText}" FontSize="10"
-                                           Opacity="0.6" VerticalAlignment="Center" Margin="8,0,0,0" />
+                                           Foreground="{StaticResource TextSecondaryBrush}" VerticalAlignment="Center" Margin="8,0,0,0" />
                               </Grid>
 
-                              <TextBlock Text="{Binding About}" FontSize="10" Opacity="0.55"
+                              <TextBlock Text="{Binding About}" FontSize="10" Foreground="{StaticResource TextMutedBrush}"
                                          TextWrapping="Wrap" LineHeight="15" />
 
-                              <TextBlock Text="{Binding Detail}" FontSize="10" Opacity="0.5"
+                              <TextBlock Text="{Binding Detail}" FontSize="10" Foreground="{StaticResource TextMutedBrush}"
                                          TextWrapping="Wrap" LineHeight="15"
                                          IsVisible="{Binding Detail, Converter={x:Static ObjectConverters.IsNotNull}}" />
 
@@ -78,7 +78,7 @@
                                          LineHeight="15" Foreground="{StaticResource WarningBrush}"
                                          IsVisible="{Binding HowToEnable, Converter={x:Static ObjectConverters.IsNotNull}}" />
 
-                              <TextBlock Text="{Binding Where}" FontSize="10" Opacity="0.6"
+                              <TextBlock Text="{Binding Where}" FontSize="10" Foreground="{StaticResource TextSecondaryBrush}"
                                          FontFamily="Consolas,Menlo,monospace"
                                          IsVisible="{Binding Where, Converter={x:Static ObjectConverters.IsNotNull}}" />
                             </StackPanel>

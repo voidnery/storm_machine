@@ -18,9 +18,9 @@
         <Button Grid.Column="5" Content="Удалить" Command="{Binding DeleteCommand}" Padding="12,5" />
       </Grid>
 
-      <TextBlock Text="{Binding SchedulerState}" FontSize="11" Opacity="0.55" TextWrapping="Wrap" />
+      <TextBlock Text="{Binding SchedulerState}" FontSize="11" Foreground="{StaticResource TextMutedBrush}" TextWrapping="Wrap" />
 
-      <TextBlock Text="{Binding Message}" FontSize="12" Foreground="#7DD3A0" TextWrapping="Wrap"
+      <TextBlock Text="{Binding Message}" FontSize="12" Foreground="{StaticResource SuccessBrush}" TextWrapping="Wrap"
                  IsVisible="{Binding Message, Converter={x:Static ObjectConverters.IsNotNull}}" />
       <TextBlock Text="{Binding ErrorMessage}" FontSize="12" Foreground="{StaticResource DangerBrush}" TextWrapping="Wrap"
                  IsVisible="{Binding ErrorMessage, Converter={x:Static ObjectConverters.IsNotNull}}" />
@@ -43,13 +43,13 @@
 
                 <StackPanel Grid.Column="1" Spacing="1" Margin="10,0">
                   <TextBlock Text="{Binding Name}" FontSize="13" TextTrimming="CharacterEllipsis" />
-                  <TextBlock Text="{Binding Subject}" FontSize="10" Opacity="0.5" TextTrimming="CharacterEllipsis" />
-                  <TextBlock Text="{Binding Schedule}" FontSize="10" Opacity="0.45" />
+                  <TextBlock Text="{Binding Subject}" FontSize="10" Foreground="{StaticResource TextMutedBrush}" TextTrimming="CharacterEllipsis" />
+                  <TextBlock Text="{Binding Schedule}" FontSize="10" Foreground="{StaticResource TextMutedBrush}" />
                 </StackPanel>
 
                 <StackPanel Grid.Column="2" Spacing="1" HorizontalAlignment="Right">
                   <TextBlock Text="{Binding StateText}" FontSize="11" HorizontalAlignment="Right" />
-                  <TextBlock Text="{Binding NextText}" FontSize="10" Opacity="0.5" HorizontalAlignment="Right" />
+                  <TextBlock Text="{Binding NextText}" FontSize="10" Foreground="{StaticResource TextMutedBrush}" HorizontalAlignment="Right" />
                   <TextBlock Text="алерт поднят" FontSize="10" HorizontalAlignment="Right"
                              Foreground="{StaticResource DangerBrush}"
                              IsVisible="{Binding IsAlerting}" />
@@ -69,27 +69,27 @@
           <ScrollViewer Grid.Row="0" DataContext="{Binding Editor}">
             <StackPanel x:DataType="vm:MonitorEditorViewModel" Spacing="12" Margin="0,0,10,0">
 
-              <TextBlock Text="Новый монитор" FontSize="14" FontWeight="SemiBold" />
+              <TextBlock Text="Новый монитор" FontSize="13" FontWeight="SemiBold" />
 
               <StackPanel Spacing="3">
-                <TextBlock Text="Имя" FontSize="11" Opacity="0.6" />
+                <TextBlock Text="Имя" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" />
                 <TextBox PlaceholderText="шлюз, сайт заказчика" Text="{Binding Name}" />
               </StackPanel>
 
               <StackPanel Spacing="3">
-                <TextBlock Text="Что проверять" FontSize="11" Opacity="0.6" />
+                <TextBlock Text="Что проверять" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" />
                 <ComboBox ItemsSource="{Binding Subjects}" SelectedItem="{Binding Subject}"
                           HorizontalAlignment="Stretch" />
-                <TextBlock Text="{Binding TargetHint}" FontSize="10" Opacity="0.5" TextWrapping="Wrap" />
+                <TextBlock Text="{Binding TargetHint}" FontSize="10" Foreground="{StaticResource TextMutedBrush}" TextWrapping="Wrap" />
               </StackPanel>
 
               <StackPanel Spacing="3">
-                <TextBlock Text="Цель" FontSize="11" Opacity="0.6" />
+                <TextBlock Text="Цель" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" />
                 <TextBox PlaceholderText="адрес, имя узла или URL" Text="{Binding Target}" />
               </StackPanel>
 
               <StackPanel Spacing="3">
-                <TextBlock Text="Как часто" FontSize="11" Opacity="0.6" />
+                <TextBlock Text="Как часто" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" />
                 <ComboBox ItemsSource="{Binding Schedules}" SelectedItem="{Binding Schedule}"
                           HorizontalAlignment="Stretch" />
 
@@ -97,14 +97,14 @@
                      любого набора выпадающих списков -->
                 <TextBox PlaceholderText="0 3 * * *" Text="{Binding Cron}"
                          IsVisible="{Binding NeedsCronText}" Margin="0,3,0,0" />
-                <TextBlock Text="{x:Static vm:MonitorEditorViewModel.CronHint}" FontSize="10" Opacity="0.5"
+                <TextBlock Text="{x:Static vm:MonitorEditorViewModel.CronHint}" FontSize="10" Foreground="{StaticResource TextMutedBrush}"
                            TextWrapping="Wrap" IsVisible="{Binding NeedsCronText}" />
               </StackPanel>
 
               <CheckBox Content="После простоя выполнить один раз" IsChecked="{Binding CatchUp}" />
 
               <StackPanel Spacing="4">
-                <TextBlock Text="Пороги" FontSize="11" Opacity="0.6" />
+                <TextBlock Text="Пороги" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" />
 
                 <Grid ColumnDefinitions="*,Auto">
                   <TextBox Grid.Column="0" PlaceholderText="p95 &lt; 50" Text="{Binding ThresholdText}" />
@@ -126,7 +126,7 @@
                   </ItemsControl.ItemTemplate>
                 </ItemsControl>
 
-                <TextBlock FontSize="10" Opacity="0.5" TextWrapping="Wrap"
+                <TextBlock FontSize="10" Foreground="{StaticResource TextMutedBrush}" TextWrapping="Wrap"
                            Text="Без порогов монитор копит историю, но ни о чём не судит." />
               </StackPanel>
 
@@ -135,45 +135,45 @@
               <StackPanel Spacing="6" IsVisible="{Binding Alert}" Margin="18,0,0,0">
                 <Grid ColumnDefinitions="*,10,*">
                   <StackPanel Grid.Column="0" Spacing="2">
-                    <TextBlock Text="Поднять после, проверок" FontSize="10" Opacity="0.6" />
+                    <TextBlock Text="Поднять после, проверок" FontSize="10" Foreground="{StaticResource TextSecondaryBrush}" />
                     <NumericUpDown Value="{Binding RaiseAfter}" Minimum="1" Maximum="20" Increment="1"
                                    FormatString="0" />
                   </StackPanel>
                   <StackPanel Grid.Column="2" Spacing="2">
-                    <TextBlock Text="Снять после, проверок" FontSize="10" Opacity="0.6" />
+                    <TextBlock Text="Снять после, проверок" FontSize="10" Foreground="{StaticResource TextSecondaryBrush}" />
                     <NumericUpDown Value="{Binding ClearAfter}" Minimum="1" Maximum="20" Increment="1"
                                    FormatString="0" />
                   </StackPanel>
                 </Grid>
 
                 <StackPanel Spacing="2">
-                  <TextBlock Text="Пауза между оповещениями" FontSize="10" Opacity="0.6" />
+                  <TextBlock Text="Пауза между оповещениями" FontSize="10" Foreground="{StaticResource TextSecondaryBrush}" />
                   <TextBox PlaceholderText="15м" Text="{Binding Cooldown}" />
                 </StackPanel>
 
                 <TextBlock Text="{x:Static vm:MonitorEditorViewModel.HysteresisHint}"
-                           FontSize="10" Opacity="0.5" TextWrapping="Wrap" LineHeight="15" />
+                           FontSize="10" Foreground="{StaticResource TextMutedBrush}" TextWrapping="Wrap" LineHeight="15" />
               </StackPanel>
 
               <StackPanel Spacing="3">
-                <TextBlock Text="Окно обслуживания" FontSize="11" Opacity="0.6" />
+                <TextBlock Text="Окно обслуживания" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" />
                 <TextBox PlaceholderText="пн-пт 02:00-04:00 регламент" Text="{Binding Maintenance}" />
-                <TextBlock FontSize="10" Opacity="0.5" TextWrapping="Wrap"
+                <TextBlock FontSize="10" Foreground="{StaticResource TextMutedBrush}" TextWrapping="Wrap"
                            Text="Проверки в это окно не идут, а время не считается ни простоем, ни работой." />
               </StackPanel>
 
               <StackPanel Spacing="3">
-                <TextBlock Text="Цель по доступности, %" FontSize="11" Opacity="0.6" />
+                <TextBlock Text="Цель по доступности, %" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" />
                 <NumericUpDown Value="{Binding ObjectivePercent}" Minimum="50" Maximum="100"
                                Increment="0.1" FormatString="0.###" />
-                <TextBlock Text="{Binding ObjectiveHint}" FontSize="10" Opacity="0.5" TextWrapping="Wrap" />
+                <TextBlock Text="{Binding ObjectiveHint}" FontSize="10" Foreground="{StaticResource TextMutedBrush}" TextWrapping="Wrap" />
               </StackPanel>
 
               <!-- Что получится, сказанное словами: форма объясняет свой смысл
                    до нажатия кнопки, а не после -->
-              <Border Padding="12,10" CornerRadius="4" Background="#232B3B">
+              <Border Padding="12,10" CornerRadius="4" Background="{StaticResource TileBrush}">
                 <StackPanel Spacing="4">
-                  <TextBlock Text="Получится" FontSize="11" FontWeight="SemiBold" Opacity="0.75" />
+                  <TextBlock Text="Получится" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextSecondaryBrush}" />
                   <TextBlock Text="{Binding Preview}" FontSize="11" TextWrapping="Wrap" LineHeight="17" />
                 </StackPanel>
               </Border>
@@ -203,15 +203,15 @@
 
             <TextBlock Text="{Binding Details}" FontSize="13" TextWrapping="Wrap" LineHeight="20" />
 
-            <Border Padding="12,10" CornerRadius="4" Background="#232B3B"
+            <Border Padding="12,10" CornerRadius="4" Background="{StaticResource TileBrush}"
                     IsVisible="{Binding AvailabilityText, Converter={x:Static ObjectConverters.IsNotNull}}">
               <StackPanel Spacing="6">
-                <TextBlock Text="Доступность" FontSize="12" FontWeight="SemiBold" Opacity="0.8" />
+                <TextBlock Text="Доступность" FontSize="12" FontWeight="SemiBold" />
                 <TextBlock Text="{Binding AvailabilityText}" FontSize="12" TextWrapping="Wrap" LineHeight="19" />
 
                 <!-- Оговорка о покрытии не прячется: 100% при покрытии 4% —
                      это отсутствие данных, а не отличная сеть -->
-                <Border Padding="9,6" CornerRadius="3" Background="#3A2E12"
+                <Border Padding="9,6" CornerRadius="3" Background="{StaticResource WarningSurfaceBrush}"
                         IsVisible="{Binding CoverageNotice, Converter={x:Static ObjectConverters.IsNotNull}}">
                   <TextBlock Text="{Binding CoverageNotice}" FontSize="11" TextWrapping="Wrap" />
                 </Border>
@@ -219,13 +219,13 @@
             </Border>
 
             <StackPanel Spacing="6" IsVisible="{Binding HasChecks}">
-              <TextBlock Text="Последние проверки" FontSize="12" FontWeight="SemiBold" Opacity="0.8" />
+              <TextBlock Text="Последние проверки" FontSize="12" FontWeight="SemiBold" />
 
               <ItemsControl ItemsSource="{Binding Checks}">
                 <ItemsControl.ItemTemplate>
                   <DataTemplate x:DataType="vm:CheckRow">
                     <Grid ColumnDefinitions="130,120,*" Margin="0,2">
-                      <TextBlock Grid.Column="0" Text="{Binding When}" FontSize="11" Opacity="0.6"
+                      <TextBlock Grid.Column="0" Text="{Binding When}" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}"
                                  FontFamily="Consolas,Menlo,monospace" />
                       <TextBlock Grid.Column="1" Text="{Binding State}" FontSize="11">
                         <TextBlock.Styles>
@@ -243,7 +243,7 @@
               </ItemsControl>
             </StackPanel>
 
-            <TextBlock FontSize="11" Opacity="0.5" TextWrapping="Wrap"
+            <TextBlock FontSize="11" Foreground="{StaticResource TextMutedBrush}" TextWrapping="Wrap"
                        Text="Форма даёт разумные умолчания; полная власть над расписанием и гистерезисом — у storm monitors add. Экран и консоль работают с одной базой и одним планировщиком." />
 
           </StackPanel>

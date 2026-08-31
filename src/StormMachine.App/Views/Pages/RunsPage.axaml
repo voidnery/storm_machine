@@ -32,8 +32,8 @@
         <Button Grid.Column="4" Content="Обновить" Command="{Binding RefreshCommand}" Padding="12,5" Margin="0,0,8,0" />
         <Button Grid.Column="5" Content="Удалить" Command="{Binding DeleteSelectedCommand}" Padding="12,5" />
       </Grid>
-      <TextBlock Text="{Binding Usage}" FontSize="11" Opacity="0.55" TextWrapping="Wrap" />
-      <TextBlock Text="{Binding Message}" FontSize="12" Foreground="#7DD3A0" TextWrapping="Wrap"
+      <TextBlock Text="{Binding Usage}" FontSize="11" Foreground="{StaticResource TextMutedBrush}" TextWrapping="Wrap" />
+      <TextBlock Text="{Binding Message}" FontSize="12" Foreground="{StaticResource SuccessBrush}" TextWrapping="Wrap"
                  IsVisible="{Binding Message, Converter={x:Static ObjectConverters.IsNotNull}}" />
       <TextBlock Text="{Binding ErrorMessage}" FontSize="12" Foreground="{StaticResource DangerBrush}" TextWrapping="Wrap"
                  IsVisible="{Binding ErrorMessage, Converter={x:Static ObjectConverters.IsNotNull}}" />
@@ -49,16 +49,16 @@
           <ListBox.ItemTemplate>
             <DataTemplate x:DataType="results:RunSummary">
               <Grid ColumnDefinitions="56,*,Auto" Margin="0,3">
-                <Border Grid.Column="0" Background="#2E3648" CornerRadius="3" Padding="5,1"
+                <Border Grid.Column="0" Background="{StaticResource DividerBrush}" CornerRadius="3" Padding="5,1"
                         HorizontalAlignment="Left" VerticalAlignment="Center">
                   <TextBlock Text="{Binding ProbeName}" FontSize="10" />
                 </Border>
                 <StackPanel Grid.Column="1" Spacing="1" Margin="8,0">
                   <TextBlock Text="{Binding TargetDisplay}" FontSize="12" TextTrimming="CharacterEllipsis" />
                   <TextBlock Text="{Binding StartedUtc.LocalDateTime, StringFormat='{}{0:dd.MM HH:mm:ss}'}"
-                             FontSize="10" Opacity="0.5" />
+                             FontSize="10" Foreground="{StaticResource TextMutedBrush}" />
                 </StackPanel>
-                <TextBlock Grid.Column="2" VerticalAlignment="Center" FontSize="11" Opacity="0.7"
+                <TextBlock Grid.Column="2" VerticalAlignment="Center" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}"
                            Text="{Binding SentCount, StringFormat='{}{0} проб'}" />
               </Grid>
             </DataTemplate>
@@ -72,7 +72,7 @@
           <StackPanel Spacing="12">
             <TextBlock Text="{Binding Details}" FontSize="13" TextWrapping="Wrap" LineHeight="20" />
 
-            <Border Padding="10,7" CornerRadius="4" Background="#3A2E12"
+            <Border Padding="10,7" CornerRadius="4" Background="{StaticResource WarningSurfaceBrush}"
                     IsVisible="{Binding RetentionNotice, Converter={x:Static ObjectConverters.IsNotNull}}">
               <TextBlock Text="{Binding RetentionNotice}" FontSize="12" TextWrapping="Wrap"
                          Foreground="{StaticResource WarningBrush}" />
@@ -82,16 +82,16 @@
                  Таблица собрана из ItemsControl намеренно: DataGrid потянул бы отдельный
                  пакет с собственной темой ради семи колонок только для чтения. -->
             <StackPanel Spacing="4">
-              <TextBlock Text="Ряды" FontWeight="SemiBold" FontSize="12" Opacity="0.7" />
+              <TextBlock Text="Ряды" FontWeight="SemiBold" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" />
 
               <Grid ColumnDefinitions="*,60,70,90,90,90,90" Margin="0,2">
-                <TextBlock Grid.Column="0" Text="ряд" FontSize="11" Opacity="0.45" />
-                <TextBlock Grid.Column="1" Text="проб" FontSize="11" Opacity="0.45" />
-                <TextBlock Grid.Column="2" Text="потери" FontSize="11" Opacity="0.45" />
-                <TextBlock Grid.Column="3" Text="мин" FontSize="11" Opacity="0.45" />
-                <TextBlock Grid.Column="4" Text="медиана" FontSize="11" Opacity="0.45" />
-                <TextBlock Grid.Column="5" Text="макс" FontSize="11" Opacity="0.45" />
-                <TextBlock Grid.Column="6" Text="джиттер" FontSize="11" Opacity="0.45" />
+                <TextBlock Grid.Column="0" Text="ряд" FontSize="11" Foreground="{StaticResource TextMutedBrush}" />
+                <TextBlock Grid.Column="1" Text="проб" FontSize="11" Foreground="{StaticResource TextMutedBrush}" />
+                <TextBlock Grid.Column="2" Text="потери" FontSize="11" Foreground="{StaticResource TextMutedBrush}" />
+                <TextBlock Grid.Column="3" Text="мин" FontSize="11" Foreground="{StaticResource TextMutedBrush}" />
+                <TextBlock Grid.Column="4" Text="медиана" FontSize="11" Foreground="{StaticResource TextMutedBrush}" />
+                <TextBlock Grid.Column="5" Text="макс" FontSize="11" Foreground="{StaticResource TextMutedBrush}" />
+                <TextBlock Grid.Column="6" Text="джиттер" FontSize="11" Foreground="{StaticResource TextMutedBrush}" />
               </Grid>
 
               <ItemsControl ItemsSource="{Binding Series}">
@@ -99,12 +99,12 @@
                   <DataTemplate x:DataType="vm:SeriesRow">
                     <Grid ColumnDefinitions="*,60,70,90,90,90,90" Margin="0,2">
                       <TextBlock Grid.Column="0" Text="{Binding Label}" FontSize="12" TextTrimming="CharacterEllipsis" />
-                      <TextBlock Grid.Column="1" Text="{Binding Sent}" FontSize="12" Opacity="0.8" />
-                      <TextBlock Grid.Column="2" Text="{Binding Loss}" FontSize="12" Opacity="0.8" />
-                      <TextBlock Grid.Column="3" Text="{Binding Min}" FontSize="12" Opacity="0.8" />
+                      <TextBlock Grid.Column="1" Text="{Binding Sent}" FontSize="12" />
+                      <TextBlock Grid.Column="2" Text="{Binding Loss}" FontSize="12" />
+                      <TextBlock Grid.Column="3" Text="{Binding Min}" FontSize="12" />
                       <TextBlock Grid.Column="4" Text="{Binding Median}" FontSize="12" />
-                      <TextBlock Grid.Column="5" Text="{Binding Max}" FontSize="12" Opacity="0.8" />
-                      <TextBlock Grid.Column="6" Text="{Binding Jitter}" FontSize="12" Opacity="0.8" />
+                      <TextBlock Grid.Column="5" Text="{Binding Max}" FontSize="12" />
+                      <TextBlock Grid.Column="6" Text="{Binding Jitter}" FontSize="12" />
                     </Grid>
                   </DataTemplate>
                 </ItemsControl.ItemTemplate>
@@ -113,13 +113,13 @@
 
             <!-- Факты: то, что не является числом во временном ряду -->
             <StackPanel Spacing="6">
-              <TextBlock Text="Факты" FontWeight="SemiBold" FontSize="12" Opacity="0.7" />
+              <TextBlock Text="Факты" FontWeight="SemiBold" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" />
               <ItemsControl ItemsSource="{Binding Facts}">
                 <ItemsControl.ItemTemplate>
                   <DataTemplate x:DataType="vm:FactRow">
                     <Grid ColumnDefinitions="70,200,*" Margin="0,2">
-                      <TextBlock Grid.Column="0" Text="{Binding Category}" FontSize="11" Opacity="0.45" />
-                      <TextBlock Grid.Column="1" Text="{Binding Name}" FontSize="12" Opacity="0.8" />
+                      <TextBlock Grid.Column="0" Text="{Binding Category}" FontSize="11" Foreground="{StaticResource TextMutedBrush}" />
+                      <TextBlock Grid.Column="1" Text="{Binding Name}" FontSize="12" />
                       <TextBlock Grid.Column="2" Text="{Binding Value}" FontSize="12" TextWrapping="Wrap"
                                  Foreground="{StaticResource WarningBrush}"
                                  IsVisible="{Binding IsWarning}" />

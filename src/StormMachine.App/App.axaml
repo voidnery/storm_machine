@@ -10,17 +10,96 @@
 
   <Application.Styles>
     <FluentTheme />
+
+    <!-- Типографическая шкала (докс/UI-DESIGN-PLAN.md): пять ступеней плюс плитка
+         и моно. Ступени задаются классами, а не числами по месту, — сторож
+         в ArchTests запрещает размеры вне шкалы. -->
+    <Style Selector="TextBlock.h1">
+      <Setter Property="FontSize" Value="24" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+    <Style Selector="TextBlock.h2">
+      <Setter Property="FontSize" Value="13" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+    <Style Selector="TextBlock.stat">
+      <Setter Property="FontSize" Value="18" />
+    </Style>
+    <Style Selector="TextBlock.body">
+      <Setter Property="FontSize" Value="12" />
+    </Style>
+    <!-- DynamicResource: стили загружаются раньше словаря ресурсов приложения,
+         и StaticResource здесь не нашёл бы кисть. -->
+    <Style Selector="TextBlock.label">
+      <Setter Property="FontSize" Value="11" />
+      <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+    </Style>
+    <Style Selector="TextBlock.caption">
+      <Setter Property="FontSize" Value="10" />
+      <Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}" />
+    </Style>
+    <Style Selector="TextBlock.mono, SelectableTextBlock.mono">
+      <Setter Property="FontFamily" Value="Consolas,Menlo,monospace" />
+    </Style>
+
+    <!-- Формы поверхностей -->
+    <Style Selector="Border.card">
+      <Setter Property="Background" Value="{DynamicResource PanelBrush}" />
+      <Setter Property="CornerRadius" Value="6" />
+      <Setter Property="Padding" Value="16" />
+    </Style>
+    <Style Selector="Border.inset">
+      <Setter Property="Background" Value="{DynamicResource InsetBrush}" />
+      <Setter Property="CornerRadius" Value="4" />
+    </Style>
+    <Style Selector="Border.tile">
+      <Setter Property="Background" Value="{DynamicResource TileBrush}" />
+      <Setter Property="CornerRadius" Value="4" />
+    </Style>
+    <Style Selector="Border.chip">
+      <Setter Property="Background" Value="{DynamicResource ChipBrush}" />
+      <Setter Property="CornerRadius" Value="3" />
+      <Setter Property="Padding" Value="6,1" />
+    </Style>
   </Application.Styles>
 
   <Application.Resources>
-    <!-- Оформление намеренно нейтральное и собрано в одном месте: визуальный дизайн
-         прорабатывается отдельно, и менять его придётся здесь, а не по всем файлам. -->
-    <SolidColorBrush x:Key="ChromeBrush">#1F2430</SolidColorBrush>
+    <!-- Дизайн-токены — единственный источник цвета в клиенте. Роли и значения —
+         docs/UI-DESIGN-PLAN.md; сторож в ArchTests запрещает литеральные цвета
+         в разметке страниц: 25 случайных оттенков при шести токенах уже было. -->
+
+    <!-- Поверхности, от глубокой к приподнятой -->
+    <SolidColorBrush x:Key="SurfaceBrush">#151922</SolidColorBrush>
     <SolidColorBrush x:Key="SidebarBrush">#191D26</SolidColorBrush>
+    <SolidColorBrush x:Key="InsetBrush">#1B222E</SolidColorBrush>
+    <SolidColorBrush x:Key="ChromeBrush">#1F2430</SolidColorBrush>
     <SolidColorBrush x:Key="PanelBrush">#232A38</SolidColorBrush>
+    <SolidColorBrush x:Key="TileBrush">#232B3B</SolidColorBrush>
+    <SolidColorBrush x:Key="ChipBrush">#233046</SolidColorBrush>
+    <SolidColorBrush x:Key="DividerBrush">#2E3746</SolidColorBrush>
+    <SolidColorBrush x:Key="OutlineBrush">#3A4356</SolidColorBrush>
+    <SolidColorBrush x:Key="ScrimBrush">#CC0F1219</SolidColorBrush>
+
+    <!-- Текст: ступени цветом, а не Opacity, — контраст не зависит от фона -->
+    <SolidColorBrush x:Key="TextBrush">#E8ECF2</SolidColorBrush>
+    <SolidColorBrush x:Key="TextSecondaryBrush">#A9B4C4</SolidColorBrush>
+    <SolidColorBrush x:Key="TextMutedBrush">#77839A</SolidColorBrush>
+
+    <!-- Смысловые цвета и их тонированные подложки -->
     <SolidColorBrush x:Key="AccentBrush">#3B82F6</SolidColorBrush>
+    <SolidColorBrush x:Key="SuccessBrush">#7DD3A0</SolidColorBrush>
     <SolidColorBrush x:Key="WarningBrush">#F59E0B</SolidColorBrush>
     <SolidColorBrush x:Key="DangerBrush">#EF4444</SolidColorBrush>
+    <SolidColorBrush x:Key="InfoBrush">#8FB8E8</SolidColorBrush>
+    <SolidColorBrush x:Key="SuccessSurfaceBrush">#16321F</SolidColorBrush>
+    <SolidColorBrush x:Key="WarningSurfaceBrush">#3A2E12</SolidColorBrush>
+    <SolidColorBrush x:Key="DangerSurfaceBrush">#3A1E1E</SolidColorBrush>
+
+    <!-- Линии карты. Значения обязаны совпадать с TopologyCanvas: рисовалка держит
+         кэшированные кисти у себя и переводится на чтение этих ресурсов волной 3. -->
+    <SolidColorBrush x:Key="LinkConfirmedBrush">#4B7FD1</SolidColorBrush>
+    <SolidColorBrush x:Key="LinkInferredBrush">#7A8AA5</SolidColorBrush>
+    <SolidColorBrush x:Key="LinkAssumedBrush">#5D6B82</SolidColorBrush>
   </Application.Resources>
 
 </Application>

@@ -9,10 +9,10 @@
     <StackPanel Spacing="14" MaxWidth="900" HorizontalAlignment="Left">
 
       <TextBlock Text="{Binding Title}" FontSize="24" FontWeight="SemiBold" />
-      <TextBlock Text="{Binding Description}" FontSize="14" Opacity="0.75" TextWrapping="Wrap" />
+      <TextBlock Text="{Binding Description}" FontSize="13" Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap" />
 
       <Border Padding="12,9" CornerRadius="4"
-              Background="#3A2E12" BorderBrush="{StaticResource WarningBrush}" BorderThickness="1"
+              Background="{StaticResource WarningSurfaceBrush}" BorderBrush="{StaticResource WarningBrush}" BorderThickness="1"
               IsVisible="{Binding Warning, Converter={x:Static ObjectConverters.IsNotNull}}">
         <TextBlock Text="{Binding Warning}" TextWrapping="Wrap" FontSize="12"
                    Foreground="{StaticResource WarningBrush}" />
@@ -20,12 +20,12 @@
 
       <!-- Первый запуск: путь от «запустил» до «вижу свою сеть» не должен
            требовать чтения документации. -->
-      <Border Padding="16" CornerRadius="6" Background="#16202C"
+      <Border Padding="16" CornerRadius="6" Background="{StaticResource InsetBrush}"
               BorderBrush="{StaticResource AccentBrush}" BorderThickness="1"
               IsVisible="{Binding IsFirstRun}">
         <StackPanel Spacing="10">
-          <TextBlock Text="С чего начать" FontWeight="SemiBold" FontSize="14" />
-          <TextBlock Text="{Binding FirstRunHint}" FontSize="12.5" TextWrapping="Wrap" Opacity="0.85" />
+          <TextBlock Text="С чего начать" FontWeight="SemiBold" FontSize="13" />
+          <TextBlock Text="{Binding FirstRunHint}" FontSize="12" TextWrapping="Wrap" />
           <Button Content="Просканировать мою сеть"
                   Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).GoToCommand}"
                   CommandParameter="/local/discovery"
@@ -38,22 +38,22 @@
       <Border Background="{StaticResource PanelBrush}" CornerRadius="6" Padding="16">
         <StackPanel Spacing="10">
           <TextBlock Text="Окружение измерений" FontWeight="SemiBold" FontSize="13" />
-          <TextBlock Text="{Binding Privileges}" FontSize="12" Opacity="0.75" />
-          <TextBlock Text="{Binding TimerInfo}" FontSize="12" Opacity="0.75" />
+          <TextBlock Text="{Binding Privileges}" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" />
+          <TextBlock Text="{Binding TimerInfo}" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" />
 
           <ItemsControl ItemsSource="{Binding Adapters}" Margin="0,4,0,0">
             <ItemsControl.ItemTemplate>
               <DataTemplate x:DataType="vm:AdapterRow">
                 <Grid ColumnDefinitions="Auto,*,Auto,Auto" Margin="0,3">
-                  <TextBlock Grid.Column="0" Text="→" Opacity="0.9" Margin="0,0,8,0"
+                  <TextBlock Grid.Column="0" Text="→" Margin="0,0,8,0"
                              IsVisible="{Binding IsPrimary}" />
                   <TextBlock Grid.Column="1" Text="{Binding Name}" FontSize="13" />
                   <TextBlock Grid.Column="2" Text="{Binding Kind}" FontSize="12" Margin="12,0"
                              Foreground="{StaticResource WarningBrush}"
                              IsVisible="{Binding IsSuspect}" />
-                  <TextBlock Grid.Column="2" Text="{Binding Kind}" FontSize="12" Margin="12,0" Opacity="0.6"
+                  <TextBlock Grid.Column="2" Text="{Binding Kind}" FontSize="12" Margin="12,0" Foreground="{StaticResource TextSecondaryBrush}"
                              IsVisible="{Binding !IsSuspect}" />
-                  <TextBlock Grid.Column="3" Text="{Binding Address}" FontSize="12" Opacity="0.6" />
+                  <TextBlock Grid.Column="3" Text="{Binding Address}" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" />
                 </Grid>
               </DataTemplate>
             </ItemsControl.ItemTemplate>
@@ -70,24 +70,24 @@
                     FontSize="12" Padding="10,3" />
           </Grid>
 
-          <TextBlock Text="{Binding JournalInfo}" FontSize="12" Opacity="0.6" TextWrapping="Wrap" />
-          <TextBlock Text="{Binding InventoryInfo}" FontSize="12" Opacity="0.6" TextWrapping="Wrap" />
+          <TextBlock Text="{Binding JournalInfo}" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap" />
+          <TextBlock Text="{Binding InventoryInfo}" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap" />
 
           <ItemsControl ItemsSource="{Binding RecentRuns}">
             <ItemsControl.ItemTemplate>
               <DataTemplate x:DataType="results:RunSummary">
                 <Grid ColumnDefinitions="70,Auto,*,Auto,Auto" Margin="0,3">
-                  <Border Grid.Column="0" Background="#2E3648" CornerRadius="3" Padding="6,1" HorizontalAlignment="Left">
+                  <Border Grid.Column="0" Background="{StaticResource DividerBrush}" CornerRadius="3" Padding="6,1" HorizontalAlignment="Left">
                     <TextBlock Text="{Binding ProbeName}" FontSize="11" />
                   </Border>
                   <TextBlock Grid.Column="1" Text="{Binding StartedUtc.LocalDateTime, StringFormat='{}{0:dd.MM HH:mm:ss}'}"
-                             FontSize="12" Opacity="0.6" Margin="8,0" />
+                             FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" Margin="8,0" />
                   <TextBlock Grid.Column="2" Text="{Binding TargetDisplay}" FontSize="12"
                              TextTrimming="CharacterEllipsis" Margin="8,0" />
                   <TextBlock Grid.Column="3" Text="{Binding SentCount, StringFormat='{}{0} проб'}"
-                             FontSize="12" Opacity="0.6" Margin="8,0" />
+                             FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" Margin="8,0" />
                   <TextBlock Grid.Column="4" Text="{Binding MedianMs, StringFormat='{}{0:0.000} мс'}"
-                             FontSize="12" Opacity="0.8" Margin="8,0" />
+                             FontSize="12" Margin="8,0" />
                 </Grid>
               </DataTemplate>
             </ItemsControl.ItemTemplate>

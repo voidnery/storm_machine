@@ -6,19 +6,19 @@
 
   <ScrollViewer Padding="32,24">
     <StackPanel Spacing="14" MaxWidth="720" HorizontalAlignment="Left">
-      <TextBlock Text="{Binding Title}" FontSize="26" FontWeight="SemiBold" />
-      <TextBlock Text="{Binding Description}" FontSize="15" Opacity="0.8" TextWrapping="Wrap" />
+      <TextBlock Text="{Binding Title}" FontSize="24" FontWeight="SemiBold" />
+      <TextBlock Text="{Binding Description}" FontSize="13" TextWrapping="Wrap" />
 
       <Border Background="{StaticResource PanelBrush}" CornerRadius="6" Padding="16" Margin="0,8,0,0">
         <StackPanel Spacing="8">
-          <TextBlock Text="Состояние раздела" FontWeight="SemiBold" Opacity="0.7" FontSize="12" />
-          <TextBlock Text="{Binding Availability}" FontSize="15" />
-          <Border Padding="10,8" CornerRadius="4" Background="#232B3B"
+          <TextBlock Text="Состояние раздела" FontWeight="SemiBold" Foreground="{StaticResource TextSecondaryBrush}" FontSize="12" />
+          <TextBlock Text="{Binding Availability}" FontSize="13" />
+          <Border Padding="10,8" CornerRadius="4" Background="{StaticResource TileBrush}"
                   IsVisible="{Binding ConsoleCommands, Converter={x:Static ObjectConverters.IsNotNull}}">
             <TextBlock Text="{Binding ConsoleCommands}" FontSize="12" TextWrapping="Wrap"
                        LineHeight="18" FontFamily="Consolas,Menlo,monospace" />
           </Border>
-          <TextBlock Text="{Binding Explanation}" TextWrapping="Wrap" FontSize="13" Opacity="0.6" />
+          <TextBlock Text="{Binding Explanation}" TextWrapping="Wrap" FontSize="13" Foreground="{StaticResource TextSecondaryBrush}" />
         </StackPanel>
       </Border>
     </StackPanel>

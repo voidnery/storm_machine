@@ -1,4 +1,4 @@
-﻿<UserControl xmlns="https://github.com/avaloniaui"
+<UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:StormMachine.App.ViewModels"
              xmlns:controls="using:StormMachine.App.Views.Controls"
@@ -9,7 +9,7 @@
 
     <StackPanel Grid.Row="0" Spacing="4">
       <TextBlock Text="{Binding Title}" FontSize="24" FontWeight="SemiBold" />
-      <TextBlock Text="{Binding Summary}" FontSize="12" Opacity="0.65" TextWrapping="Wrap" />
+      <TextBlock Text="{Binding Summary}" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap" />
 
       <!-- Оговорки заметнее сводки: они говорят не о достоверности связей,
            а о том, что карту нельзя читать буквально. -->
@@ -42,7 +42,7 @@
           <Button Grid.Column="4" Content="Развернуть выбранное" Command="{Binding ExpandCommand}"
                   FontSize="12" Padding="10,4" Margin="0,0,10,0" />
 
-          <TextBlock Grid.Column="5" Text="{Binding StatusLine}" FontSize="12" Opacity="0.65"
+          <TextBlock Grid.Column="5" Text="{Binding StatusLine}" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}"
                      VerticalAlignment="Center" Margin="10,0" TextTrimming="CharacterEllipsis" />
 
           <Button Grid.Column="6" Content="PNG" Command="{Binding ExportPngCommand}"
@@ -55,7 +55,7 @@
 
         <!-- Опрос идёт секундами на устройство: молчащий в это время инструмент
              выглядит зависшим. -->
-        <TextBlock Text="{Binding Note}" FontSize="11" Opacity="0.6" TextWrapping="Wrap"
+        <TextBlock Text="{Binding Note}" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap"
                    IsVisible="{Binding Note, Converter={x:Static ObjectConverters.IsNotNull}}" />
 
         <TextBlock Text="{Binding ErrorMessage}" FontSize="12"
@@ -75,26 +75,26 @@
 
           <!-- Легенда лежит прямо на карте: различие достоверности — главное,
                что карта сообщает, и объяснять его надо там же, где смотрят. -->
-          <Border Grid.Row="1" Background="#1A1F2B" Padding="12,7">
+          <Border Grid.Row="1" Background="{StaticResource ChromeBrush}" Padding="12,7">
             <StackPanel Orientation="Horizontal" Spacing="18">
               <StackPanel Orientation="Horizontal" Spacing="6">
-                <Rectangle Width="24" Height="2" Fill="#4B7FD1" VerticalAlignment="Center" />
-                <TextBlock Text="подтверждено" FontSize="11" Opacity="0.7" />
+                <Rectangle Width="24" Height="2" Fill="{StaticResource LinkConfirmedBrush}" VerticalAlignment="Center" />
+                <TextBlock Text="подтверждено" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" />
               </StackPanel>
               <StackPanel Orientation="Horizontal" Spacing="6">
-                <Rectangle Width="24" Height="2" Fill="#7A8AA5" VerticalAlignment="Center"
+                <Rectangle Width="24" Height="2" Fill="{StaticResource LinkInferredBrush}" VerticalAlignment="Center"
                            StrokeDashArray="2,1.5" />
-                <TextBlock Text="выведено по правилу" FontSize="11" Opacity="0.7" />
+                <TextBlock Text="выведено по правилу" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" />
               </StackPanel>
               <StackPanel Orientation="Horizontal" Spacing="6">
-                <Rectangle Width="24" Height="2" Fill="#5D6B82" VerticalAlignment="Center"
+                <Rectangle Width="24" Height="2" Fill="{StaticResource LinkAssumedBrush}" VerticalAlignment="Center"
                            StrokeDashArray="0.6,2" />
-                <TextBlock Text="допущение" FontSize="11" Opacity="0.7" />
+                <TextBlock Text="допущение" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" />
               </StackPanel>
-              <TextBlock Text="цвет рамки — категория устройства" FontSize="11" Opacity="0.7"
+              <TextBlock Text="цвет рамки — категория устройства" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}"
                          VerticalAlignment="Center" />
               <TextBlock Text="Колесо — масштаб, перетаскивание — сдвиг, щелчок — выбор узла."
-                         FontSize="11" Opacity="0.45" VerticalAlignment="Center" />
+                         FontSize="11" Foreground="{StaticResource TextMutedBrush}" VerticalAlignment="Center" />
             </StackPanel>
           </Border>
         </Grid>
@@ -106,23 +106,23 @@
           <StackPanel Grid.Row="0" Spacing="2" Margin="0,0,0,8">
             <TextBlock Text="Выбранный узел" FontWeight="SemiBold" FontSize="13" />
             <TextBlock Text="Щёлкните узел на карте — покажу его связи и то, откуда они взялись."
-                       FontSize="11" Opacity="0.55" TextWrapping="Wrap" />
+                       FontSize="11" Foreground="{StaticResource TextMutedBrush}" TextWrapping="Wrap" />
           </StackPanel>
 
           <StackPanel Grid.Row="1" Spacing="2" Margin="0,0,0,10"
                       IsVisible="{Binding SelectedNode, Converter={x:Static ObjectConverters.IsNotNull}}">
-            <TextBlock Text="{Binding SelectedNode.Label}" FontSize="14" TextWrapping="Wrap" />
-            <TextBlock Text="{Binding SelectedNode.Address}" FontSize="12" Opacity="0.7"
+            <TextBlock Text="{Binding SelectedNode.Label}" FontSize="13" TextWrapping="Wrap" />
+            <TextBlock Text="{Binding SelectedNode.Address}" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}"
                        IsVisible="{Binding SelectedNode.Address, Converter={x:Static ObjectConverters.IsNotNull}}" />
-            <TextBlock Text="{Binding SelectedNode.MacAddress}" FontSize="12" Opacity="0.7"
+            <TextBlock Text="{Binding SelectedNode.MacAddress}" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}"
                        IsVisible="{Binding SelectedNode.MacAddress, Converter={x:Static ObjectConverters.IsNotNull}}" />
-            <TextBlock Text="{Binding SelectedNode.Vendor}" FontSize="12" Opacity="0.7"
+            <TextBlock Text="{Binding SelectedNode.Vendor}" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}"
                        TextWrapping="Wrap"
                        IsVisible="{Binding SelectedNode.Vendor, Converter={x:Static ObjectConverters.IsNotNull}}" />
             <TextBlock Text="{Binding SelectedNode.Role}" FontSize="12"
                        Foreground="{StaticResource AccentBrush}"
                        IsVisible="{Binding SelectedNode.Role, Converter={x:Static ObjectConverters.IsNotNull}}" />
-            <TextBlock Text="{Binding SelectedNode.Detail}" FontSize="11" Opacity="0.55"
+            <TextBlock Text="{Binding SelectedNode.Detail}" FontSize="11" Foreground="{StaticResource TextMutedBrush}"
                        TextWrapping="Wrap"
                        IsVisible="{Binding SelectedNode.Detail, Converter={x:Static ObjectConverters.IsNotNull}}" />
           </StackPanel>
@@ -131,17 +131,17 @@
             <ItemsControl ItemsSource="{Binding SelectedLinks}">
               <ItemsControl.ItemTemplate>
                 <DataTemplate x:DataType="vm:LinkRow">
-                  <Border Padding="8,6" Margin="0,0,0,6" CornerRadius="4" Background="#1A2130">
+                  <Border Padding="8,6" Margin="0,0,0,6" CornerRadius="4" Background="{StaticResource InsetBrush}">
                     <StackPanel Spacing="3">
                       <Grid ColumnDefinitions="*,Auto">
                         <TextBlock Grid.Column="0" Text="{Binding Peer}" FontSize="12"
                                    TextTrimming="CharacterEllipsis" />
                         <TextBlock Grid.Column="1" Text="{Binding Confidence}" FontSize="10"
-                                   Opacity="0.75" Margin="8,0,0,0" />
+                                   Foreground="{StaticResource TextSecondaryBrush}" Margin="8,0,0,0" />
                       </Grid>
                       <!-- Догадка обязана себя объяснять: иначе её нельзя
                            ни проверить, ни оспорить. -->
-                      <TextBlock Text="{Binding Because}" FontSize="10.5" Opacity="0.55"
+                      <TextBlock Text="{Binding Because}" FontSize="10" Foreground="{StaticResource TextMutedBrush}"
                                  TextWrapping="Wrap"
                                  IsVisible="{Binding !IsConfirmed}" />
                     </StackPanel>
@@ -156,10 +156,10 @@
                  узел, потом выбирается второй. Перетаскивание было бы естественнее,
                  но случайное движение мышью создавало бы связи, которых никто
                  не рисовал. -->
-            <Border Background="#1A2130" CornerRadius="4" Padding="10,8">
+            <Border Background="{StaticResource InsetBrush}" CornerRadius="4" Padding="10,8">
               <StackPanel Spacing="6">
                 <TextBlock Text="Поправить карту" FontWeight="SemiBold" FontSize="12" />
-                <TextBlock Text="{Binding PinnedCaption}" FontSize="11" Opacity="0.6"
+                <TextBlock Text="{Binding PinnedCaption}" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}"
                            TextTrimming="CharacterEllipsis" />
 
                 <TextBox Text="{Binding LinkNote}" FontSize="11"
@@ -195,9 +195,9 @@
                     <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,4">
                       <StackPanel Grid.Column="0" Spacing="1">
                         <TextBlock Text="{Binding Text}" FontSize="11" TextWrapping="Wrap" />
-                        <TextBlock Text="{Binding Note}" FontSize="10" Opacity="0.5" TextWrapping="Wrap"
+                        <TextBlock Text="{Binding Note}" FontSize="10" Foreground="{StaticResource TextMutedBrush}" TextWrapping="Wrap"
                                    IsVisible="{Binding Note, Converter={x:Static ObjectConverters.IsNotNull}}" />
-                        <TextBlock Text="{Binding When}" FontSize="10" Opacity="0.4" />
+                        <TextBlock Text="{Binding When}" FontSize="10" Foreground="{StaticResource TextMutedBrush}" />
                       </StackPanel>
                       <Button Grid.Column="1" Content="отменить" FontSize="10" Padding="7,3"
                               VerticalAlignment="Top"

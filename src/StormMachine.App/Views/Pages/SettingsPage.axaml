@@ -1,4 +1,4 @@
-﻿<UserControl xmlns="https://github.com/avaloniaui"
+<UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:StormMachine.App.ViewModels"
              x:Class="StormMachine.App.Views.Pages.SettingsPage"
@@ -12,7 +12,7 @@
         <Button Grid.Column="1" Content="Обновить" Command="{Binding RefreshCommand}" Padding="12,5" />
       </Grid>
 
-      <TextBlock Text="{Binding Message}" FontSize="12" Foreground="#7DD3A0" TextWrapping="Wrap"
+      <TextBlock Text="{Binding Message}" FontSize="12" Foreground="{StaticResource SuccessBrush}" TextWrapping="Wrap"
                  IsVisible="{Binding Message, Converter={x:Static ObjectConverters.IsNotNull}}" />
       <TextBlock Text="{Binding ErrorMessage}" FontSize="12" Foreground="{StaticResource DangerBrush}"
                  TextWrapping="Wrap"
@@ -33,18 +33,18 @@
 
             <TextBlock Text="Профили окружения" FontSize="13" FontWeight="SemiBold" />
 
-            <TextBlock FontSize="10" Opacity="0.5" TextWrapping="Wrap" LineHeight="15"
+            <TextBlock FontSize="10" Foreground="{StaticResource TextMutedBrush}" TextWrapping="Wrap" LineHeight="15"
                        Text="Порог 50 мс, разумный в офисе, бессмыслен для канала до филиала через VPN. Активный профиль пишется в условия каждого измерения — иначе через полгода отличить замер у заказчика от замера в офисе будет нечем." />
 
             <StackPanel Spacing="2">
-              <TextBlock Text="Приметы текущей сети" FontSize="10" Opacity="0.6" />
+              <TextBlock Text="Приметы текущей сети" FontSize="10" Foreground="{StaticResource TextSecondaryBrush}" />
               <TextBlock Text="{Binding CurrentSignature}" FontSize="11" TextWrapping="Wrap" />
             </StackPanel>
 
             <Button Content="Узнать, где мы" Command="{Binding DetectCommand}" Padding="12,5"
                     HorizontalAlignment="Left" />
 
-            <Border Padding="10,8" CornerRadius="4" Background="#232B3B"
+            <Border Padding="10,8" CornerRadius="4" Background="{StaticResource TileBrush}"
                     IsVisible="{Binding Guess, Converter={x:Static ObjectConverters.IsNotNull}}">
               <TextBlock Text="{Binding Guess}" FontSize="11" TextWrapping="Wrap" LineHeight="16" />
             </Border>
@@ -56,12 +56,12 @@
                   <Grid ColumnDefinitions="*,Auto" Margin="0,3">
                     <StackPanel Grid.Column="0" Spacing="1">
                       <TextBlock Text="{Binding Name}" FontSize="12" TextTrimming="CharacterEllipsis" />
-                      <TextBlock Text="{Binding Signature}" FontSize="10" Opacity="0.5"
+                      <TextBlock Text="{Binding Signature}" FontSize="10" Foreground="{StaticResource TextMutedBrush}"
                                  TextTrimming="CharacterEllipsis" />
-                      <TextBlock Text="{Binding Extras}" FontSize="10" Opacity="0.45" />
+                      <TextBlock Text="{Binding Extras}" FontSize="10" Foreground="{StaticResource TextMutedBrush}" />
                     </StackPanel>
                     <TextBlock Grid.Column="1" Text="активен" FontSize="10" VerticalAlignment="Center"
-                               Foreground="#7DD3A0" IsVisible="{Binding IsActive}" />
+                               Foreground="{StaticResource SuccessBrush}" IsVisible="{Binding IsActive}" />
                   </Grid>
                 </DataTemplate>
               </ListBox.ItemTemplate>
@@ -82,7 +82,7 @@
                       Padding="12,5" Margin="6,0,0,0" />
             </Grid>
 
-            <TextBlock FontSize="10" Opacity="0.5" TextWrapping="Wrap" LineHeight="15"
+            <TextBlock FontSize="10" Foreground="{StaticResource TextMutedBrush}" TextWrapping="Wrap" LineHeight="15"
                        Text="Продукт узнаёт сеть, но не переключает профиль сам: смена профиля меняет пороги и состав работающих мониторов, а делать это молча значит поменять смысл измерений за спиной оператора." />
 
           </StackPanel>
@@ -99,10 +99,10 @@
                       Command="{Binding ToggleCredentialEditorCommand}" />
             </Grid>
 
-            <TextBlock Text="{x:Static vm:SettingsPageViewModel.SnmpNote}" FontSize="10" Opacity="0.5"
+            <TextBlock Text="{x:Static vm:SettingsPageViewModel.SnmpNote}" FontSize="10" Foreground="{StaticResource TextMutedBrush}"
                        TextWrapping="Wrap" LineHeight="15" />
 
-            <TextBlock Text="Наборов нет — опрашивать оборудование нечем." FontSize="11" Opacity="0.5"
+            <TextBlock Text="Наборов нет — опрашивать оборудование нечем." FontSize="11" Foreground="{StaticResource TextMutedBrush}"
                        IsVisible="{Binding !Credentials.Count}" />
 
             <ListBox ItemsSource="{Binding Credentials}" SelectedItem="{Binding SelectedCredential}"
@@ -113,7 +113,7 @@
                   <Grid ColumnDefinitions="*,Auto" Margin="0,3">
                     <StackPanel Grid.Column="0" Spacing="1">
                       <TextBlock Text="{Binding Name}" FontSize="12" TextTrimming="CharacterEllipsis" />
-                      <TextBlock Text="{Binding About}" FontSize="10" Opacity="0.5"
+                      <TextBlock Text="{Binding About}" FontSize="10" Foreground="{StaticResource TextMutedBrush}"
                                  TextTrimming="CharacterEllipsis" />
                     </StackPanel>
 
@@ -128,7 +128,7 @@
             </ListBox>
 
             <!-- Форма набора -->
-            <Border Padding="12,10" CornerRadius="4" Background="#232B3B"
+            <Border Padding="12,10" CornerRadius="4" Background="{StaticResource TileBrush}"
                     IsVisible="{Binding IsCredentialEditorOpen}">
               <StackPanel Spacing="8" DataContext="{Binding Editor}">
                 <StackPanel x:DataType="vm:SnmpCredentialEditorViewModel" Spacing="8">
@@ -142,7 +142,7 @@
                     <TextBox PlaceholderText="строка сообщества" Text="{Binding Community}"
                              PasswordChar="•" />
                     <TextBlock Text="{x:Static vm:SnmpCredentialEditorViewModel.CommunityNote}"
-                               FontSize="10" Opacity="0.5" TextWrapping="Wrap" LineHeight="15" />
+                               FontSize="10" Foreground="{StaticResource TextMutedBrush}" TextWrapping="Wrap" LineHeight="15" />
                   </StackPanel>
 
                   <StackPanel Spacing="6" IsVisible="{Binding IsV3}">
@@ -161,21 +161,21 @@
 
                   <Grid ColumnDefinitions="*,8,*">
                     <StackPanel Grid.Column="0" Spacing="2">
-                      <TextBlock Text="Порт" FontSize="10" Opacity="0.6" />
+                      <TextBlock Text="Порт" FontSize="10" Foreground="{StaticResource TextSecondaryBrush}" />
                       <NumericUpDown Value="{Binding Port}" Minimum="1" Maximum="65535" Increment="1"
                                      FormatString="0" />
                     </StackPanel>
                     <StackPanel Grid.Column="2" Spacing="2">
-                      <TextBlock Text="Порядок перебора" FontSize="10" Opacity="0.6" />
+                      <TextBlock Text="Порядок перебора" FontSize="10" Foreground="{StaticResource TextSecondaryBrush}" />
                       <NumericUpDown Value="{Binding Order}" Minimum="0" Maximum="99" Increment="1"
                                      FormatString="0" />
                     </StackPanel>
                   </Grid>
 
                   <TextBlock Text="{x:Static vm:SnmpCredentialEditorViewModel.PasswordNote}"
-                             FontSize="10" Opacity="0.5" TextWrapping="Wrap" LineHeight="15" />
+                             FontSize="10" Foreground="{StaticResource TextMutedBrush}" TextWrapping="Wrap" LineHeight="15" />
 
-                  <Border Padding="10,8" CornerRadius="3" Background="#1B2230">
+                  <Border Padding="10,8" CornerRadius="3" Background="{StaticResource InsetBrush}">
                     <TextBlock Text="{Binding Preview}" FontSize="11" TextWrapping="Wrap" LineHeight="16" />
                   </Border>
                 </StackPanel>
@@ -199,7 +199,7 @@
                       Command="{Binding DeleteCredentialCommand}" />
             </Grid>
 
-            <Border Padding="10,8" CornerRadius="4" Background="#232B3B"
+            <Border Padding="10,8" CornerRadius="4" Background="{StaticResource TileBrush}"
                     IsVisible="{Binding ProbeResult, Converter={x:Static ObjectConverters.IsNotNull}}">
               <TextBlock Text="{Binding ProbeResult}" FontSize="11" TextWrapping="Wrap" LineHeight="16" />
             </Border>
@@ -225,18 +225,18 @@
 
                 <TextBlock Text="Агенты" FontSize="13" FontWeight="SemiBold" />
 
-                <TextBlock FontSize="10" Opacity="0.5" TextWrapping="Wrap" LineHeight="15"
+                <TextBlock FontSize="10" Foreground="{StaticResource TextMutedBrush}" TextWrapping="Wrap" LineHeight="15"
                            Text="Вторая точка измерения. Без неё пропускная способность, качество канала и задержка под нагрузкой измерены быть не могут: скорость между точками требует двух точек." />
 
                 <StackPanel Spacing="2"
                             IsVisible="{Binding OwnThumbprint, Converter={x:Static ObjectConverters.IsNotNull}}">
                   <TextBlock Text="Наш отпечаток — его называют тому, кто у агента" FontSize="10"
-                             Opacity="0.6" />
+                             Foreground="{StaticResource TextSecondaryBrush}" />
                   <TextBlock Text="{Binding OwnThumbprint}" FontSize="11" FontFamily="Consolas"
                              TextWrapping="Wrap" />
                 </StackPanel>
 
-                <TextBlock Text="Сопряжённых агентов нет." FontSize="11" Opacity="0.5"
+                <TextBlock Text="Сопряжённых агентов нет." FontSize="11" Foreground="{StaticResource TextMutedBrush}"
                            IsVisible="{Binding !HasAgents}" />
 
                 <ListBox ItemsSource="{Binding Agents}" SelectedItem="{Binding Selected}"
@@ -247,11 +247,11 @@
                       <Grid ColumnDefinitions="*,Auto" Margin="0,3">
                         <StackPanel Grid.Column="0" Spacing="1">
                           <TextBlock Text="{Binding Name}" FontSize="12" TextTrimming="CharacterEllipsis" />
-                          <TextBlock Text="{Binding Where}" FontSize="10" Opacity="0.5"
+                          <TextBlock Text="{Binding Where}" FontSize="10" Foreground="{StaticResource TextMutedBrush}"
                                      TextTrimming="CharacterEllipsis" />
                         </StackPanel>
                         <TextBlock Grid.Column="1" Text="{Binding Thumbprint}" FontSize="10"
-                                   FontFamily="Consolas" Opacity="0.6" VerticalAlignment="Center" />
+                                   FontFamily="Consolas" Foreground="{StaticResource TextSecondaryBrush}" VerticalAlignment="Center" />
                       </Grid>
                     </DataTemplate>
                   </ListBox.ItemTemplate>
@@ -263,14 +263,14 @@
                   <Button Grid.Column="1" Content="Забыть" Command="{Binding ForgetCommand}" Padding="10,5" />
                 </Grid>
 
-                <Border Height="1" Background="#2E3746" Margin="0,2" />
+                <Border Height="1" Background="{StaticResource DividerBrush}" Margin="0,2" />
 
-                <TextBlock Text="Сопрячь новый" FontSize="11" FontWeight="SemiBold" Opacity="0.8" />
+                <TextBlock Text="Сопрячь новый" FontSize="11" FontWeight="SemiBold" />
 
                 <!-- Два способа, потому что соединение устанавливает любая сторона:
                      входящие на Windows заблокированы по умолчанию, а правило требует
                      администратора. Где прав нет — звонит агент. -->
-                <TextBlock FontSize="10" Opacity="0.5" TextWrapping="Wrap" LineHeight="15"
+                <TextBlock FontSize="10" Foreground="{StaticResource TextMutedBrush}" TextWrapping="Wrap" LineHeight="15"
                            Text="Звонить самим — когда на машине агента разрешены входящие. Ждать звонка — когда прав там нет: исходящие разрешены всегда." />
 
                 <Grid ColumnDefinitions="*,Auto">
@@ -288,9 +288,9 @@
                       <Grid ColumnDefinitions="*,Auto" Margin="0,2">
                         <StackPanel Grid.Column="0" Spacing="1">
                           <TextBlock Text="{Binding Name}" FontSize="11" />
-                          <TextBlock Text="{Binding Where}" FontSize="10" Opacity="0.5" />
+                          <TextBlock Text="{Binding Where}" FontSize="10" Foreground="{StaticResource TextMutedBrush}" />
                         </StackPanel>
-                        <TextBlock Grid.Column="1" Text="{Binding State}" FontSize="10" Opacity="0.6"
+                        <TextBlock Grid.Column="1" Text="{Binding State}" FontSize="10" Foreground="{StaticResource TextSecondaryBrush}"
                                    VerticalAlignment="Center" />
                       </Grid>
                     </DataTemplate>
@@ -316,18 +316,18 @@
                 <!-- Ход сопряжения показывается здесь, а не уходит в консоль:
                      у графического клиента её нет. Именно так в И-19 пропадала
                      просьба «набери на второй машине вот это». -->
-                <Border Padding="10,8" CornerRadius="4" Background="#232B3B"
+                <Border Padding="10,8" CornerRadius="4" Background="{StaticResource TileBrush}"
                         IsVisible="{Binding Progress, Converter={x:Static ObjectConverters.IsNotNull}}">
                   <TextBlock Text="{Binding Progress}" FontSize="11" TextWrapping="Wrap" LineHeight="16" />
                 </Border>
 
-                <TextBlock Text="{Binding Message}" FontSize="11" Foreground="#7DD3A0" TextWrapping="Wrap"
+                <TextBlock Text="{Binding Message}" FontSize="11" Foreground="{StaticResource SuccessBrush}" TextWrapping="Wrap"
                            IsVisible="{Binding Message, Converter={x:Static ObjectConverters.IsNotNull}}" />
                 <TextBlock Text="{Binding Error}" FontSize="11" Foreground="{StaticResource DangerBrush}"
                            TextWrapping="Wrap"
                            IsVisible="{Binding Error, Converter={x:Static ObjectConverters.IsNotNull}}" />
 
-                <TextBlock FontSize="10" Opacity="0.5" TextWrapping="Wrap" LineHeight="15"
+                <TextBlock FontSize="10" Foreground="{StaticResource TextMutedBrush}" TextWrapping="Wrap" LineHeight="15"
                            Text="Отпечаток сверяется глазами и всегда. Объявление о себе в сети подделать может кто угодно: поиск избавляет от набора адреса и только от этого." />
 
               </StackPanel>
@@ -346,26 +346,26 @@
             <SelectableTextBlock Text="{Binding DatabasePath}" FontSize="11" TextWrapping="Wrap"
                                  FontFamily="Consolas,Menlo,monospace" />
 
-            <TextBlock Text="{x:Static vm:SettingsPageViewModel.StorageHint}" FontSize="10" Opacity="0.5"
+            <TextBlock Text="{x:Static vm:SettingsPageViewModel.StorageHint}" FontSize="10" Foreground="{StaticResource TextMutedBrush}"
                        TextWrapping="Wrap" LineHeight="15" />
 
             <!-- Политика хранения. До И-24 жила только умолчаниями и ключами консоли. -->
             <StackPanel Spacing="10" DataContext="{Binding Retention}">
               <StackPanel x:DataType="vm:RetentionSectionViewModel" Spacing="10">
 
-                <TextBlock Text="Политика хранения" FontSize="12" FontWeight="SemiBold" Opacity="0.85" />
+                <TextBlock Text="Политика хранения" FontSize="12" FontWeight="SemiBold" />
 
-                <TextBlock Text="{x:Static vm:RetentionSectionViewModel.Note}" FontSize="10" Opacity="0.5"
+                <TextBlock Text="{x:Static vm:RetentionSectionViewModel.Note}" FontSize="10" Foreground="{StaticResource TextMutedBrush}"
                            TextWrapping="Wrap" LineHeight="15" />
 
                 <Grid ColumnDefinitions="*,8,*">
                   <StackPanel Grid.Column="0" Spacing="2">
-                    <TextBlock Text="Сырые сэмплы, дней" FontSize="10" Opacity="0.6" />
+                    <TextBlock Text="Сырые сэмплы, дней" FontSize="10" Foreground="{StaticResource TextSecondaryBrush}" />
                     <NumericUpDown Value="{Binding RawDays}" Minimum="1" Maximum="3650" Increment="1"
                                    FormatString="0" />
                   </StackPanel>
                   <StackPanel Grid.Column="2" Spacing="2">
-                    <TextBlock Text="Прогоны с агрегатами, дней" FontSize="10" Opacity="0.6" />
+                    <TextBlock Text="Прогоны с агрегатами, дней" FontSize="10" Foreground="{StaticResource TextSecondaryBrush}" />
                     <NumericUpDown Value="{Binding RunDays}" Minimum="1" Maximum="3650" Increment="1"
                                    FormatString="0" />
                   </StackPanel>
@@ -381,7 +381,7 @@
                           Padding="12,5" />
                 </Grid>
 
-                <TextBlock Text="{Binding Message}" FontSize="11" Foreground="#7DD3A0" TextWrapping="Wrap"
+                <TextBlock Text="{Binding Message}" FontSize="11" Foreground="{StaticResource SuccessBrush}" TextWrapping="Wrap"
                            IsVisible="{Binding Message, Converter={x:Static ObjectConverters.IsNotNull}}" />
                 <TextBlock Text="{Binding Error}" FontSize="11" Foreground="{StaticResource DangerBrush}"
                            TextWrapping="Wrap"
@@ -390,7 +390,7 @@
               </StackPanel>
             </StackPanel>
 
-            <Border Height="1" Background="#2E3746" Margin="0,6" />
+            <Border Height="1" Background="{StaticResource DividerBrush}" Margin="0,6" />
 
             <!-- Перенос настроек. Механизм И-22 (сценарии — И-23), экранная форма — И-24:
                  «настроил у себя, разворачиваю у заказчика» — сценарий и того,
@@ -400,7 +400,7 @@
 
                 <TextBlock Text="Перенос настроек" FontSize="13" FontWeight="SemiBold" />
 
-                <TextBlock Text="{x:Static vm:TransferSectionViewModel.Note}" FontSize="10" Opacity="0.5"
+                <TextBlock Text="{x:Static vm:TransferSectionViewModel.Note}" FontSize="10" Foreground="{StaticResource TextMutedBrush}"
                            TextWrapping="Wrap" LineHeight="15" />
 
                 <Grid ColumnDefinitions="Auto,Auto,*">
@@ -413,7 +413,7 @@
                 <CheckBox Content="Не трогать существующие — только добавлять новое"
                           IsChecked="{Binding KeepExisting}" FontSize="11" />
 
-                <TextBlock Text="{Binding Message}" FontSize="11" Foreground="#7DD3A0" TextWrapping="Wrap"
+                <TextBlock Text="{Binding Message}" FontSize="11" Foreground="{StaticResource SuccessBrush}" TextWrapping="Wrap"
                            IsVisible="{Binding Message, Converter={x:Static ObjectConverters.IsNotNull}}" />
                 <TextBlock Text="{Binding Error}" FontSize="11" Foreground="{StaticResource DangerBrush}"
                            TextWrapping="Wrap"
@@ -433,13 +433,13 @@
             <TextBlock Text="О продукте" FontSize="13" FontWeight="SemiBold" />
 
             <StackPanel Spacing="2">
-              <TextBlock Text="Версия" FontSize="10" Opacity="0.6" />
+              <TextBlock Text="Версия" FontSize="10" Foreground="{StaticResource TextSecondaryBrush}" />
               <SelectableTextBlock Text="{x:Static vm:SettingsPageViewModel.Version}" FontSize="11"
                                    FontFamily="Consolas,Menlo,monospace" />
             </StackPanel>
 
             <StackPanel Spacing="5">
-              <TextBlock Text="Обновление" FontSize="10" Opacity="0.6" />
+              <TextBlock Text="Обновление" FontSize="10" Foreground="{StaticResource TextSecondaryBrush}" />
               <TextBlock Text="{Binding Updates.StateText}" FontSize="11" TextWrapping="Wrap" LineHeight="16" />
 
               <TextBlock Text="{Binding Updates.Hold}" FontSize="10" TextWrapping="Wrap" LineHeight="15"
@@ -456,11 +456,11 @@
                         Background="{StaticResource AccentBrush}" Foreground="White" />
               </Grid>
 
-              <TextBlock Text="{x:Static vm:SettingsPageViewModel.UpdateNote}" FontSize="10" Opacity="0.5"
+              <TextBlock Text="{x:Static vm:SettingsPageViewModel.UpdateNote}" FontSize="10" Foreground="{StaticResource TextMutedBrush}"
                          TextWrapping="Wrap" LineHeight="15" />
             </StackPanel>
 
-            <TextBlock Text="{x:Static vm:SettingsPageViewModel.LicenceNote}" FontSize="10" Opacity="0.5"
+            <TextBlock Text="{x:Static vm:SettingsPageViewModel.LicenceNote}" FontSize="10" Foreground="{StaticResource TextMutedBrush}"
                        TextWrapping="Wrap" LineHeight="15" />
 
           </StackPanel>

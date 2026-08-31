@@ -11,7 +11,7 @@
         <TextBlock Grid.Column="0" Text="{Binding Title}" FontSize="24" FontWeight="SemiBold" />
         <Button Grid.Column="1" Content="Обновить" Command="{Binding RefreshCommand}" Padding="12,5" />
       </Grid>
-      <TextBlock Text="{Binding Summary}" FontSize="11" Opacity="0.55" TextWrapping="Wrap" />
+      <TextBlock Text="{Binding Summary}" FontSize="11" Foreground="{StaticResource TextMutedBrush}" TextWrapping="Wrap" />
       <TextBlock Text="{Binding ErrorMessage}" FontSize="12" Foreground="{StaticResource DangerBrush}" TextWrapping="Wrap"
                  IsVisible="{Binding ErrorMessage, Converter={x:Static ObjectConverters.IsNotNull}}" />
     </StackPanel>
@@ -24,27 +24,27 @@
           <ItemsControl ItemsSource="{Binding Alerts}">
             <ItemsControl.ItemTemplate>
               <DataTemplate x:DataType="vm:AlertRow">
-                <Border Margin="0,0,0,8" Padding="12,9" CornerRadius="4" Background="#232B3B">
+                <Border Margin="0,0,0,8" Padding="12,9" CornerRadius="4" Background="{StaticResource TileBrush}">
                   <StackPanel Spacing="3">
                     <Grid ColumnDefinitions="Auto,*,Auto">
                       <Border Grid.Column="0" Width="8" Height="8" CornerRadius="4" VerticalAlignment="Center"
                               Background="{StaticResource DangerBrush}"
                               IsVisible="{Binding IsRaise}" />
                       <Border Grid.Column="0" Width="8" Height="8" CornerRadius="4" VerticalAlignment="Center"
-                              Background="#7DD3A0"
+                              Background="{StaticResource SuccessBrush}"
                               IsVisible="{Binding IsClear}" />
                       <TextBlock Grid.Column="1" Margin="10,0,0,0" FontSize="13" FontWeight="SemiBold"
                                  Text="{Binding Monitor}" />
-                      <TextBlock Grid.Column="2" FontSize="11" Opacity="0.55" Text="{Binding When}"
+                      <TextBlock Grid.Column="2" FontSize="11" Foreground="{StaticResource TextMutedBrush}" Text="{Binding When}"
                                  FontFamily="Consolas,Menlo,monospace" />
                     </Grid>
 
-                    <TextBlock Text="{Binding Action}" FontSize="11" Opacity="0.7" Margin="18,0,0,0" />
+                    <TextBlock Text="{Binding Action}" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" Margin="18,0,0,0" />
                     <TextBlock Text="{Binding Reason}" FontSize="12" TextWrapping="Wrap" Margin="18,0,0,0" />
-                    <TextBlock Text="{Binding Summary}" FontSize="11" Opacity="0.65" TextWrapping="Wrap" Margin="18,0,0,0"
+                    <TextBlock Text="{Binding Summary}" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap" Margin="18,0,0,0"
                                IsVisible="{Binding Summary, Converter={x:Static ObjectConverters.IsNotNull}}" />
 
-                    <TextBlock Text="{Binding Delivery}" FontSize="10" Opacity="0.5" Margin="18,2,0,0" />
+                    <TextBlock Text="{Binding Delivery}" FontSize="10" Foreground="{StaticResource TextMutedBrush}" Margin="18,2,0,0" />
 
                     <!-- Молчащий канал опаснее отсутствующего: на него рассчитывают -->
                     <TextBlock Text="{Binding Failures}" FontSize="10" Margin="18,0,0,0" TextWrapping="Wrap"
@@ -70,20 +70,20 @@
                   <StackPanel Spacing="2" Margin="0,0,0,10">
                     <Grid ColumnDefinitions="*,Auto">
                       <TextBlock Grid.Column="0" Text="{Binding Name}" FontSize="12" />
-                      <TextBlock Grid.Column="1" FontSize="10" Text="настроен" Foreground="#7DD3A0"
+                      <TextBlock Grid.Column="1" FontSize="10" Text="настроен" Foreground="{StaticResource SuccessBrush}"
                                  IsVisible="{Binding IsConfigured}" />
-                      <TextBlock Grid.Column="1" FontSize="10" Text="не настроен" Opacity="0.6"
+                      <TextBlock Grid.Column="1" FontSize="10" Text="не настроен" Foreground="{StaticResource TextSecondaryBrush}"
                                  IsVisible="{Binding !IsConfigured}" />
                     </Grid>
-                    <TextBlock Text="{Binding Title}" FontSize="10" Opacity="0.5" TextWrapping="Wrap" />
-                    <TextBlock Text="{Binding Missing}" FontSize="10" TextWrapping="Wrap" Opacity="0.7"
+                    <TextBlock Text="{Binding Title}" FontSize="10" Foreground="{StaticResource TextMutedBrush}" TextWrapping="Wrap" />
+                    <TextBlock Text="{Binding Missing}" FontSize="10" TextWrapping="Wrap" Foreground="{StaticResource TextSecondaryBrush}"
                                IsVisible="{Binding Missing, Converter={x:Static ObjectConverters.IsNotNull}}" />
                   </StackPanel>
                 </DataTemplate>
               </ItemsControl.ItemTemplate>
             </ItemsControl>
 
-            <TextBlock FontSize="10" Opacity="0.45" TextWrapping="Wrap"
+            <TextBlock FontSize="10" Foreground="{StaticResource TextMutedBrush}" TextWrapping="Wrap"
                        Text="Настраиваются из консоли: storm alerts set. Пароли хранятся зашифрованными средствами Windows и привязаны к этой учётной записи." />
           </StackPanel>
         </ScrollViewer>

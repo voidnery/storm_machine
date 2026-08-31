@@ -16,7 +16,7 @@
                 Padding="16,5" Background="{StaticResource AccentBrush}" Foreground="White" />
       </Grid>
 
-      <TextBlock Text="{Binding Message}" FontSize="12" Foreground="#7DD3A0" TextWrapping="Wrap"
+      <TextBlock Text="{Binding Message}" FontSize="12" Foreground="{StaticResource SuccessBrush}" TextWrapping="Wrap"
                  IsVisible="{Binding Message, Converter={x:Static ObjectConverters.IsNotNull}}" />
       <TextBlock Text="{Binding ErrorMessage}" FontSize="12" Foreground="{StaticResource DangerBrush}" TextWrapping="Wrap"
                  IsVisible="{Binding ErrorMessage, Converter={x:Static ObjectConverters.IsNotNull}}" />
@@ -30,20 +30,20 @@
           <StackPanel Spacing="12">
 
             <StackPanel Spacing="4">
-              <TextBlock Text="Шаблон" FontSize="11" Opacity="0.6" />
+              <TextBlock Text="Шаблон" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" />
               <ComboBox ItemsSource="{Binding Templates}" SelectedItem="{Binding Template}"
                         HorizontalAlignment="Stretch" />
-              <TextBlock Text="{Binding Template.About}" FontSize="10" Opacity="0.5" TextWrapping="Wrap" />
+              <TextBlock Text="{Binding Template.About}" FontSize="10" Foreground="{StaticResource TextMutedBrush}" TextWrapping="Wrap" />
             </StackPanel>
 
             <StackPanel Spacing="4">
-              <TextBlock Text="Период" FontSize="11" Opacity="0.6" />
+              <TextBlock Text="Период" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" />
               <ComboBox ItemsSource="{Binding Periods}" SelectedItem="{Binding Period}"
                         HorizontalAlignment="Stretch" />
             </StackPanel>
 
             <StackPanel Spacing="4" IsVisible="{Binding IsServiceLevel}">
-              <TextBlock Text="Монитор" FontSize="11" Opacity="0.6" />
+              <TextBlock Text="Монитор" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" />
               <ComboBox ItemsSource="{Binding Monitors}" SelectedItem="{Binding Monitor}"
                         HorizontalAlignment="Stretch">
                 <ComboBox.ItemTemplate>
@@ -55,7 +55,7 @@
             </StackPanel>
 
             <StackPanel Spacing="4">
-              <TextBlock Text="Сравнить с эталоном" FontSize="11" Opacity="0.6" />
+              <TextBlock Text="Сравнить с эталоном" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" />
               <ComboBox ItemsSource="{Binding Baselines}" SelectedItem="{Binding Baseline}"
                         HorizontalAlignment="Stretch" PlaceholderText="без сравнения">
                 <ComboBox.ItemTemplate>
@@ -64,7 +64,7 @@
                   </DataTemplate>
                 </ComboBox.ItemTemplate>
               </ComboBox>
-              <TextBlock FontSize="10" Opacity="0.45" TextWrapping="Wrap"
+              <TextBlock FontSize="10" Foreground="{StaticResource TextMutedBrush}" TextWrapping="Wrap"
                          Text="Эталоны снимаются из консоли: storm baseline capture." />
             </StackPanel>
 
@@ -75,7 +75,7 @@
 
             <!-- Реквизиты нужны только акту -->
             <StackPanel Spacing="6" IsVisible="{Binding IsAcceptance}">
-              <TextBlock Text="Реквизиты акта" FontSize="12" FontWeight="SemiBold" Opacity="0.8" />
+              <TextBlock Text="Реквизиты акта" FontSize="12" FontWeight="SemiBold" />
 
               <TextBox PlaceholderText="Заказчик" Text="{Binding Customer}" />
               <TextBox PlaceholderText="Объект: площадка, филиал" Text="{Binding Site}" />
@@ -85,7 +85,7 @@
                        Text="{Binding Conclusion}"
                        AcceptsReturn="True" MinHeight="70" TextWrapping="Wrap" />
 
-              <TextBlock FontSize="10" Opacity="0.45" TextWrapping="Wrap"
+              <TextBlock FontSize="10" Foreground="{StaticResource TextMutedBrush}" TextWrapping="Wrap"
                          Text="Продукт заключение не составляет: он показывает измеренное и вердикты по заданным порогам, а оценку пригодности даёт подписавший." />
             </StackPanel>
 
@@ -98,9 +98,9 @@
         <Grid RowDefinitions="Auto,Auto,*">
 
           <TextBlock Grid.Row="0" Text="Измерения, которые войдут в документ"
-                     FontSize="12" FontWeight="SemiBold" Opacity="0.8" />
+                     FontSize="12" FontWeight="SemiBold" />
 
-          <Border Grid.Row="1" Margin="0,8" Padding="10,7" CornerRadius="4" Background="#3A2E12"
+          <Border Grid.Row="1" Margin="0,8" Padding="10,7" CornerRadius="4" Background="{StaticResource WarningSurfaceBrush}"
                   IsVisible="{Binding SizeNotice, Converter={x:Static ObjectConverters.IsNotNull}}">
             <TextBlock Text="{Binding SizeNotice}" FontSize="11" TextWrapping="Wrap" />
           </Border>
@@ -111,11 +111,11 @@
                 <DataTemplate x:DataType="vm:RunChoice">
                   <Grid ColumnDefinitions="Auto,150,*,Auto" Margin="0,3">
                     <CheckBox Grid.Column="0" IsChecked="{Binding IsChosen}" />
-                    <TextBlock Grid.Column="1" Text="{Binding When}" FontSize="11" Opacity="0.6"
+                    <TextBlock Grid.Column="1" Text="{Binding When}" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}"
                                VerticalAlignment="Center" FontFamily="Consolas,Menlo,monospace" />
                     <TextBlock Grid.Column="2" Text="{Binding Title}" FontSize="12"
                                VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
-                    <TextBlock Grid.Column="3" Text="{Binding Detail}" FontSize="11" Opacity="0.5"
+                    <TextBlock Grid.Column="3" Text="{Binding Detail}" FontSize="11" Foreground="{StaticResource TextMutedBrush}"
                                VerticalAlignment="Center" />
                   </Grid>
                 </DataTemplate>

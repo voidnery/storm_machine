@@ -8,7 +8,7 @@
 
     <StackPanel Grid.Row="0" Spacing="4">
       <TextBlock Text="{Binding Title}" FontSize="24" FontWeight="SemiBold" />
-      <TextBlock Text="{Binding Description}" FontSize="12" Opacity="0.6" TextWrapping="Wrap" />
+      <TextBlock Text="{Binding Description}" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap" />
     </StackPanel>
 
     <Border Grid.Row="1" Margin="0,12,0,0" Padding="14" CornerRadius="6"
@@ -16,13 +16,13 @@
       <StackPanel Spacing="10">
         <Grid ColumnDefinitions="Auto,2*,Auto,Auto">
           <StackPanel Grid.Column="0" Spacing="4" Margin="0,0,12,0" Width="150">
-            <TextBlock Text="Инспектор" FontSize="11" Opacity="0.6" />
+            <TextBlock Text="Инспектор" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" />
             <ComboBox ItemsSource="{Binding Inspectors}" SelectedItem="{Binding Inspector}"
                       HorizontalAlignment="Stretch" IsEnabled="{Binding CanStart}" />
           </StackPanel>
 
           <StackPanel Grid.Column="1" Spacing="4" Margin="0,0,12,0">
-            <TextBlock Text="Цель" FontSize="11" Opacity="0.6" />
+            <TextBlock Text="Цель" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" />
             <TextBox Text="{Binding Target}" PlaceholderText="example.com"
                      IsEnabled="{Binding CanStart}" />
           </StackPanel>
@@ -40,8 +40,8 @@
                   Background="{StaticResource AccentBrush}" Foreground="White" />
         </Grid>
 
-        <TextBlock Text="{Binding Inspector.About}" FontSize="11" Opacity="0.55" />
-        <TextBlock Text="{Binding Error}" FontSize="12" Foreground="#E05252" TextWrapping="Wrap"
+        <TextBlock Text="{Binding Inspector.About}" FontSize="11" Foreground="{StaticResource TextMutedBrush}" />
+        <TextBlock Text="{Binding Error}" FontSize="12" Foreground="{StaticResource DangerBrush}" TextWrapping="Wrap"
                    IsVisible="{Binding Error, Converter={x:Static ObjectConverters.IsNotNull}}" />
       </StackPanel>
     </Border>
@@ -49,14 +49,14 @@
     <ScrollViewer Grid.Row="2" Margin="0,14,0,0">
       <StackPanel Spacing="14">
 
-        <TextBlock Text="{Binding Summary}" FontSize="12" Opacity="0.75" TextWrapping="Wrap"
+        <TextBlock Text="{Binding Summary}" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap"
                    IsVisible="{Binding HasFacts}" />
 
         <!-- Разложение по рядам. Что это за ряды и складываются ли они,
              сказано подписью, а не оставлено на догадку. -->
         <StackPanel Spacing="4" IsVisible="{Binding HasSeries}">
           <TextBlock Text="Разложение" FontSize="13" FontWeight="SemiBold" />
-          <TextBlock Text="{Binding SeriesCaption}" FontSize="11" Opacity="0.55" TextWrapping="Wrap" />
+          <TextBlock Text="{Binding SeriesCaption}" FontSize="11" Foreground="{StaticResource TextMutedBrush}" TextWrapping="Wrap" />
 
           <ItemsControl ItemsSource="{Binding Series}" Margin="0,4,0,0">
             <ItemsControl.ItemTemplate>
@@ -65,10 +65,10 @@
                   <TextBlock Grid.Column="0" Text="{Binding Label}" />
                   <TextBlock Grid.Column="1" Text="{Binding Median}" FontFamily="Consolas"
                              HorizontalAlignment="Right" Margin="0,0,10,0" />
-                  <TextBlock Grid.Column="2" Text="{Binding Share}" Opacity="0.6"
+                  <TextBlock Grid.Column="2" Text="{Binding Share}" Foreground="{StaticResource TextSecondaryBrush}"
                              HorizontalAlignment="Right" Margin="0,0,10,0" />
-                  <TextBlock Grid.Column="3" Text="{Binding Loss}" Opacity="0.7" FontSize="11"
-                             Foreground="#D9A441" />
+                  <TextBlock Grid.Column="3" Text="{Binding Loss}" FontSize="11"
+                             Foreground="{StaticResource WarningBrush}" />
                   <Rectangle Grid.Column="4" Height="8" HorizontalAlignment="Left"
                              VerticalAlignment="Center" Width="{Binding BarWidth}"
                              Fill="{StaticResource AccentBrush}" Opacity="0.6" />
@@ -85,8 +85,8 @@
             <ItemsControl.ItemTemplate>
               <DataTemplate x:DataType="vm:InspectFactRow">
                 <Grid ColumnDefinitions="70,220,*" Margin="0,2">
-                  <TextBlock Grid.Column="0" Text="{Binding Category}" FontSize="11" Opacity="0.45" />
-                  <TextBlock Grid.Column="1" Text="{Binding Name}" FontSize="12" Opacity="0.8" />
+                  <TextBlock Grid.Column="0" Text="{Binding Category}" FontSize="11" Foreground="{StaticResource TextMutedBrush}" />
+                  <TextBlock Grid.Column="1" Text="{Binding Name}" FontSize="12" />
                   <TextBlock Grid.Column="2" Text="{Binding Value}" FontSize="12" TextWrapping="Wrap"
                              Foreground="{Binding IsWarning, Converter={x:Static vm:FactBrushes.ByWarning}}" />
                 </Grid>
@@ -102,7 +102,7 @@
             <Grid ColumnDefinitions="*,Auto">
               <StackPanel Grid.Column="0" Spacing="2">
                 <TextBlock Text="Как сеть видна снаружи" FontSize="13" FontWeight="SemiBold" />
-                <TextBlock FontSize="11" Opacity="0.55" TextWrapping="Wrap"
+                <TextBlock FontSize="11" Foreground="{StaticResource TextMutedBrush}" TextWrapping="Wrap"
                            Text="Внешний адрес и поведение NAT изнутри сети неизвестны в принципе: ответ есть только у собеседника за пределами трансляции. Проверка обращается к публичным серверам STUN." />
               </StackPanel>
               <Button Grid.Column="1" Content="Посмотреть" VerticalAlignment="Center"
@@ -112,15 +112,15 @@
 
             <StackPanel Spacing="4" IsVisible="{Binding HasOutside}">
               <TextBlock Text="{Binding OutsideSummary}" FontSize="12" TextWrapping="Wrap" />
-              <TextBlock Text="{Binding NatSummary}" FontSize="12" TextWrapping="Wrap" Opacity="0.85" />
-              <TextBlock Text="{Binding Ipv6Summary}" FontSize="12" TextWrapping="Wrap" Opacity="0.85" />
+              <TextBlock Text="{Binding NatSummary}" FontSize="12" TextWrapping="Wrap" />
+              <TextBlock Text="{Binding Ipv6Summary}" FontSize="12" TextWrapping="Wrap" />
 
               <ItemsControl ItemsSource="{Binding Mappings}" Margin="0,4,0,0">
                 <ItemsControl.ItemTemplate>
                   <DataTemplate x:DataType="vm:OutsideMappingRow">
                     <Grid ColumnDefinitions="220,*" Margin="0,1">
-                      <TextBlock Grid.Column="0" Text="{Binding Server}" FontSize="11" Opacity="0.7" />
-                      <TextBlock Grid.Column="1" Text="{Binding Seen}" FontSize="11" Opacity="0.7" />
+                      <TextBlock Grid.Column="0" Text="{Binding Server}" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" />
+                      <TextBlock Grid.Column="1" Text="{Binding Seen}" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" />
                     </Grid>
                   </DataTemplate>
                 </ItemsControl.ItemTemplate>
@@ -129,7 +129,7 @@
               <ItemsControl ItemsSource="{Binding Notes}" Margin="0,6,0,0">
                 <ItemsControl.ItemTemplate>
                   <DataTemplate x:DataType="x:String">
-                    <TextBlock Text="{Binding}" FontSize="11" Opacity="0.5" TextWrapping="Wrap"
+                    <TextBlock Text="{Binding}" FontSize="11" Foreground="{StaticResource TextMutedBrush}" TextWrapping="Wrap"
                                Margin="0,1" />
                   </DataTemplate>
                 </ItemsControl.ItemTemplate>
