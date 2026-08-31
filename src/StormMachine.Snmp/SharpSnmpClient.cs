@@ -215,27 +215,40 @@ public sealed class SharpSnmpClient : ISnmpClient
         var bridgeToIf = await Optional(() => Column(session, Oids.Dot1dBasePortIfIndex, cancellationToken))
             .ConfigureAwait(false);
 
-        var statuses = await Optional(() => Walk(session, Oids.Dot1dTpFdbStatus, cancellationToken))
+        // Сначала ветка с VLAN (Q-BRIDGE), и только при пустой — старая. Раньше порядок
+        // был обратным: старая ветка читалась первой, а вторая — лишь когда первая
+        // ничего не дала. Но устройства с VLAN отдают старую ветку непустой — обычно
+        // только для первой VLAN, — и номера VLAN терялись на любом реальном
+        // коммутаторе: колонка была всегда пустой (найдено SNMP-стендом И-24).
+        // Номер VLAN — не украшение: без него карта рисует соседями устройства
+        // из разных широковещательных доменов, ровно то, что чинила И-23.
+        var qEntries = await Optional(() => Walk(session, Oids.Dot1qTpFdbPort, cancellationToken))
             .ConfigureAwait(false);
 
-        var status = statuses.ToDictionary(
-            v => SnmpValues.Suffix(v.Id, Oids.Dot1dTpFdbStatus),
+        var qStatuses = await Optional(() => Walk(session, Oids.Dot1qTpFdbStatus, cancellationToken))
+            .ConfigureAwait(false);
+
+        var qStatus = qStatuses.ToDictionary(
+            v => SnmpValues.Suffix(v.Id, Oids.Dot1qTpFdbStatus),
             v => (int)SnmpValues.Number(v.Data),
             StringComparer.Ordinal);
 
-        var entries = await Optional(() => Walk(session, Oids.Dot1dTpFdbPort, cancellationToken))
-            .ConfigureAwait(false);
+        var result = Read(qEntries, Oids.Dot1qTpFdbPort, qStatus, bridgeToIf, vlanAware: true);
 
-        var result = Read(entries, Oids.Dot1dTpFdbPort, status, bridgeToIf, vlanAware: false);
-
-        // Устройства с VLAN держат таблицу в другой ветке, а старую отдают пустой
-        // или только для первой VLAN. Читаем вторую, если первая ничего не дала.
         if (result.Count == 0)
         {
-            var qEntries = await Optional(() => Walk(session, Oids.Dot1qTpFdbPort, cancellationToken))
+            var statuses = await Optional(() => Walk(session, Oids.Dot1dTpFdbStatus, cancellationToken))
                 .ConfigureAwait(false);
 
-            result = Read(qEntries, Oids.Dot1qTpFdbPort, new Dictionary<string, int>(StringComparer.Ordinal), bridgeToIf, vlanAware: true);
+            var status = statuses.ToDictionary(
+                v => SnmpValues.Suffix(v.Id, Oids.Dot1dTpFdbStatus),
+                v => (int)SnmpValues.Number(v.Data),
+                StringComparer.Ordinal);
+
+            var entries = await Optional(() => Walk(session, Oids.Dot1dTpFdbPort, cancellationToken))
+                .ConfigureAwait(false);
+
+            result = Read(entries, Oids.Dot1dTpFdbPort, status, bridgeToIf, vlanAware: false);
         }
 
         return result;

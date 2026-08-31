@@ -80,6 +80,9 @@ internal static class Oids
     /// <summary>Q-BRIDGE-MIB, RFC 4363: та же таблица с разбивкой по VLAN.</summary>
     public const string Dot1qTpFdbPort = "1.3.6.1.2.1.17.7.1.2.2.1.2";
 
+    /// <summary>Статус записи Q-BRIDGE — те же коды, что у BRIDGE-MIB.</summary>
+    public const string Dot1qTpFdbStatus = "1.3.6.1.2.1.17.7.1.2.2.1.3";
+
     // --------------------------------------------------------- LLDP-MIB, IEEE 802.1AB
 
     /// <summary>Идентификатор порта соседа.</summary>
