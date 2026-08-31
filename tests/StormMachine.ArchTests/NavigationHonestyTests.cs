@@ -69,7 +69,12 @@ public sealed class NavigationHonestyTests
             .Distinct(StringComparer.Ordinal)
             .ToList();
 
-        Assert.NotEmpty(mentioned);
+        // Заглушек может не быть вовсе — с И-24 их и нет. Проверка остаётся
+        // на случай, когда заглушка появится снова: названное обязано существовать.
+        if (mentioned.Count == 0)
+        {
+            return;
+        }
 
         var declared = new HashSet<string>(StringComparer.Ordinal);
         foreach (var file in RepositoryLayout.SourceFiles("src"))

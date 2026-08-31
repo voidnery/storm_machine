@@ -61,6 +61,9 @@ internal static class AppServices
         NavigationMap.Alerts => ActivatorUtilities.CreateInstance<AlertsPageViewModel>(provider, section),
         NavigationMap.Reports => ActivatorUtilities.CreateInstance<ReportsPageViewModel>(provider, section),
         NavigationMap.Settings => ActivatorUtilities.CreateInstance<SettingsPageViewModel>(provider, section),
+        NavigationMap.LocalTests => ActivatorUtilities.CreateInstance<LocalTestsPageViewModel>(provider, section),
+        NavigationMap.Speed => ActivatorUtilities.CreateInstance<SpeedPageViewModel>(provider, section),
+        NavigationMap.Development => ActivatorUtilities.CreateInstance<DevelopmentPageViewModel>(provider, section),
         _ => new PlaceholderPageViewModel(section),
     };
 }

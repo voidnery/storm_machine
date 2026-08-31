@@ -1,0 +1,99 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:StormMachine.App.ViewModels"
+             x:Class="StormMachine.App.Views.Pages.DevelopmentPage"
+             x:DataType="vm:DevelopmentPageViewModel">
+
+  <Grid RowDefinitions="Auto,*" Margin="24,20">
+
+    <StackPanel Grid.Row="0" Spacing="4" Margin="0,0,0,12">
+      <Grid ColumnDefinitions="*,Auto">
+        <TextBlock Grid.Column="0" Text="{Binding Title}" FontSize="24" FontWeight="SemiBold" />
+        <Button Grid.Column="1" Content="Обновить" Command="{Binding RefreshCommand}" Padding="12,5" />
+      </Grid>
+
+      <TextBlock Text="{x:Static vm:DevelopmentPageViewModel.Note}" FontSize="11" Opacity="0.55"
+                 TextWrapping="Wrap" LineHeight="16" />
+
+      <TextBlock Text="{Binding ErrorMessage}" FontSize="12" Foreground="{StaticResource DangerBrush}"
+                 TextWrapping="Wrap"
+                 IsVisible="{Binding ErrorMessage, Converter={x:Static ObjectConverters.IsNotNull}}" />
+    </StackPanel>
+
+    <Border Grid.Row="1" Background="{StaticResource PanelBrush}" CornerRadius="6" Padding="16">
+      <ScrollViewer>
+        <StackPanel Spacing="14" Margin="0,0,10,0" MaxWidth="820" HorizontalAlignment="Left">
+
+          <StackPanel Spacing="3">
+            <TextBlock Text="Что продукт может на этой машине" FontSize="13" FontWeight="SemiBold" />
+            <TextBlock Text="{Binding Summary}" FontSize="11" Opacity="0.6" TextWrapping="Wrap" />
+
+            <!-- UX-принцип 6: недоступное не прячется, а объясняется -->
+            <TextBlock Text="{x:Static vm:DevelopmentPageViewModel.SummaryNote}" FontSize="11"
+                       Opacity="0.5" TextWrapping="Wrap" LineHeight="17" />
+          </StackPanel>
+
+          <ItemsControl ItemsSource="{Binding Levels}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:CapabilityGroup">
+                <StackPanel Spacing="6" Margin="0,0,0,16" IsVisible="{Binding HasItems}">
+
+                  <Grid ColumnDefinitions="*,Auto">
+                    <TextBlock Grid.Column="0" Text="{Binding Title}" FontSize="12" FontWeight="SemiBold"
+                               Opacity="0.85" />
+                    <TextBlock Grid.Column="1" Text="{Binding StateText}" FontSize="11" Opacity="0.6" />
+                  </Grid>
+
+                  <TextBlock Text="{Binding About}" FontSize="10" Opacity="0.5" TextWrapping="Wrap"
+                             LineHeight="15" />
+
+                  <ItemsControl ItemsSource="{Binding Items}">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate x:DataType="vm:CapabilityRow">
+                        <Border Padding="10,8" CornerRadius="4" Background="#232B3B" Margin="0,3">
+                          <Grid ColumnDefinitions="Auto,*">
+
+                            <Border Grid.Column="0" Width="8" Height="8" CornerRadius="4"
+                                    VerticalAlignment="Top" Margin="0,5,0,0"
+                                    Background="{Binding Level, Converter={x:Static vm:VerdictBrushConverter.Instance}}" />
+
+                            <StackPanel Grid.Column="1" Spacing="2" Margin="10,0,0,0">
+                              <Grid ColumnDefinitions="*,Auto">
+                                <TextBlock Grid.Column="0" Text="{Binding Title}" FontSize="12"
+                                           TextWrapping="Wrap" />
+                                <TextBlock Grid.Column="1" Text="{Binding StateText}" FontSize="10"
+                                           Opacity="0.6" VerticalAlignment="Center" Margin="8,0,0,0" />
+                              </Grid>
+
+                              <TextBlock Text="{Binding About}" FontSize="10" Opacity="0.55"
+                                         TextWrapping="Wrap" LineHeight="15" />
+
+                              <TextBlock Text="{Binding Detail}" FontSize="10" Opacity="0.5"
+                                         TextWrapping="Wrap" LineHeight="15"
+                                         IsVisible="{Binding Detail, Converter={x:Static ObjectConverters.IsNotNull}}" />
+
+                              <!-- Что сделать, чтобы заработало: недоступное — это задача,
+                                   а не приговор -->
+                              <TextBlock Text="{Binding HowToEnable}" FontSize="10" TextWrapping="Wrap"
+                                         LineHeight="15" Foreground="{StaticResource WarningBrush}"
+                                         IsVisible="{Binding HowToEnable, Converter={x:Static ObjectConverters.IsNotNull}}" />
+
+                              <TextBlock Text="{Binding Where}" FontSize="10" Opacity="0.6"
+                                         FontFamily="Consolas,Menlo,monospace"
+                                         IsVisible="{Binding Where, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                            </StackPanel>
+                          </Grid>
+                        </Border>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                </StackPanel>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+
+        </StackPanel>
+      </ScrollViewer>
+    </Border>
+  </Grid>
+</UserControl>

@@ -32,6 +32,9 @@ public sealed class ViewLocator : IDataTemplate
         AlertsPageViewModel => new AlertsPage(),
         ReportsPageViewModel => new ReportsPage(),
         SettingsPageViewModel => new SettingsPage(),
+        LocalTestsPageViewModel => new LocalTestsPage(),
+        SpeedPageViewModel => new SpeedPage(),
+        DevelopmentPageViewModel => new DevelopmentPage(),
         PlaceholderPageViewModel => new PlaceholderPage(),
         _ => new TextBlock { Text = $"Нет представления для {param?.GetType().Name ?? "null"}" },
     };

@@ -15,32 +15,6 @@ using StormMachine.Domain.Results;
 
 namespace StormMachine.App.ViewModels;
 
-/// <summary>Одна возможность в списке.</summary>
-public sealed record CapabilityRow(Capability Capability)
-{
-    public string Title => Capability.Title;
-
-    public string About => Capability.About;
-
-    public string? Detail => Capability.Detail;
-
-    public string? HowToEnable => Capability.HowToEnable;
-
-    public string? Where => Capability.Where;
-
-    public string StateText => SettingsPageViewModel.Describe(Capability.State)
-                               + (Capability.Iteration is { } iteration ? $" · {iteration}" : string.Empty);
-
-    /// <summary>Цвет точки состояния. Тот же словарь, что у мониторов и вердиктов.</summary>
-    public VerdictLevel Level => SettingsPageViewModel.LevelOf(Capability.State);
-}
-
-/// <summary>Уровень зависимостей со своими возможностями.</summary>
-public sealed record CapabilityGroup(string Title, string About, string StateText, IReadOnlyList<CapabilityRow> Items)
-{
-    public bool HasItems => Items.Count > 0;
-}
-
 /// <summary>Строка списка учётных данных SNMP.</summary>
 public sealed record CredentialRow(SnmpCredential Credential)
 {
@@ -90,18 +64,16 @@ public sealed record ProfileRow(NetworkProfile Profile)
 }
 
 /// <summary>
-/// Настройки: что продукт может здесь, где он находится и куда пишет.
+/// Настройки: где продукт находится, чем опрашивает и куда пишет.
 /// </summary>
 /// <remarks>
-/// Экран отвечает на три вопроса, которые задают, когда что-то пошло не так:
-/// <b>что вообще доступно на этой машине</b>, <b>в какой сети мы сейчас</b> и
-/// <b>с каким файлом базы мы разговариваем</b>. Все три ответа продукт обязан давать
-/// сам: догадываться о них по косвенным признакам — работа, которую нельзя перекладывать
-/// на человека.
+/// Экран отвечает на вопросы, которые задают, когда что-то пошло не так:
+/// <b>в какой сети мы сейчас</b> и <b>с каким файлом базы мы разговариваем</b>.
+/// Сводка возможностей машины жила здесь до И-24 и вынесена во временный раздел
+/// «Разработка» по решению оператора: в настройках — настройки.
 /// </remarks>
 public sealed partial class SettingsPageViewModel : PageViewModel
 {
-    private readonly CapabilityInspector _capabilities;
     private readonly ProfileService _profiles;
     private readonly IRunStore _runs;
     private readonly ISnmpCredentialStore _credentials;
@@ -109,7 +81,6 @@ public sealed partial class SettingsPageViewModel : PageViewModel
 
     public SettingsPageViewModel(
         NavigationSection section,
-        CapabilityInspector capabilities,
         ProfileService profiles,
         IRunStore runs,
         UpdateService updates,
@@ -128,7 +99,6 @@ public sealed partial class SettingsPageViewModel : PageViewModel
         Retention = new RetentionSectionViewModel(
             retention ?? throw new ArgumentNullException(nameof(retention)),
             runs ?? throw new ArgumentNullException(nameof(runs)));
-        _capabilities = capabilities ?? throw new ArgumentNullException(nameof(capabilities));
         _profiles = profiles ?? throw new ArgumentNullException(nameof(profiles));
         _runs = runs ?? throw new ArgumentNullException(nameof(runs));
         _credentials = credentials ?? throw new ArgumentNullException(nameof(credentials));
@@ -180,8 +150,6 @@ public sealed partial class SettingsPageViewModel : PageViewModel
     /// </remarks>
     public UpdateService Updates { get; }
 
-    public ObservableCollection<CapabilityGroup> Levels { get; } = [];
-
     public ObservableCollection<ProfileRow> Profiles { get; } = [];
 
     [ObservableProperty]
@@ -189,9 +157,6 @@ public sealed partial class SettingsPageViewModel : PageViewModel
 
     [ObservableProperty]
     private string _newProfileName = string.Empty;
-
-    [ObservableProperty]
-    private string _summary = "…";
 
     [ObservableProperty]
     private string _currentSignature = "…";
@@ -343,23 +308,6 @@ public sealed partial class SettingsPageViewModel : PageViewModel
 
         try
         {
-            var report = await _capabilities.InspectAsync(cancellationToken).ConfigureAwait(true);
-
-            Levels.Clear();
-
-            foreach (var group in Build(report))
-            {
-                Levels.Add(group);
-            }
-
-            Summary =
-                $"Работает {report.UsableCount.ToString(CultureInfo.InvariantCulture)}, "
-                + $"упирается в условия {report.BlockedCount.ToString(CultureInfo.InvariantCulture)}, "
-                + $"запланировано {report.PlannedCount.ToString(CultureInfo.InvariantCulture)}. "
-                + (report.IsElevated
-                    ? "Продукт запущен с правами администратора."
-                    : "Продукт запущен без прав администратора.");
-
             var profiles = await _profiles.ListAsync(cancellationToken).ConfigureAwait(true);
             var chosen = SelectedProfile?.Profile.Id;
 
@@ -520,76 +468,6 @@ public sealed partial class SettingsPageViewModel : PageViewModel
 
         await RefreshAsync(cancellationToken).ConfigureAwait(true);
     }
-
-    /// <summary>
-    /// Возможности, разложенные по уровням зависимостей.
-    /// </summary>
-    /// <remarks>
-    /// Уровень показывается целиком, даже если в нём всё недоступно: недоступное
-    /// не прячется, а объясняется. Спрятанный уровень выглядит как отсутствующий,
-    /// и оператор идёт искать его в другом инструменте.
-    /// </remarks>
-    private static IEnumerable<CapabilityGroup> Build(CapabilityReport report)
-    {
-        foreach (var level in Enum.GetValues<CapabilityLevel>())
-        {
-            var items = report.OfLevel(level)
-                .OrderBy(c => c.State)
-                .ThenBy(c => c.Title, StringComparer.CurrentCulture)
-                .Select(c => new CapabilityRow(c))
-                .ToList();
-
-            yield return new CapabilityGroup(
-                TitleOf(level),
-                AboutOf(level),
-                Describe(report.StateOf(level)),
-                items);
-        }
-    }
-
-    private static string TitleOf(CapabilityLevel level) => level switch
-    {
-        CapabilityLevel.Core => "Уровень 0 — работает у всех",
-        CapabilityLevel.Snmp => "Уровень 1 — учётные данные оборудования",
-        _ => "Уровень 2 — драйвер захвата",
-    };
-
-    private static string AboutOf(CapabilityLevel level) => level switch
-    {
-        CapabilityLevel.Core => "Ни прав, ни драйверов, ни паролей. Это тот продукт, "
-                                + "который достаётся любому оператору сразу после установки.",
-        CapabilityLevel.Snmp => "Нужны сообщества или учётные записи SNMP на оборудовании. "
-                                + "Их выдают сетевики, и выдают не всегда.",
-        _ => "Нужен Npcap. Продукт его не распространяет ни при каких условиях: "
-             + "лицензия NPSL это запрещает. Ставится вручную с npcap.com.",
-    };
-
-    internal static string Describe(CapabilityState state) => state switch
-    {
-        CapabilityState.Available => "работает",
-        CapabilityState.Limited => "работает не в полную силу",
-        CapabilityState.NeedsElevation => "нужны права администратора",
-        CapabilityState.NeedsCredentials => "нужны учётные данные",
-        CapabilityState.NeedsDriver => "нужен драйвер захвата",
-        CapabilityState.NeedsData => "нужен файл базы",
-        CapabilityState.NeedsAgent => "нужна вторая точка измерения",
-        _ => "запланировано",
-    };
-
-    /// <summary>
-    /// Цвет состояния.
-    /// </summary>
-    /// <remarks>
-    /// Красным помечается только то, что сломано. Возможность, упирающаяся в права
-    /// или драйвер, не сломана — она ждёт решения, которое оператор может принять,
-    /// и красный на ней означал бы неисправность там, где её нет.
-    /// </remarks>
-    internal static VerdictLevel LevelOf(CapabilityState state) => state switch
-    {
-        CapabilityState.Available => VerdictLevel.Pass,
-        CapabilityState.Planned => VerdictLevel.Unknown,
-        _ => VerdictLevel.Warn,
-    };
 
     private static string Changed(int count) => count == 0
         ? "Состав работающих мониторов не изменился."

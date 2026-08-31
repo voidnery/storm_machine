@@ -503,13 +503,5 @@ public sealed partial class LatencyPageViewModel : PageViewModel, ITargetAware
     private static string Format(double value) =>
         value.ToString("0.000", CultureInfo.InvariantCulture) + " мс";
 
-    private static Domain.Targets.Target ParseTarget(string raw)
-    {
-        var trimmed = raw.Trim();
-
-        return trimmed.Equals("gateway", StringComparison.OrdinalIgnoreCase)
-               || trimmed.Equals("шлюз", StringComparison.OrdinalIgnoreCase)
-            ? Domain.Targets.Target.Gateway("шлюз по умолчанию")
-            : Domain.Targets.Target.Parse(trimmed);
-    }
+    private static Domain.Targets.Target ParseTarget(string raw) => TargetInput.Parse(raw);
 }

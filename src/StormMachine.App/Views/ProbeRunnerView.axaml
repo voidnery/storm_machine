@@ -1,0 +1,149 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:StormMachine.App.ViewModels"
+             x:Class="StormMachine.App.Views.ProbeRunnerView"
+             x:DataType="vm:ProbeRunnerViewModel">
+
+  <!-- Общий прогонщик пробы: форма из паспорта (принцип 1), запуск, итог.
+       Используется страницами «Локальные тесты» и «Скорость и качество». -->
+  <StackPanel Spacing="12">
+
+    <Border Padding="14" CornerRadius="6" Background="{StaticResource PanelBrush}">
+      <StackPanel Spacing="10">
+
+        <Grid ColumnDefinitions="2*,2*,Auto,Auto,Auto">
+          <StackPanel Grid.Column="0" Spacing="4" Margin="0,0,12,0">
+            <TextBlock Text="Проба" FontSize="11" Opacity="0.6" />
+            <ComboBox ItemsSource="{Binding Probes}" SelectedItem="{Binding Probe}"
+                      HorizontalAlignment="Stretch" IsEnabled="{Binding CanStart}" />
+          </StackPanel>
+
+          <StackPanel Grid.Column="1" Spacing="4" Margin="0,0,12,0" IsVisible="{Binding NeedsTarget}">
+            <TextBlock Text="{Binding TargetHint}" FontSize="11" Opacity="0.6" />
+            <TextBox Text="{Binding Target}" IsEnabled="{Binding CanStart}" />
+          </StackPanel>
+
+          <StackPanel Grid.Column="2" Spacing="4" Margin="0,0,12,0" VerticalAlignment="Bottom">
+            <CheckBox IsChecked="{Binding Save}" Content="В журнал" IsEnabled="{Binding CanStart}" />
+          </StackPanel>
+
+          <Button Grid.Column="3" Content="Запустить" Margin="0,0,8,0" VerticalAlignment="Bottom"
+                  Command="{Binding StartCommand}" Padding="18,7"
+                  Background="{StaticResource AccentBrush}" Foreground="White" />
+
+          <Button Grid.Column="4" Content="Стоп" VerticalAlignment="Bottom"
+                  Command="{Binding StopCommand}" />
+        </Grid>
+
+        <TextBlock Text="{Binding ProbeAbout}" FontSize="11" Opacity="0.6" TextWrapping="Wrap" />
+
+        <!-- Сопряжённые агенты подставляются нажатием: помнить имена наизусть незачем. -->
+        <StackPanel Orientation="Horizontal" Spacing="6" IsVisible="{Binding WantsAgent}">
+          <TextBlock Text="Агенты:" FontSize="11" Opacity="0.6" VerticalAlignment="Center" />
+          <ItemsControl ItemsSource="{Binding AgentNames}">
+            <ItemsControl.ItemsPanel>
+              <ItemsPanelTemplate>
+                <StackPanel Orientation="Horizontal" Spacing="6" />
+              </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="x:String">
+                <Button Content="{Binding}" FontSize="11" Padding="8,3"
+                        Command="{Binding $parent[UserControl].((vm:ProbeRunnerViewModel)DataContext).UseAgentCommand}"
+                        CommandParameter="{Binding}" />
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+          <TextBlock Text="сопряжённых агентов нет — настройки, раздел «Агенты»" FontSize="11"
+                     Opacity="0.5" VerticalAlignment="Center" IsVisible="{Binding !HasAgents}" />
+        </StackPanel>
+
+        <!-- Форма из паспорта пробы: новая проба получает поля без правки экрана. -->
+        <ItemsControl ItemsSource="{Binding Fields}">
+          <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate>
+              <WrapPanel Orientation="Horizontal" />
+            </ItemsPanelTemplate>
+          </ItemsControl.ItemsPanel>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:ParameterFieldViewModel">
+              <StackPanel Spacing="2" Margin="0,0,12,8" Width="170"
+                          ToolTip.Tip="{Binding Description}">
+                <TextBlock Text="{Binding Label}" FontSize="10" Opacity="0.6" />
+                <NumericUpDown Value="{Binding Number}" Minimum="{Binding Minimum}"
+                               Maximum="{Binding Maximum}" Increment="1" FormatString="0.###"
+                               IsVisible="{Binding IsNumber}" />
+                <CheckBox IsChecked="{Binding Flag}" IsVisible="{Binding IsBoolean}" />
+                <TextBox Text="{Binding Text}" IsVisible="{Binding IsText}" FontSize="12" />
+                <ComboBox ItemsSource="{Binding Choices}" SelectedItem="{Binding Text}"
+                          IsVisible="{Binding IsChoice}" HorizontalAlignment="Stretch" />
+              </StackPanel>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
+        <TextBlock Text="{Binding Status}" FontSize="12" Opacity="0.75" TextWrapping="Wrap" />
+        <TextBlock Text="{Binding Error}" FontSize="12" Foreground="{StaticResource DangerBrush}"
+                   TextWrapping="Wrap"
+                   IsVisible="{Binding Error, Converter={x:Static ObjectConverters.IsNotNull}}" />
+      </StackPanel>
+    </Border>
+
+    <!-- Суждение отдельно от чисел: пороги — мнение профиля, а не измерение. -->
+    <TextBlock Text="{Binding VerdictLine}" FontSize="12" TextWrapping="Wrap"
+               IsVisible="{Binding VerdictLine, Converter={x:Static ObjectConverters.IsNotNull}}" />
+
+    <Border Padding="12" CornerRadius="6" Background="{StaticResource PanelBrush}"
+            IsVisible="{Binding HasSeries}">
+      <StackPanel Spacing="6">
+        <TextBlock Text="Ряды" FontSize="13" FontWeight="SemiBold" />
+        <Grid ColumnDefinitions="220,60,70,80,80,80,80">
+          <TextBlock Grid.Column="0" Text="ряд" FontSize="10" Opacity="0.5" />
+          <TextBlock Grid.Column="1" Text="проб" FontSize="10" Opacity="0.5" />
+          <TextBlock Grid.Column="2" Text="потери" FontSize="10" Opacity="0.5" />
+          <TextBlock Grid.Column="3" Text="мин" FontSize="10" Opacity="0.5" />
+          <TextBlock Grid.Column="4" Text="медиана" FontSize="10" Opacity="0.5" />
+          <TextBlock Grid.Column="5" Text="макс" FontSize="10" Opacity="0.5" />
+          <TextBlock Grid.Column="6" Text="джиттер" FontSize="10" Opacity="0.5" />
+        </Grid>
+        <ItemsControl ItemsSource="{Binding Series}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:SeriesRow">
+              <Grid ColumnDefinitions="220,60,70,80,80,80,80" Margin="0,1">
+                <TextBlock Grid.Column="0" Text="{Binding Label}" FontSize="12" />
+                <TextBlock Grid.Column="1" Text="{Binding Sent}" FontSize="12" FontFamily="Consolas" />
+                <TextBlock Grid.Column="2" Text="{Binding Loss}" FontSize="12" FontFamily="Consolas" />
+                <TextBlock Grid.Column="3" Text="{Binding Min}" FontSize="12" FontFamily="Consolas" />
+                <TextBlock Grid.Column="4" Text="{Binding Median}" FontSize="12" FontFamily="Consolas" />
+                <TextBlock Grid.Column="5" Text="{Binding Max}" FontSize="12" FontFamily="Consolas" />
+                <TextBlock Grid.Column="6" Text="{Binding Jitter}" FontSize="12" FontFamily="Consolas" />
+              </Grid>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+        <TextBlock Text="Времена в миллисекундах." FontSize="10" Opacity="0.5" />
+      </StackPanel>
+    </Border>
+
+    <Border Padding="12" CornerRadius="6" Background="{StaticResource PanelBrush}"
+            IsVisible="{Binding HasFacts}">
+      <StackPanel Spacing="6">
+        <TextBlock Text="Факты" FontSize="13" FontWeight="SemiBold" />
+        <ItemsControl ItemsSource="{Binding Facts}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:FactRow">
+              <Grid ColumnDefinitions="240,*" Margin="0,1">
+                <TextBlock Grid.Column="0" Text="{Binding Name}" FontSize="12" Opacity="0.8" />
+                <TextBlock Grid.Column="1" Text="{Binding Value}" FontSize="12" TextWrapping="Wrap"
+                           Foreground="{StaticResource WarningBrush}" IsVisible="{Binding IsWarning}" />
+                <TextBlock Grid.Column="1" Text="{Binding Value}" FontSize="12" TextWrapping="Wrap"
+                           IsVisible="{Binding !IsWarning}" />
+              </Grid>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </StackPanel>
+    </Border>
+
+  </StackPanel>
+</UserControl>

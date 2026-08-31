@@ -572,13 +572,5 @@ public sealed partial class PathPageViewModel : PageViewModel, ITargetAware
               + "имена узлов работают и без неё.";
     }
 
-    private static Target ParseTarget(string raw)
-    {
-        var trimmed = raw.Trim();
-
-        return trimmed.Equals("gateway", StringComparison.OrdinalIgnoreCase)
-               || trimmed.Equals("шлюз", StringComparison.OrdinalIgnoreCase)
-            ? Target.Gateway("шлюз по умолчанию")
-            : Target.Parse(trimmed);
-    }
+    private static Target ParseTarget(string raw) => TargetInput.Parse(raw);
 }
