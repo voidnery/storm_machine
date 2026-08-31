@@ -102,6 +102,52 @@ public sealed class PageRenderingTests(HeadlessSessionFixture fixture)
             "Осмотр страниц нашёл:" + Environment.NewLine + string.Join(Environment.NewLine, failures));
     }
 
+    /// <summary>
+    /// Каждая страница переживает активацию и уход — не только конструирование.
+    /// </summary>
+    /// <remarks>
+    /// Активация — это загрузка данных: журнал, возможности, профили, сценарии.
+    /// Тесты сборки её не касались, и «страница собирается» ничего не говорило
+    /// о том, что на неё можно перейти. База изолирована через STORM_DB;
+    /// страницы, делающие активные действия по сети при одном лишь переходе,
+    /// нарушали бы принцип продукта — такой находке тест обязан упасть.
+    /// </remarks>
+    [Fact]
+    public async Task EveryPage_ActivatesAndDeactivates()
+    {
+        var failures = await _session.Dispatch(
+            async () =>
+            {
+                await using var services = AppServices.Build();
+                var factory = services.GetRequiredService<Func<NavigationSection, PageViewModel>>();
+
+                var found = new List<string>();
+
+                foreach (var section in NavigationMap.Sections)
+                {
+                    var page = factory(section);
+
+                    try
+                    {
+                        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(60));
+                        await page.ActivateAsync(timeout.Token);
+                        page.Deactivate();
+                    }
+                    catch (Exception ex)
+                    {
+                        found.Add($"{section.Route}: {ex.GetType().Name}: {ex.Message}");
+                    }
+                }
+
+                return found;
+            },
+            CancellationToken.None);
+
+        Assert.True(
+            failures.Count == 0,
+            "Активация страниц упала:" + Environment.NewLine + string.Join(Environment.NewLine, failures));
+    }
+
     /// <summary>Оболочка открывается с настоящей моделью: навигация, статус, первая страница.</summary>
     [Fact]
     public async Task MainWindow_OpensWithRealShell()
