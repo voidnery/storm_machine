@@ -29,18 +29,45 @@
         <Grid ColumnDefinitions="2*,Auto,Auto,Auto,Auto" >
           <StackPanel Grid.Column="0" Spacing="4" Margin="0,0,12,0">
             <TextBlock Text="Цель" FontSize="11" Opacity="0.6" />
-            <!-- Подсказки из инвентаря (И-24): сеть просканирована — адреса подставляются.
-                 Фильтр ищет и по имени с ролью, своя строка по-прежнему годится. -->
-            <AutoCompleteBox Text="{Binding TargetText}" ItemsSource="{Binding Suggestions}"
-                             ItemFilter="{x:Static vm:TargetSuggestions.Filter}"
-                             MinimumPrefixLength="0" Watermark="gateway, 192.168.1.1 или example.com"
-                             IsEnabled="{Binding CanStart}">
-              <AutoCompleteBox.ItemTemplate>
-                <DataTemplate x:DataType="vm:TargetSuggestion">
-                  <TextBlock Text="{Binding Description}" FontSize="12" />
-                </DataTemplate>
-              </AutoCompleteBox.ItemTemplate>
-            </AutoCompleteBox>
+            <!-- Подсказки из инвентаря (И-24): набор фильтрует список, кнопка ▾ открывает
+                 его целиком — набранный текст выпадению не мешает. -->
+            <Grid ColumnDefinitions="*,Auto">
+              <AutoCompleteBox Grid.Column="0" Text="{Binding TargetText}" ItemsSource="{Binding Suggestions}"
+                               ItemFilter="{x:Static vm:TargetSuggestions.Filter}"
+                               MinimumPrefixLength="1" PlaceholderText="gateway, 192.168.1.1 или example.com"
+                               IsEnabled="{Binding CanStart}">
+                <AutoCompleteBox.ItemTemplate>
+                  <DataTemplate x:DataType="vm:TargetSuggestion">
+                    <TextBlock Text="{Binding Description}" FontSize="12" />
+                  </DataTemplate>
+                </AutoCompleteBox.ItemTemplate>
+              </AutoCompleteBox>
+              <Button Grid.Column="1" Content="▾" FontSize="11" Padding="8,6" Margin="4,0,0,0"
+                      IsEnabled="{Binding CanStart}" ToolTip.Tip="Подставить цель из инвентаря">
+                <Button.Flyout>
+                  <Flyout Placement="BottomEdgeAlignedRight">
+                    <ScrollViewer MaxHeight="300" MaxWidth="380">
+                      <StackPanel>
+                        <TextBlock Text="Инвентарь пуст — просканируйте сеть в «Обнаружении»."
+                                   FontSize="11" Opacity="0.6" TextWrapping="Wrap" MaxWidth="240"
+                                   IsVisible="{Binding !Suggestions.Count}" />
+                        <ItemsControl ItemsSource="{Binding Suggestions}">
+                          <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:TargetSuggestion">
+                              <Button Content="{Binding Description}" FontSize="12" Padding="8,4"
+                                      HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                                      Background="Transparent"
+                                      Command="{Binding $parent[ItemsControl].((vm:LatencyPageViewModel)DataContext).UseSuggestionCommand}"
+                                      CommandParameter="{Binding}" />
+                            </DataTemplate>
+                          </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                      </StackPanel>
+                    </ScrollViewer>
+                  </Flyout>
+                </Button.Flyout>
+              </Button>
+            </Grid>
           </StackPanel>
 
           <StackPanel Grid.Column="1" Spacing="4" Margin="0,0,12,0" Width="110">

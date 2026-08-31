@@ -173,6 +173,9 @@ public sealed partial class LatencyPageViewModel : PageViewModel, ITargetAware
     /// <summary>Подсказки цели из инвентаря (И-24): сеть просканирована — подставляем.</summary>
     public System.Collections.ObjectModel.ObservableCollection<TargetSuggestion> Suggestions { get; } = [];
 
+    [RelayCommand]
+    private void UseSuggestion(TargetSuggestion suggestion) => TargetText = suggestion.Address;
+
     private async Task LoadSuggestionsAsync(CancellationToken cancellationToken)
     {
         Suggestions.Clear();

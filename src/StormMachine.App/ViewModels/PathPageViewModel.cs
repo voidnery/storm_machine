@@ -178,6 +178,9 @@ public sealed partial class PathPageViewModel : PageViewModel, ITargetAware
     /// <summary>Подсказки цели из инвентаря (И-24): сеть просканирована — подставляем.</summary>
     public System.Collections.ObjectModel.ObservableCollection<TargetSuggestion> Suggestions { get; } = [];
 
+    [RelayCommand]
+    private void UseSuggestion(TargetSuggestion suggestion) => TargetText = suggestion.Address;
+
     public override void Deactivate() => _timer.Stop();
 
     // ------------------------------------------------------------------ команды

@@ -257,6 +257,9 @@ public sealed partial class ProbeRunnerViewModel : ObservableObject
     [RelayCommand]
     private void UseAgent(string name) => Target = name;
 
+    [RelayCommand]
+    private void UseSuggestion(TargetSuggestion suggestion) => Target = suggestion.Address;
+
     [RelayCommand(CanExecute = nameof(CanStart))]
     private async Task StartAsync()
     {

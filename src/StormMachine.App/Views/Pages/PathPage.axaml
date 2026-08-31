@@ -49,17 +49,45 @@
         <Grid ColumnDefinitions="2*,Auto,Auto,Auto,Auto,Auto">
           <StackPanel Grid.Column="0" Spacing="4" Margin="0,0,12,0">
             <TextBlock Text="Цель" FontSize="11" Opacity="0.6" />
-            <!-- Подсказки из инвентаря (И-24): сеть просканирована — адреса подставляются. -->
-            <AutoCompleteBox Text="{Binding TargetText}" ItemsSource="{Binding Suggestions}"
-                             ItemFilter="{x:Static vm:TargetSuggestions.Filter}"
-                             MinimumPrefixLength="0" Watermark="1.1.1.1, example.com или gateway"
-                             IsEnabled="{Binding CanStart}">
-              <AutoCompleteBox.ItemTemplate>
-                <DataTemplate x:DataType="vm:TargetSuggestion">
-                  <TextBlock Text="{Binding Description}" FontSize="12" />
-                </DataTemplate>
-              </AutoCompleteBox.ItemTemplate>
-            </AutoCompleteBox>
+            <!-- Подсказки из инвентаря (И-24): набор фильтрует список, кнопка ▾ открывает
+                 его целиком. -->
+            <Grid ColumnDefinitions="*,Auto">
+              <AutoCompleteBox Grid.Column="0" Text="{Binding TargetText}" ItemsSource="{Binding Suggestions}"
+                               ItemFilter="{x:Static vm:TargetSuggestions.Filter}"
+                               MinimumPrefixLength="1" PlaceholderText="1.1.1.1, example.com или gateway"
+                               IsEnabled="{Binding CanStart}">
+                <AutoCompleteBox.ItemTemplate>
+                  <DataTemplate x:DataType="vm:TargetSuggestion">
+                    <TextBlock Text="{Binding Description}" FontSize="12" />
+                  </DataTemplate>
+                </AutoCompleteBox.ItemTemplate>
+              </AutoCompleteBox>
+              <Button Grid.Column="1" Content="▾" FontSize="11" Padding="8,6" Margin="4,0,0,0"
+                      IsEnabled="{Binding CanStart}" ToolTip.Tip="Подставить цель из инвентаря">
+                <Button.Flyout>
+                  <Flyout Placement="BottomEdgeAlignedRight">
+                    <ScrollViewer MaxHeight="300" MaxWidth="380">
+                      <StackPanel>
+                        <TextBlock Text="Инвентарь пуст — просканируйте сеть в «Обнаружении»."
+                                   FontSize="11" Opacity="0.6" TextWrapping="Wrap" MaxWidth="240"
+                                   IsVisible="{Binding !Suggestions.Count}" />
+                        <ItemsControl ItemsSource="{Binding Suggestions}">
+                          <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:TargetSuggestion">
+                              <Button Content="{Binding Description}" FontSize="12" Padding="8,4"
+                                      HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                                      Background="Transparent"
+                                      Command="{Binding $parent[ItemsControl].((vm:PathPageViewModel)DataContext).UseSuggestionCommand}"
+                                      CommandParameter="{Binding}" />
+                            </DataTemplate>
+                          </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                      </StackPanel>
+                    </ScrollViewer>
+                  </Flyout>
+                </Button.Flyout>
+              </Button>
+            </Grid>
           </StackPanel>
 
           <StackPanel Grid.Column="1" Spacing="4" Margin="0,0,12,0" Width="100">
@@ -175,8 +203,11 @@
 
                         <Grid Grid.Column="3" ColumnDefinitions="44,*" Margin="0,0,10,0">
                           <TextBlock Grid.Column="0" Text="{Binding Loss}" FontSize="12" />
+                          <!-- MinWidth="0" обязателен: у ProgressBar в теме Fluent он ~200,
+                               и полоса требовала больше своей ячейки — ложилась поверх
+                               соседних колонок (замечание оператора, И-24). -->
                           <ProgressBar Grid.Column="1" Minimum="0" Maximum="100"
-                                       Value="{Binding LossPercent}" Height="4"
+                                       Value="{Binding LossPercent}" Height="4" MinWidth="0"
                                        VerticalAlignment="Center" />
                         </Grid>
 

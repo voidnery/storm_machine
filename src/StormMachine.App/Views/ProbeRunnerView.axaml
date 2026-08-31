@@ -14,22 +14,64 @@
         <Grid ColumnDefinitions="2*,2*,Auto,Auto,Auto">
           <StackPanel Grid.Column="0" Spacing="4" Margin="0,0,12,0">
             <TextBlock Text="Проба" FontSize="11" Opacity="0.6" />
+            <!-- Свой шаблон вместо ToString: полная строка с описанием делала пункты
+                 шире окна, и список открывался вкривь (замечание оператора, И-24).
+                 В пункте — название и описание с переносом, в поле — то же, но узко. -->
             <ComboBox ItemsSource="{Binding Probes}" SelectedItem="{Binding Probe}"
-                      HorizontalAlignment="Stretch" IsEnabled="{Binding CanStart}" />
+                      HorizontalAlignment="Stretch" IsEnabled="{Binding CanStart}"
+                      MaxDropDownHeight="420">
+              <ComboBox.ItemTemplate>
+                <DataTemplate x:DataType="vm:ProbeOption">
+                  <StackPanel Spacing="1" MaxWidth="420">
+                    <TextBlock Text="{Binding Descriptor.Title}" FontSize="12" />
+                    <TextBlock Text="{Binding Descriptor.Description}" FontSize="10" Opacity="0.55"
+                               TextWrapping="Wrap" />
+                  </StackPanel>
+                </DataTemplate>
+              </ComboBox.ItemTemplate>
+            </ComboBox>
           </StackPanel>
 
           <StackPanel Grid.Column="1" Spacing="4" Margin="0,0,12,0" IsVisible="{Binding NeedsTarget}">
             <TextBlock Text="{Binding TargetHint}" FontSize="11" Opacity="0.6" />
-            <!-- Подсказки из инвентаря (И-24): сеть просканирована — адреса подставляются. -->
-            <AutoCompleteBox Text="{Binding Target}" ItemsSource="{Binding Suggestions}"
-                             ItemFilter="{x:Static vm:TargetSuggestions.Filter}"
-                             MinimumPrefixLength="0" IsEnabled="{Binding CanStart}">
-              <AutoCompleteBox.ItemTemplate>
-                <DataTemplate x:DataType="vm:TargetSuggestion">
-                  <TextBlock Text="{Binding Description}" FontSize="12" />
-                </DataTemplate>
-              </AutoCompleteBox.ItemTemplate>
-            </AutoCompleteBox>
+            <!-- Подсказки из инвентаря (И-24): набор фильтрует список, кнопка ▾ открывает
+                 его целиком. -->
+            <Grid ColumnDefinitions="*,Auto">
+              <AutoCompleteBox Grid.Column="0" Text="{Binding Target}" ItemsSource="{Binding Suggestions}"
+                               ItemFilter="{x:Static vm:TargetSuggestions.Filter}"
+                               MinimumPrefixLength="1" IsEnabled="{Binding CanStart}">
+                <AutoCompleteBox.ItemTemplate>
+                  <DataTemplate x:DataType="vm:TargetSuggestion">
+                    <TextBlock Text="{Binding Description}" FontSize="12" />
+                  </DataTemplate>
+                </AutoCompleteBox.ItemTemplate>
+              </AutoCompleteBox>
+              <Button Grid.Column="1" Content="▾" FontSize="11" Padding="8,6" Margin="4,0,0,0"
+                      IsEnabled="{Binding CanStart}" ToolTip.Tip="Подставить цель из инвентаря">
+                <Button.Flyout>
+                  <Flyout Placement="BottomEdgeAlignedRight">
+                    <ScrollViewer MaxHeight="300" MaxWidth="380">
+                      <StackPanel>
+                        <TextBlock Text="Инвентарь пуст — просканируйте сеть в «Обнаружении»."
+                                   FontSize="11" Opacity="0.6" TextWrapping="Wrap" MaxWidth="240"
+                                   IsVisible="{Binding !Suggestions.Count}" />
+                        <ItemsControl ItemsSource="{Binding Suggestions}">
+                          <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:TargetSuggestion">
+                              <Button Content="{Binding Description}" FontSize="12" Padding="8,4"
+                                      HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                                      Background="Transparent"
+                                      Command="{Binding $parent[ItemsControl].((vm:ProbeRunnerViewModel)DataContext).UseSuggestionCommand}"
+                                      CommandParameter="{Binding}" />
+                            </DataTemplate>
+                          </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                      </StackPanel>
+                    </ScrollViewer>
+                  </Flyout>
+                </Button.Flyout>
+              </Button>
+            </Grid>
           </StackPanel>
 
           <StackPanel Grid.Column="2" Spacing="4" Margin="0,0,12,0" VerticalAlignment="Bottom">

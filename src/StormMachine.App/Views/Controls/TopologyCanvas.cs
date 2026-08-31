@@ -269,11 +269,25 @@ public sealed class TopologyCanvas : Control
         var rect = new Rect(topLeft, size);
 
         var selected = SelectedNode is { } selection && selection.Id == node.Node.Id;
+
+        // Категория красит рамку (И-24, замечание оператора: тег текстом почти
+        // не виден). Цвет — у категоризованных устройств; виды узлов самой карты
+        // (эта машина, подсеть, интернет) остаются своими цветами.
+        var role = RoleBrush(node.Node.Role);
         var border = selected
             ? new Pen(Selection, 2)
-            : new Pen(BorderFor(node.Node.Kind), node.Node.Kind == TopologyNodeKind.ThisMachine ? 1.8 : 1);
+            : role is not null
+                ? new Pen(role, 1.6)
+                : new Pen(BorderFor(node.Node.Kind), node.Node.Kind == TopologyNodeKind.ThisMachine ? 1.8 : 1);
 
         context.DrawRectangle(NodeFill, border, rect, 4, 4);
+
+        // Полоска слева тем же цветом: рамки на маленьком масштабе сливаются,
+        // а полоска остаётся различимой.
+        if (role is not null)
+        {
+            context.FillRectangle(role, new Rect(rect.X, rect.Y, Math.Min(3 * _scale, rect.Width), rect.Height));
+        }
 
         // Подписи ниже определённого масштаба не рисуются вовсе: они превращаются
         // в нечитаемую кашу и стоят дороже всего остального рисования вместе взятого.
@@ -309,6 +323,40 @@ public sealed class TopologyCanvas : Control
 
         context.DrawText(detail, new Point(rect.X + (8 * _scale), rect.Y + (21 * _scale)));
     }
+
+    /// <summary>
+    /// Цвет категории устройства.
+    /// </summary>
+    /// <remarks>
+    /// Догадка («сервер?») красится тем же цветом, что и факт: вопрос остаётся
+    /// в подписи, а цвет отвечает на «что это», не утверждая, откуда известно.
+    /// Неизвестной категории цвета нет — красить всё подряд значило бы обесценить
+    /// подсветку.
+    /// </remarks>
+    private static IBrush? RoleBrush(string? role)
+    {
+        if (string.IsNullOrEmpty(role))
+        {
+            return null;
+        }
+
+        return RoleBrushes.TryGetValue(role.TrimEnd('?'), out var brush) ? brush : null;
+    }
+
+    private static readonly Dictionary<string, IBrush> RoleBrushes = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["маршрутизатор"] = new SolidColorBrush(Color.Parse("#5B8DEF")),
+        ["шлюз"] = new SolidColorBrush(Color.Parse("#5B8DEF")),
+        ["коммутатор"] = new SolidColorBrush(Color.Parse("#9A6CFF")),
+        ["точка доступа"] = new SolidColorBrush(Color.Parse("#E0C341")),
+        ["сервер"] = new SolidColorBrush(Color.Parse("#4C9A5A")),
+        ["хранилище"] = new SolidColorBrush(Color.Parse("#2FB5A0")),
+        ["принтер"] = new SolidColorBrush(Color.Parse("#D9A441")),
+        ["камера"] = new SolidColorBrush(Color.Parse("#E05252")),
+        ["компьютер"] = new SolidColorBrush(Color.Parse("#7A9BC8")),
+        ["телефон"] = new SolidColorBrush(Color.Parse("#5CB8E0")),
+        ["медиа"] = new SolidColorBrush(Color.Parse("#C05CC0")),
+    };
 
     private static IBrush BorderFor(TopologyNodeKind kind) => kind switch
     {

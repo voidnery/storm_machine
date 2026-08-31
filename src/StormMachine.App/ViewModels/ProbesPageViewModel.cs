@@ -355,6 +355,9 @@ public sealed partial class ProbesPageViewModel : PageViewModel, ITargetAware, I
     [RelayCommand]
     private void UseSet(string key) => Target = key;
 
+    [RelayCommand]
+    private void UseSuggestion(TargetSuggestion suggestion) => Target = suggestion.Address;
+
     public string BaselineCaption =>
         $"Порог достоверности {_clock.CalibrationBaselineMs.ToString("0.000", CultureInfo.InvariantCulture)} мс";
 }
