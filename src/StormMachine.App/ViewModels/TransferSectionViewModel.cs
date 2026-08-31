@@ -105,10 +105,11 @@ public sealed partial class TransferSectionViewModel(SettingsTransfer transfer, 
                 .ConfigureAwait(true);
 
             Message = $"Добавлено {report.Added}, обновлено {report.Updated}, пропущено {report.Skipped}."
-                      + (report.Added + report.Updated > 0
+                      + (report.Added + report.Updated > 0 && bundle.Profiles.Count > 0
                           // Профиль приезжает неактивным всегда: смена профиля меняет пороги
                           // и состав мониторов, а делать это молча значит поменять смысл
-                          // измерений за спиной оператора.
+                          // измерений за спиной оператора. Совет только когда профили
+                          // в файле были — иначе он сбивает (стенд И-24).
                           ? " Профили приехали неактивными — активируйте нужный в списке выше."
                           : string.Empty);
 

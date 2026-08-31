@@ -90,6 +90,7 @@ public sealed class UdpProbe(IHighResolutionClock clock, TargetResolver resolver
         observer.OnFact(ProbeFact.Text("udp", "Полезная нагрузка", "запрос DNS типа A к несуществующему имени"));
 
         var silent = 0;
+        var rejected = 0;
 
         for (var sequence = 0; sequence < count; sequence++)
         {
@@ -105,6 +106,10 @@ public sealed class UdpProbe(IHighResolutionClock clock, TargetResolver resolver
             if (sample.Status == SampleStatus.Timeout)
             {
                 silent++;
+            }
+            else if (sample.Status == SampleStatus.Rejected)
+            {
+                rejected++;
             }
 
             yield return sample;
@@ -123,6 +128,14 @@ public sealed class UdpProbe(IHighResolutionClock clock, TargetResolver resolver
                 "Итог",
                 "Ответов нет. Для UDP это не равно недоступности: порт может быть открыт и молчать."));
         }
+        else if (rejected == count)
+        {
+            // А это уже не догадка: узел сам сказал, что порт закрыт.
+            observer.OnFact(ProbeFact.Text(
+                "udp",
+                "Итог",
+                "Порт явно недоступен: на каждую датаграмму пришёл ICMP «порт недоступен»."));
+        }
     }
 
     private async Task<Sample> SendOnceAsync(
@@ -137,18 +150,12 @@ public sealed class UdpProbe(IHighResolutionClock clock, TargetResolver resolver
     {
         using var socket = new Socket(endpoint.AddressFamily, SocketType.Dgram, ProtocolType.Udp);
 
-        // Без этого Windows на ICMP Port Unreachable роняет сокет ошибкой ConnectionReset
-        // при СЛЕДУЮЩЕЙ отправке, а не при текущей — и отказ приписывается не той пробе.
-        // Здесь сокет одноразовый, но флаг оставлен намеренно: поведение должно быть
-        // предсказуемым, если проба когда-нибудь станет переиспользовать сокет.
-        try
-        {
-            socket.IOControl(unchecked((int)0x9800000C), [0, 0, 0, 0], null);
-        }
-        catch (SocketException)
-        {
-            // Управляющий код недоступен — не критично.
-        }
+        // ICMP Port Unreachable обязан доходить до пробы: «явный отказ порта» — одно
+        // из трёх различий, ради которых она существует. Раньше здесь стоял
+        // SIO_UDP_CONNRESET = 0, глушивший это уведомление «для предсказуемости», —
+        // и закрытый порт девять итераций выглядел молчанием (найдено стендом И-24).
+        // Сокет одноразовый, поэтому штатное поведение Windows атрибутирует отказ
+        // ровно той отправке, которая его вызвала.
 
         using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeoutCts.CancelAfter(timeoutMs);
