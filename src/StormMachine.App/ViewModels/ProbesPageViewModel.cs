@@ -355,8 +355,20 @@ public sealed partial class ProbesPageViewModel : PageViewModel, ITargetAware, I
     [RelayCommand]
     private void UseSet(string key) => Target = key;
 
+    /// <summary>Открыт ли список инвентаря под полем цели.</summary>
+    [ObservableProperty]
+    private bool _isPickerOpen;
+
+    // Кнопка только открывает: закрытие — выбором или щелчком мимо (light dismiss).
     [RelayCommand]
-    private void UseSuggestion(TargetSuggestion suggestion) => Target = suggestion.Address;
+    private void OpenPicker() => IsPickerOpen = true;
+
+    [RelayCommand]
+    private void UseSuggestion(TargetSuggestion suggestion)
+    {
+        Target = suggestion.Address;
+        IsPickerOpen = false;
+    }
 
     public string BaselineCaption =>
         $"Порог достоверности {_clock.CalibrationBaselineMs.ToString("0.000", CultureInfo.InvariantCulture)} мс";

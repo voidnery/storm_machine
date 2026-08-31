@@ -27,12 +27,14 @@
             Background="{StaticResource PanelBrush}">
       <StackPanel Spacing="10">
         <Grid ColumnDefinitions="2*,Auto,Auto,Auto,Auto" >
-          <StackPanel Grid.Column="0" Spacing="4" Margin="0,0,12,0">
+          <StackPanel Grid.Column="0" Spacing="4" Margin="0,0,12,0" MinWidth="320">
             <TextBlock Text="Цель" FontSize="11" Opacity="0.6" />
             <!-- Подсказки из инвентаря (И-24): набор фильтрует список, кнопка ▾ открывает
-                 его целиком — набранный текст выпадению не мешает. -->
+                 его целиком. Список — Popup, привязанный к самому полю и шириной с него:
+                 выпадение из кнопки открывалось вкривь (замечание оператора). -->
             <Grid ColumnDefinitions="*,Auto">
-              <AutoCompleteBox Grid.Column="0" Text="{Binding TargetText}" ItemsSource="{Binding Suggestions}"
+              <AutoCompleteBox x:Name="TargetBox" Grid.Column="0" Text="{Binding TargetText}"
+                               ItemsSource="{Binding Suggestions}"
                                ItemFilter="{x:Static vm:TargetSuggestions.Filter}"
                                MinimumPrefixLength="1" PlaceholderText="gateway, 192.168.1.1 или example.com"
                                IsEnabled="{Binding CanStart}">
@@ -43,40 +45,45 @@
                 </AutoCompleteBox.ItemTemplate>
               </AutoCompleteBox>
               <Button Grid.Column="1" Content="▾" FontSize="11" Padding="8,6" Margin="4,0,0,0"
-                      IsEnabled="{Binding CanStart}" ToolTip.Tip="Подставить цель из инвентаря">
-                <Button.Flyout>
-                  <Flyout Placement="BottomEdgeAlignedRight">
-                    <ScrollViewer MaxHeight="300" MaxWidth="380">
-                      <StackPanel>
-                        <TextBlock Text="Инвентарь пуст — просканируйте сеть в «Обнаружении»."
-                                   FontSize="11" Opacity="0.6" TextWrapping="Wrap" MaxWidth="240"
-                                   IsVisible="{Binding !Suggestions.Count}" />
-                        <ItemsControl ItemsSource="{Binding Suggestions}">
-                          <ItemsControl.ItemTemplate>
-                            <DataTemplate x:DataType="vm:TargetSuggestion">
-                              <Button Content="{Binding Description}" FontSize="12" Padding="8,4"
-                                      HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
-                                      Background="Transparent"
-                                      Command="{Binding $parent[ItemsControl].((vm:LatencyPageViewModel)DataContext).UseSuggestionCommand}"
-                                      CommandParameter="{Binding}" />
-                            </DataTemplate>
-                          </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                      </StackPanel>
-                    </ScrollViewer>
-                  </Flyout>
-                </Button.Flyout>
-              </Button>
+                      Command="{Binding OpenPickerCommand}"
+                      IsEnabled="{Binding CanStart}" ToolTip.Tip="Подставить цель из инвентаря" />
+              <Popup PlacementTarget="{Binding #TargetBox}" Placement="BottomEdgeAlignedLeft"
+                     IsOpen="{Binding IsPickerOpen, Mode=TwoWay}" IsLightDismissEnabled="True">
+                <Border Background="#1B222E" BorderBrush="#2E3746" BorderThickness="1" CornerRadius="4"
+                        Padding="4" MinWidth="{Binding #TargetBox.Bounds.Width}" MaxWidth="480"
+                        MaxHeight="300">
+                  <ScrollViewer>
+                    <StackPanel>
+                      <TextBlock Text="Инвентарь пуст — просканируйте сеть в «Обнаружении»."
+                                 FontSize="11" Opacity="0.6" TextWrapping="Wrap" Margin="8,6"
+                                 IsVisible="{Binding !Suggestions.Count}" />
+                      <ItemsControl ItemsSource="{Binding Suggestions}">
+                        <ItemsControl.ItemTemplate>
+                          <DataTemplate x:DataType="vm:TargetSuggestion">
+                            <Button Content="{Binding Description}" FontSize="12" Padding="8,4"
+                                    HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                                    Background="Transparent"
+                                    Command="{Binding $parent[ItemsControl].((vm:LatencyPageViewModel)DataContext).UseSuggestionCommand}"
+                                    CommandParameter="{Binding}" />
+                          </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                      </ItemsControl>
+                    </StackPanel>
+                  </ScrollViewer>
+                </Border>
+              </Popup>
             </Grid>
           </StackPanel>
 
-          <StackPanel Grid.Column="1" Spacing="4" Margin="0,0,12,0" Width="110">
+          <!-- Ширина 140: у NumericUpDown стрелки съедают место, и «100» в 110 px
+               обрезалось (замечание оператора, И-24). -->
+          <StackPanel Grid.Column="1" Spacing="4" Margin="0,0,12,0" Width="140">
             <TextBlock Text="Интервал, мс" FontSize="11" Opacity="0.6" />
             <NumericUpDown Value="{Binding IntervalMs}" Minimum="10" Maximum="600000" Increment="100"
                            FormatString="0" IsEnabled="{Binding CanStart}" />
           </StackPanel>
 
-          <StackPanel Grid.Column="2" Spacing="4" Margin="0,0,12,0" Width="110">
+          <StackPanel Grid.Column="2" Spacing="4" Margin="0,0,12,0" Width="140">
             <TextBlock Text="Число проб" FontSize="11" Opacity="0.6" />
             <NumericUpDown Value="{Binding Count}" Minimum="1" Maximum="1000000" Increment="10"
                            FormatString="0"

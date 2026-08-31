@@ -257,8 +257,20 @@ public sealed partial class ProbeRunnerViewModel : ObservableObject
     [RelayCommand]
     private void UseAgent(string name) => Target = name;
 
+    /// <summary>Открыт ли список инвентаря под полем цели.</summary>
+    [ObservableProperty]
+    private bool _isPickerOpen;
+
+    // Кнопка только открывает: закрытие — выбором или щелчком мимо (light dismiss).
     [RelayCommand]
-    private void UseSuggestion(TargetSuggestion suggestion) => Target = suggestion.Address;
+    private void OpenPicker() => IsPickerOpen = true;
+
+    [RelayCommand]
+    private void UseSuggestion(TargetSuggestion suggestion)
+    {
+        Target = suggestion.Address;
+        IsPickerOpen = false;
+    }
 
     [RelayCommand(CanExecute = nameof(CanStart))]
     private async Task StartAsync()

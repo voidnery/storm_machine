@@ -178,8 +178,20 @@ public sealed partial class PathPageViewModel : PageViewModel, ITargetAware
     /// <summary>Подсказки цели из инвентаря (И-24): сеть просканирована — подставляем.</summary>
     public System.Collections.ObjectModel.ObservableCollection<TargetSuggestion> Suggestions { get; } = [];
 
+    /// <summary>Открыт ли список инвентаря под полем цели.</summary>
+    [ObservableProperty]
+    private bool _isPickerOpen;
+
+    // Кнопка только открывает: закрытие — выбором или щелчком мимо (light dismiss).
     [RelayCommand]
-    private void UseSuggestion(TargetSuggestion suggestion) => TargetText = suggestion.Address;
+    private void OpenPicker() => IsPickerOpen = true;
+
+    [RelayCommand]
+    private void UseSuggestion(TargetSuggestion suggestion)
+    {
+        TargetText = suggestion.Address;
+        IsPickerOpen = false;
+    }
 
     public override void Deactivate() => _timer.Stop();
 
