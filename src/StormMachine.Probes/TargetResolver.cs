@@ -59,7 +59,7 @@ public sealed class TargetResolver(INetworkEnvironment environment)
 
             case TargetKind.ExternalIp:
                 throw new NotSupportedException(
-                    "Определение внешнего адреса появится в итерации И-11.");
+                    "Внешний адрес — не цель одиночной пробы. Его показывает storm outside.");
 
             default:
                 throw new NotSupportedException($"Неизвестный вид цели: {target.Kind}");

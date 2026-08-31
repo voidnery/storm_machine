@@ -34,15 +34,19 @@ public abstract partial class PageViewModel : ObservableObject
     }
 }
 
-/// <summary>Страница раздела, который ещё не сделан.</summary>
+/// <summary>Страница раздела, у которого нет экранной формы.</summary>
 /// <remarks>
 /// Недоступное не прячется, а объясняется — UX-принцип 6 (docs/01-analysis.md §9.5).
+/// Возможность при этом в продукте есть: страница называет консольные команды,
+/// которыми она делается сегодня.
 /// </remarks>
 public sealed class PlaceholderPageViewModel(NavigationSection section) : PageViewModel(section)
 {
     public string Availability => Section.Availability;
 
+    public string? ConsoleCommands => Section.ConsoleCommands;
+
     public static string Explanation =>
-        "Раздел показан заранее намеренно: недоступное не прячется, а объясняется. "
-        + "Порядок итераций описан в docs/03-development-plan.md.";
+        "Раздел показан, а не спрятан: недоступное объясняется. Сама возможность "
+        + "в продукте есть — ею пользуются из консоли командами выше.";
 }

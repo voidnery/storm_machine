@@ -55,9 +55,7 @@
           <TextBlock Text="Окна обслуживания" FontSize="13" FontWeight="SemiBold" />
 
           <TextBlock FontSize="10" Opacity="0.5" TextWrapping="Wrap"
-                     Text="В окне проверки не идут, и это время исключается из расчёта доступности.
-                           Считать плановые работы простоем — завышать нарушение SLA, считать их
-                           работой — занижать." />
+                     Text="В окне проверки не идут, и это время исключается из расчёта доступности. Считать плановые работы простоем — завышать нарушение SLA, считать их работой — занижать." />
 
           <ItemsControl ItemsSource="{Binding Maintenance}">
             <ItemsControl.ItemTemplate>

@@ -13,6 +13,11 @@
         <StackPanel Spacing="8">
           <TextBlock Text="Состояние раздела" FontWeight="SemiBold" Opacity="0.7" FontSize="12" />
           <TextBlock Text="{Binding Availability}" FontSize="15" />
+          <Border Padding="10,8" CornerRadius="4" Background="#232B3B"
+                  IsVisible="{Binding ConsoleCommands, Converter={x:Static ObjectConverters.IsNotNull}}">
+            <TextBlock Text="{Binding ConsoleCommands}" FontSize="12" TextWrapping="Wrap"
+                       LineHeight="18" FontFamily="Consolas,Menlo,monospace" />
+          </Border>
           <TextBlock Text="{Binding Explanation}" TextWrapping="Wrap" FontSize="13" Opacity="0.6" />
         </StackPanel>
       </Border>

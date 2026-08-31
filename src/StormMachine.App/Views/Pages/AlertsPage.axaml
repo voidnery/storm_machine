@@ -84,8 +84,7 @@
             </ItemsControl>
 
             <TextBlock FontSize="10" Opacity="0.45" TextWrapping="Wrap"
-                       Text="Настраиваются из консоли: storm alerts set. Пароли хранятся зашифрованными
-                             средствами Windows и привязаны к этой учётной записи." />
+                       Text="Настраиваются из консоли: storm alerts set. Пароли хранятся зашифрованными средствами Windows и привязаны к этой учётной записи." />
           </StackPanel>
         </ScrollViewer>
       </Border>

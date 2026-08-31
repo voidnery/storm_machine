@@ -98,7 +98,7 @@
               <StackPanel Spacing="1" Margin="0,3">
                 <StackPanel Orientation="Horizontal" Spacing="6">
                   <TextBlock Text="{Binding Title}" FontSize="14" />
-                  <TextBlock Text="{Binding Iteration}" FontSize="10" Opacity="0.4"
+                  <TextBlock Text="консоль" FontSize="10" Opacity="0.4"
                              VerticalAlignment="Center"
                              IsVisible="{Binding !IsReady}" />
                 </StackPanel>
