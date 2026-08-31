@@ -225,8 +225,10 @@ public sealed partial class SnmpCredentialEditorViewModel : ObservableObject
     }
 
     public static string PasswordNote =>
-        "Пароли хранятся зашифрованными средствами Windows и привязаны к учётной записи. "
-        + "Перенос установки на другую машину их не переносит — и не восстанавливает.";
+        "Пароли хранятся зашифрованными средствами Windows и привязаны к учётной записи.";
+
+    public static string PasswordNoteWhy =>
+        "Перенос установки на другую машину их не переносит — и не восстанавливает.";
 
     public static string CommunityNote =>
         "Строка сообщества идёт по сети открытым текстом. Это метка, а не пароль: "

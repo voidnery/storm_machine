@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:StormMachine.App.ViewModels"
+             xmlns:controls="using:StormMachine.App.Controls"
              x:Class="StormMachine.App.Views.Pages.SettingsPage"
              x:DataType="vm:SettingsPageViewModel">
 
@@ -20,25 +21,26 @@
     </StackPanel>
 
     <ScrollViewer Grid.Row="1">
-      <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto" Margin="0,0,10,20">
+      <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto" Margin="0,0,10,20">
 
-        <!-- Карточки по смыслу (перестановка И-24 по замечанию оператора): сверху то,
-             что определяет измерения (профили) и опрос (SNMP); ниже — агенты и данные;
-             «О продукте» — отдельной полосой внизу. Сводка возможностей машины ушла
-             во временный раздел «Разработка»: в настройках — настройки. -->
-        <Border Grid.Row="0" Grid.Column="0" Margin="0,0,7,14"
-                Background="{StaticResource PanelBrush}" CornerRadius="6" Padding="16"
-                VerticalAlignment="Top">
+        <!-- Карточки по смыслу (перестановка И-24 по замечанию оператора): слева то,
+             что определяет измерения (профили) и вторую точку (агенты); справа опрос
+             оборудования и данные; «О продукте» — полосой внизу. Колонки независимы:
+             в сетке 2×2 высота строки равнялась высоте длинной карточки, и под
+             короткой зияла пустота в пол-экрана. -->
+        <StackPanel Grid.Row="0" Grid.Column="0" Spacing="14" Margin="0,0,7,14">
+
+        <Border Background="{StaticResource PanelBrush}" CornerRadius="6" Padding="16">
           <StackPanel Spacing="10">
 
-            <TextBlock Text="Профили окружения" FontSize="13" FontWeight="SemiBold" />
+            <TextBlock Text="Профили окружения" Classes="h2" />
 
-            <TextBlock FontSize="10" Foreground="{StaticResource TextMutedBrush}" TextWrapping="Wrap" LineHeight="15"
-                       Text="Порог 50 мс, разумный в офисе, бессмыслен для канала до филиала через VPN. Активный профиль пишется в условия каждого измерения — иначе через полгода отличить замер у заказчика от замера в офисе будет нечем." />
+            <controls:MethodCard Thesis="Порог 50 мс, разумный в офисе, бессмыслен для канала до филиала через VPN."
+                                 Detail="Активный профиль пишется в условия каждого измерения — иначе через полгода отличить замер у заказчика от замера в офисе будет нечем." />
 
             <StackPanel Spacing="2">
-              <TextBlock Text="Приметы текущей сети" FontSize="10" Foreground="{StaticResource TextSecondaryBrush}" />
-              <TextBlock Text="{Binding CurrentSignature}" FontSize="11" TextWrapping="Wrap" />
+              <TextBlock Text="Приметы текущей сети" Classes="caption" />
+              <TextBlock Text="{Binding CurrentSignature}" Classes="label" TextWrapping="Wrap" />
             </StackPanel>
 
             <Button Content="Узнать, где мы" Command="{Binding DetectCommand}" Padding="12,5"
@@ -82,134 +84,13 @@
                       Padding="12,5" Margin="6,0,0,0" />
             </Grid>
 
-            <TextBlock FontSize="10" Foreground="{StaticResource TextMutedBrush}" TextWrapping="Wrap" LineHeight="15"
-                       Text="Продукт узнаёт сеть, но не переключает профиль сам: смена профиля меняет пороги и состав работающих мониторов, а делать это молча значит поменять смысл измерений за спиной оператора." />
+            <controls:MethodCard Thesis="Продукт узнаёт сеть, но не переключает профиль сам."
+                                 Detail="Смена профиля меняет пороги и состав работающих мониторов, а делать это молча значит поменять смысл измерений за спиной оператора." />
 
           </StackPanel>
         </Border>
 
-        <Border Grid.Row="0" Grid.Column="1" Margin="7,0,0,14"
-                Background="{StaticResource PanelBrush}" CornerRadius="6" Padding="16"
-                VerticalAlignment="Top">
-          <StackPanel Spacing="10">
-
-            <Grid ColumnDefinitions="*,Auto">
-              <TextBlock Grid.Column="0" Text="Учётные данные SNMP" FontSize="13" FontWeight="SemiBold" />
-              <Button Grid.Column="1" Content="Завести" Padding="10,3" FontSize="11"
-                      Command="{Binding ToggleCredentialEditorCommand}" />
-            </Grid>
-
-            <TextBlock Text="{x:Static vm:SettingsPageViewModel.SnmpNote}" FontSize="10" Foreground="{StaticResource TextMutedBrush}"
-                       TextWrapping="Wrap" LineHeight="15" />
-
-            <TextBlock Text="Наборов нет — опрашивать оборудование нечем." FontSize="11" Foreground="{StaticResource TextMutedBrush}"
-                       IsVisible="{Binding !Credentials.Count}" />
-
-            <ListBox ItemsSource="{Binding Credentials}" SelectedItem="{Binding SelectedCredential}"
-                     Background="Transparent" BorderThickness="0" MaxHeight="160"
-                     IsVisible="{Binding Credentials.Count}">
-              <ListBox.ItemTemplate>
-                <DataTemplate x:DataType="vm:CredentialRow">
-                  <Grid ColumnDefinitions="*,Auto" Margin="0,3">
-                    <StackPanel Grid.Column="0" Spacing="1">
-                      <TextBlock Text="{Binding Name}" FontSize="12" TextTrimming="CharacterEllipsis" />
-                      <TextBlock Text="{Binding About}" FontSize="10" Foreground="{StaticResource TextMutedBrush}"
-                                 TextTrimming="CharacterEllipsis" />
-                    </StackPanel>
-
-                    <!-- Защищает набор что-нибудь или нет — видно сразу: строка сообщества
-                         идёт открытым текстом и защитой не является. -->
-                    <TextBlock Grid.Column="1" Text="открыто" FontSize="10" VerticalAlignment="Center"
-                               Foreground="{StaticResource WarningBrush}"
-                               IsVisible="{Binding !IsProtected}" />
-                  </Grid>
-                </DataTemplate>
-              </ListBox.ItemTemplate>
-            </ListBox>
-
-            <!-- Форма набора -->
-            <Border Padding="12,10" CornerRadius="4" Background="{StaticResource TileBrush}"
-                    IsVisible="{Binding IsCredentialEditorOpen}">
-              <StackPanel Spacing="8" DataContext="{Binding Editor}">
-                <StackPanel x:DataType="vm:SnmpCredentialEditorViewModel" Spacing="8">
-
-                  <TextBox PlaceholderText="имя набора: «свитчи», «ядро»" Text="{Binding Name}" />
-
-                  <ComboBox ItemsSource="{Binding Versions}" SelectedItem="{Binding Version}"
-                            HorizontalAlignment="Stretch" />
-
-                  <StackPanel Spacing="4" IsVisible="{Binding IsCommunity}">
-                    <TextBox PlaceholderText="строка сообщества" Text="{Binding Community}"
-                             PasswordChar="•" />
-                    <TextBlock Text="{x:Static vm:SnmpCredentialEditorViewModel.CommunityNote}"
-                               FontSize="10" Foreground="{StaticResource TextMutedBrush}" TextWrapping="Wrap" LineHeight="15" />
-                  </StackPanel>
-
-                  <StackPanel Spacing="6" IsVisible="{Binding IsV3}">
-                    <TextBox PlaceholderText="имя пользователя" Text="{Binding UserName}" />
-
-                    <ComboBox ItemsSource="{Binding Auths}" SelectedItem="{Binding Auth}"
-                              HorizontalAlignment="Stretch" />
-                    <TextBox PlaceholderText="пароль проверки подлинности" Text="{Binding AuthPassword}"
-                             PasswordChar="•" IsVisible="{Binding NeedsAuthPassword}" />
-
-                    <ComboBox ItemsSource="{Binding Privacies}" SelectedItem="{Binding Privacy}"
-                              HorizontalAlignment="Stretch" />
-                    <TextBox PlaceholderText="пароль шифрования" Text="{Binding PrivacyPassword}"
-                             PasswordChar="•" IsVisible="{Binding NeedsPrivacyPassword}" />
-                  </StackPanel>
-
-                  <Grid ColumnDefinitions="*,8,*">
-                    <StackPanel Grid.Column="0" Spacing="2">
-                      <TextBlock Text="Порт" FontSize="10" Foreground="{StaticResource TextSecondaryBrush}" />
-                      <NumericUpDown Value="{Binding Port}" Minimum="1" Maximum="65535" Increment="1"
-                                     FormatString="0" />
-                    </StackPanel>
-                    <StackPanel Grid.Column="2" Spacing="2">
-                      <TextBlock Text="Порядок перебора" FontSize="10" Foreground="{StaticResource TextSecondaryBrush}" />
-                      <NumericUpDown Value="{Binding Order}" Minimum="0" Maximum="99" Increment="1"
-                                     FormatString="0" />
-                    </StackPanel>
-                  </Grid>
-
-                  <TextBlock Text="{x:Static vm:SnmpCredentialEditorViewModel.PasswordNote}"
-                             FontSize="10" Foreground="{StaticResource TextMutedBrush}" TextWrapping="Wrap" LineHeight="15" />
-
-                  <Border Padding="10,8" CornerRadius="3" Background="{StaticResource InsetBrush}">
-                    <TextBlock Text="{Binding Preview}" FontSize="11" TextWrapping="Wrap" LineHeight="16" />
-                  </Border>
-                </StackPanel>
-              </StackPanel>
-            </Border>
-
-            <Grid ColumnDefinitions="*,Auto" IsVisible="{Binding IsCredentialEditorOpen}">
-              <Button Grid.Column="0" Content="Отмена" Padding="12,5" HorizontalAlignment="Left"
-                      Command="{Binding ToggleCredentialEditorCommand}" />
-              <Button Grid.Column="1" Content="Завести набор" Padding="14,5"
-                      Background="{StaticResource AccentBrush}" Foreground="White"
-                      Command="{Binding AddCredentialCommand}" />
-            </Grid>
-
-            <Grid ColumnDefinitions="*,Auto,Auto">
-              <TextBox Grid.Column="0" PlaceholderText="адрес устройства для проверки"
-                       Text="{Binding ProbeHost}" />
-              <Button Grid.Column="1" Content="Проверить" Padding="12,5" Margin="6,0,6,0"
-                      Command="{Binding ProbeCommand}" />
-              <Button Grid.Column="2" Content="Удалить" Padding="12,5"
-                      Command="{Binding DeleteCredentialCommand}" />
-            </Grid>
-
-            <Border Padding="10,8" CornerRadius="4" Background="{StaticResource TileBrush}"
-                    IsVisible="{Binding ProbeResult, Converter={x:Static ObjectConverters.IsNotNull}}">
-              <TextBlock Text="{Binding ProbeResult}" FontSize="11" TextWrapping="Wrap" LineHeight="16" />
-            </Border>
-
-          </StackPanel>
-        </Border>
-
-        <Border Grid.Row="1" Grid.Column="0" Margin="0,0,7,14"
-                Background="{StaticResource PanelBrush}" CornerRadius="6" Padding="16"
-                VerticalAlignment="Top">
+        <Border Background="{StaticResource PanelBrush}" CornerRadius="6" Padding="16">
           <StackPanel Spacing="10">
 
             <!-- Агенты.
@@ -223,20 +104,19 @@
             <StackPanel Spacing="10" DataContext="{Binding Agents}">
               <StackPanel x:DataType="vm:AgentsSectionViewModel" Spacing="10">
 
-                <TextBlock Text="Агенты" FontSize="13" FontWeight="SemiBold" />
+                <TextBlock Text="Агенты" Classes="h2" />
 
-                <TextBlock FontSize="10" Foreground="{StaticResource TextMutedBrush}" TextWrapping="Wrap" LineHeight="15"
-                           Text="Вторая точка измерения. Без неё пропускная способность, качество канала и задержка под нагрузкой измерены быть не могут: скорость между точками требует двух точек." />
+                <controls:MethodCard Thesis="Вторая точка измерения."
+                                     Detail="Без неё пропускная способность, качество канала и задержка под нагрузкой измерены быть не могут: скорость между точками требует двух точек." />
 
-                <StackPanel Spacing="2"
+                <StackPanel Spacing="3"
                             IsVisible="{Binding OwnThumbprint, Converter={x:Static ObjectConverters.IsNotNull}}">
-                  <TextBlock Text="Наш отпечаток — его называют тому, кто у агента" FontSize="10"
-                             Foreground="{StaticResource TextSecondaryBrush}" />
-                  <TextBlock Text="{Binding OwnThumbprint}" FontSize="11" FontFamily="Consolas"
-                             TextWrapping="Wrap" />
+                  <TextBlock Text="Наш отпечаток — его называют тому, кто у агента" Classes="caption" />
+                  <!-- Отпечаток диктуют по телефону или шлют сообщением: чип копируется -->
+                  <controls:CopyChip Text="{Binding OwnThumbprint}" />
                 </StackPanel>
 
-                <TextBlock Text="Сопряжённых агентов нет." FontSize="11" Foreground="{StaticResource TextMutedBrush}"
+                <TextBlock Text="Сопряжённых агентов нет." Classes="label"
                            IsVisible="{Binding !HasAgents}" />
 
                 <ListBox ItemsSource="{Binding Agents}" SelectedItem="{Binding Selected}"
@@ -265,13 +145,13 @@
 
                 <Border Height="1" Background="{StaticResource DividerBrush}" Margin="0,2" />
 
-                <TextBlock Text="Сопрячь новый" FontSize="11" FontWeight="SemiBold" />
+                <TextBlock Text="Сопрячь новый" Classes="label" FontWeight="SemiBold" />
 
                 <!-- Два способа, потому что соединение устанавливает любая сторона:
                      входящие на Windows заблокированы по умолчанию, а правило требует
                      администратора. Где прав нет — звонит агент. -->
-                <TextBlock FontSize="10" Foreground="{StaticResource TextMutedBrush}" TextWrapping="Wrap" LineHeight="15"
-                           Text="Звонить самим — когда на машине агента разрешены входящие. Ждать звонка — когда прав там нет: исходящие разрешены всегда." />
+                <controls:MethodCard Thesis="Звонить самим — когда на машине агента разрешены входящие."
+                                     Detail="Ждать звонка — когда прав там нет: исходящие разрешены всегда." />
 
                 <Grid ColumnDefinitions="*,Auto">
                   <TextBox Grid.Column="0" PlaceholderText="адрес агента или адрес:порт"
@@ -316,9 +196,10 @@
                 <!-- Ход сопряжения показывается здесь, а не уходит в консоль:
                      у графического клиента её нет. Именно так в И-19 пропадала
                      просьба «набери на второй машине вот это». -->
-                <Border Padding="10,8" CornerRadius="4" Background="{StaticResource TileBrush}"
+                <Border Classes="tile" Padding="10,8"
                         IsVisible="{Binding Progress, Converter={x:Static ObjectConverters.IsNotNull}}">
-                  <TextBlock Text="{Binding Progress}" FontSize="11" TextWrapping="Wrap" LineHeight="16" />
+                  <TextBlock Text="{Binding Progress}" Classes="label" Foreground="{StaticResource TextBrush}"
+                             TextWrapping="Wrap" LineHeight="16" />
                 </Border>
 
                 <TextBlock Text="{Binding Message}" FontSize="11" Foreground="{StaticResource SuccessBrush}" TextWrapping="Wrap"
@@ -327,36 +208,171 @@
                            TextWrapping="Wrap"
                            IsVisible="{Binding Error, Converter={x:Static ObjectConverters.IsNotNull}}" />
 
-                <TextBlock FontSize="10" Foreground="{StaticResource TextMutedBrush}" TextWrapping="Wrap" LineHeight="15"
-                           Text="Отпечаток сверяется глазами и всегда. Объявление о себе в сети подделать может кто угодно: поиск избавляет от набора адреса и только от этого." />
+                <controls:Caveat Text="Отпечаток сверяется глазами и всегда: объявление о себе в сети подделать может кто угодно, и поиск избавляет от набора адреса — только от этого." />
 
               </StackPanel>
             </StackPanel>
 
           </StackPanel>
         </Border>
+        </StackPanel>
 
-        <Border Grid.Row="1" Grid.Column="1" Margin="7,0,0,14"
-                Background="{StaticResource PanelBrush}" CornerRadius="6" Padding="16"
-                VerticalAlignment="Top">
+        <StackPanel Grid.Row="0" Grid.Column="1" Spacing="14" Margin="7,0,0,14">
+
+        <Border Background="{StaticResource PanelBrush}" CornerRadius="6" Padding="16">
           <StackPanel Spacing="10">
 
-            <TextBlock Text="Хранилище" FontSize="13" FontWeight="SemiBold" />
+            <Grid ColumnDefinitions="*,Auto">
+              <TextBlock Grid.Column="0" Text="Учётные данные SNMP" Classes="h2" />
+              <Button Grid.Column="1" Content="Завести" Padding="10,3" FontSize="11"
+                      Command="{Binding ToggleCredentialEditorCommand}" />
+            </Grid>
 
-            <SelectableTextBlock Text="{Binding DatabasePath}" FontSize="11" TextWrapping="Wrap"
-                                 FontFamily="Consolas,Menlo,monospace" />
+            <controls:MethodCard Thesis="{x:Static vm:SettingsPageViewModel.SnmpNote}"
+                                 Detail="{x:Static vm:SettingsPageViewModel.SnmpNoteWhy}" />
 
-            <TextBlock Text="{x:Static vm:SettingsPageViewModel.StorageHint}" FontSize="10" Foreground="{StaticResource TextMutedBrush}"
-                       TextWrapping="Wrap" LineHeight="15" />
+            <TextBlock Text="Наборов нет — опрашивать оборудование нечем." Classes="label"
+                       IsVisible="{Binding !Credentials.Count}" />
+
+            <ListBox ItemsSource="{Binding Credentials}" SelectedItem="{Binding SelectedCredential}"
+                     Background="Transparent" BorderThickness="0" MaxHeight="160"
+                     IsVisible="{Binding Credentials.Count}">
+              <ListBox.ItemTemplate>
+                <DataTemplate x:DataType="vm:CredentialRow">
+                  <Grid ColumnDefinitions="*,Auto" Margin="0,3">
+                    <StackPanel Grid.Column="0" Spacing="1">
+                      <TextBlock Text="{Binding Name}" FontSize="12" TextTrimming="CharacterEllipsis" />
+                      <TextBlock Text="{Binding About}" FontSize="10" Foreground="{StaticResource TextMutedBrush}"
+                                 TextTrimming="CharacterEllipsis" />
+                    </StackPanel>
+
+                    <!-- Защищает набор что-нибудь или нет — видно сразу: строка сообщества
+                         идёт открытым текстом и защитой не является. -->
+                    <TextBlock Grid.Column="1" Text="открыто" FontSize="10" VerticalAlignment="Center"
+                               Foreground="{StaticResource WarningBrush}"
+                               IsVisible="{Binding !IsProtected}" />
+                  </Grid>
+                </DataTemplate>
+              </ListBox.ItemTemplate>
+            </ListBox>
+
+            <!-- Форма набора -->
+            <Border Padding="12,10" CornerRadius="4" Background="{StaticResource TileBrush}"
+                    IsVisible="{Binding IsCredentialEditorOpen}">
+              <StackPanel Spacing="8" DataContext="{Binding Editor}">
+                <StackPanel x:DataType="vm:SnmpCredentialEditorViewModel" Spacing="8">
+
+                  <TextBox PlaceholderText="имя набора: «свитчи», «ядро»" Text="{Binding Name}" />
+
+                  <ComboBox ItemsSource="{Binding Versions}" SelectedItem="{Binding Version}"
+                            HorizontalAlignment="Stretch" />
+
+                  <StackPanel Spacing="6" IsVisible="{Binding IsCommunity}">
+                    <TextBox PlaceholderText="строка сообщества" Text="{Binding Community}"
+                             PasswordChar="•" />
+                    <!-- Не методика, а оговорка: набор со строкой сообщества ничего
+                         не защищает, и сказать об этом надо голосом предупреждения. -->
+                    <controls:Caveat Text="{x:Static vm:SnmpCredentialEditorViewModel.CommunityNote}" />
+                  </StackPanel>
+
+                  <StackPanel Spacing="6" IsVisible="{Binding IsV3}">
+                    <TextBox PlaceholderText="имя пользователя" Text="{Binding UserName}" />
+
+                    <ComboBox ItemsSource="{Binding Auths}" SelectedItem="{Binding Auth}"
+                              HorizontalAlignment="Stretch" />
+                    <TextBox PlaceholderText="пароль проверки подлинности" Text="{Binding AuthPassword}"
+                             PasswordChar="•" IsVisible="{Binding NeedsAuthPassword}" />
+
+                    <ComboBox ItemsSource="{Binding Privacies}" SelectedItem="{Binding Privacy}"
+                              HorizontalAlignment="Stretch" />
+                    <TextBox PlaceholderText="пароль шифрования" Text="{Binding PrivacyPassword}"
+                             PasswordChar="•" IsVisible="{Binding NeedsPrivacyPassword}" />
+                  </StackPanel>
+
+                  <Grid ColumnDefinitions="*,8,*">
+                    <StackPanel Grid.Column="0" Spacing="2">
+                      <TextBlock Text="Порт" FontSize="10" Foreground="{StaticResource TextSecondaryBrush}" />
+                      <NumericUpDown Value="{Binding Port}" Minimum="1" Maximum="65535" Increment="1"
+                                     FormatString="0" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="2" Spacing="2">
+                      <TextBlock Text="Порядок перебора" FontSize="10" Foreground="{StaticResource TextSecondaryBrush}" />
+                      <NumericUpDown Value="{Binding Order}" Minimum="0" Maximum="99" Increment="1"
+                                     FormatString="0" />
+                    </StackPanel>
+                  </Grid>
+
+                  <controls:MethodCard Thesis="{x:Static vm:SnmpCredentialEditorViewModel.PasswordNote}"
+                                       Detail="{x:Static vm:SnmpCredentialEditorViewModel.PasswordNoteWhy}" />
+
+                  <Border Classes="inset" Padding="10,8">
+                    <TextBlock Text="{Binding Preview}" Classes="label" Foreground="{StaticResource TextBrush}"
+                               TextWrapping="Wrap" LineHeight="16" />
+                  </Border>
+                </StackPanel>
+              </StackPanel>
+            </Border>
+
+            <Grid ColumnDefinitions="*,Auto" IsVisible="{Binding IsCredentialEditorOpen}">
+              <Button Grid.Column="0" Content="Отмена" Padding="12,5" HorizontalAlignment="Left"
+                      Command="{Binding ToggleCredentialEditorCommand}" />
+              <Button Grid.Column="1" Content="Завести набор" Padding="14,5"
+                      Background="{StaticResource AccentBrush}" Foreground="White"
+                      Command="{Binding AddCredentialCommand}" />
+            </Grid>
+
+            <Grid ColumnDefinitions="*,Auto,Auto">
+              <TextBox Grid.Column="0" PlaceholderText="адрес устройства для проверки"
+                       Text="{Binding ProbeHost}" />
+              <Button Grid.Column="1" Content="Проверить" Padding="12,5" Margin="6,0,6,0"
+                      Command="{Binding ProbeCommand}" />
+              <Button Grid.Column="2" Content="Удалить" Padding="12,5"
+                      Command="{Binding DeleteCredentialCommand}" />
+            </Grid>
+
+            <Border Classes="tile" Padding="10,8"
+                    IsVisible="{Binding ProbeResult, Converter={x:Static ObjectConverters.IsNotNull}}">
+              <TextBlock Text="{Binding ProbeResult}" Classes="label" Foreground="{StaticResource TextBrush}"
+                         TextWrapping="Wrap" LineHeight="16" />
+            </Border>
+
+          </StackPanel>
+        </Border>
+
+        <Border Background="{StaticResource PanelBrush}" CornerRadius="6" Padding="16">
+          <StackPanel Spacing="10">
+
+            <TextBlock Text="Хранилище" Classes="h2" />
+
+            <controls:CopyChip Text="{Binding DatabasePath}" />
+
+            <controls:MethodCard Thesis="{x:Static vm:SettingsPageViewModel.StorageNote}"
+                                 Detail="{x:Static vm:SettingsPageViewModel.StorageNoteWhy}" />
+
+            <!-- Два способа назвать другой файл — чипами: их набирают руками
+                 и ошибаются в имени переменной. -->
+            <StackPanel Spacing="4">
+              <TextBlock Text="Другой файл базы задаётся так" Classes="caption" />
+              <WrapPanel>
+                <controls:CopyChip Text="{x:Static vm:SettingsPageViewModel.StoragePathVariable}"
+                                   Margin="0,0,6,4" />
+                <controls:CopyChip Text="--база" Margin="0,0,6,4" />
+              </WrapPanel>
+            </StackPanel>
 
             <!-- Политика хранения. До И-24 жила только умолчаниями и ключами консоли. -->
             <StackPanel Spacing="10" DataContext="{Binding Retention}">
               <StackPanel x:DataType="vm:RetentionSectionViewModel" Spacing="10">
 
-                <TextBlock Text="Политика хранения" FontSize="12" FontWeight="SemiBold" />
+                <TextBlock Text="Политика хранения" Classes="h2" />
 
-                <TextBlock Text="{x:Static vm:RetentionSectionViewModel.Note}" FontSize="10" Foreground="{StaticResource TextMutedBrush}"
-                           TextWrapping="Wrap" LineHeight="15" />
+                <controls:MethodCard Thesis="{x:Static vm:RetentionSectionViewModel.Note}"
+                                     Detail="{x:Static vm:RetentionSectionViewModel.NoteWhy}" />
+
+                <StackPanel Spacing="4">
+                  <TextBlock Text="Та же уборка из консоли" Classes="caption" />
+                  <controls:CopyChip Text="{x:Static vm:RetentionSectionViewModel.PurgeCommand}" />
+                </StackPanel>
 
                 <Grid ColumnDefinitions="*,8,*">
                   <StackPanel Grid.Column="0" Spacing="2">
@@ -398,10 +414,20 @@
             <StackPanel Spacing="10" DataContext="{Binding Transfer}">
               <StackPanel x:DataType="vm:TransferSectionViewModel" Spacing="10">
 
-                <TextBlock Text="Перенос настроек" FontSize="13" FontWeight="SemiBold" />
+                <TextBlock Text="Перенос настроек" Classes="h2" />
 
-                <TextBlock Text="{x:Static vm:TransferSectionViewModel.Note}" FontSize="10" Foreground="{StaticResource TextMutedBrush}"
-                           TextWrapping="Wrap" LineHeight="15" />
+                <controls:MethodCard Thesis="{x:Static vm:TransferSectionViewModel.Note}"
+                                     Detail="{x:Static vm:TransferSectionViewModel.NoteWhy}" />
+
+                <!-- Чего перенос не делает — голосом предупреждения, а рядом команды,
+                     которыми заводят заново то, что не переехало. -->
+                <controls:Caveat Text="{x:Static vm:TransferSectionViewModel.SecretsCaveat}" />
+                <WrapPanel>
+                  <controls:CopyChip Text="{x:Static vm:TransferSectionViewModel.SnmpCredsCommand}"
+                                     Margin="0,0,6,4" />
+                  <controls:CopyChip Text="{x:Static vm:TransferSectionViewModel.AlertsCommand}"
+                                     Margin="0,0,6,4" />
+                </WrapPanel>
 
                 <Grid ColumnDefinitions="Auto,Auto,*">
                   <Button Grid.Column="0" Content="Выгрузить в файл" Command="{Binding ExportCommand}"
@@ -424,27 +450,25 @@
 
           </StackPanel>
         </Border>
+        </StackPanel>
 
         <!-- О продукте — полосой на всю ширину: это справка, а не настройка. -->
-        <Border Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2"
+        <Border Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2"
                 Background="{StaticResource PanelBrush}" CornerRadius="6" Padding="16">
           <StackPanel Spacing="10">
 
-            <TextBlock Text="О продукте" FontSize="13" FontWeight="SemiBold" />
+            <TextBlock Text="О продукте" Classes="h2" />
 
-            <StackPanel Spacing="2">
-              <TextBlock Text="Версия" FontSize="10" Foreground="{StaticResource TextSecondaryBrush}" />
-              <SelectableTextBlock Text="{x:Static vm:SettingsPageViewModel.Version}" FontSize="11"
-                                   FontFamily="Consolas,Menlo,monospace" />
+            <StackPanel Spacing="3">
+              <TextBlock Text="Версия" Classes="caption" />
+              <controls:CopyChip Text="{x:Static vm:SettingsPageViewModel.Version}" />
             </StackPanel>
 
-            <StackPanel Spacing="5">
-              <TextBlock Text="Обновление" FontSize="10" Foreground="{StaticResource TextSecondaryBrush}" />
-              <TextBlock Text="{Binding Updates.StateText}" FontSize="11" TextWrapping="Wrap" LineHeight="16" />
+            <StackPanel Spacing="6">
+              <TextBlock Text="Обновление" Classes="caption" />
+              <TextBlock Text="{Binding Updates.StateText}" Classes="label" TextWrapping="Wrap" LineHeight="16" />
 
-              <TextBlock Text="{Binding Updates.Hold}" FontSize="10" TextWrapping="Wrap" LineHeight="15"
-                         Foreground="{StaticResource WarningBrush}"
-                         IsVisible="{Binding Updates.Hold, Converter={x:Static ObjectConverters.IsNotNull}}" />
+              <controls:Caveat Text="{Binding Updates.Hold}" />
 
               <Grid ColumnDefinitions="Auto,Auto,Auto">
                 <Button Grid.Column="0" Content="Проверить" Padding="12,5" Margin="0,0,6,0"
@@ -456,12 +480,12 @@
                         Background="{StaticResource AccentBrush}" Foreground="White" />
               </Grid>
 
-              <TextBlock Text="{x:Static vm:SettingsPageViewModel.UpdateNote}" FontSize="10" Foreground="{StaticResource TextMutedBrush}"
-                         TextWrapping="Wrap" LineHeight="15" />
+              <controls:MethodCard Thesis="{x:Static vm:SettingsPageViewModel.UpdateNote}"
+                                   Detail="{x:Static vm:SettingsPageViewModel.UpdateNoteWhy}" />
             </StackPanel>
 
-            <TextBlock Text="{x:Static vm:SettingsPageViewModel.LicenceNote}" FontSize="10" Foreground="{StaticResource TextMutedBrush}"
-                       TextWrapping="Wrap" LineHeight="15" />
+            <controls:MethodCard Thesis="{x:Static vm:SettingsPageViewModel.LicenceNote}"
+                                 Detail="{x:Static vm:SettingsPageViewModel.LicenceNoteWhy}" />
 
           </StackPanel>
         </Border>

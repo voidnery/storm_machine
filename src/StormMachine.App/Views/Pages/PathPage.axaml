@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:StormMachine.App.ViewModels"
+             xmlns:controls="using:StormMachine.App.Controls"
              xmlns:results="using:StormMachine.Domain.Results"
              x:Class="StormMachine.App.Views.Pages.PathPage"
              x:DataType="vm:PathPageViewModel">
@@ -28,10 +29,21 @@
 
   <Grid RowDefinitions="Auto,Auto,Auto,Auto,*" Margin="24,20">
 
-    <!-- Заголовок -->
-    <StackPanel Grid.Row="0" Spacing="4">
-      <TextBlock Text="{Binding Title}" FontSize="24" FontWeight="SemiBold" />
-      <TextBlock Text="{Binding MeasurementConditions}" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" />
+    <!-- Заголовок с условиями измерения бейджами -->
+    <StackPanel Grid.Row="0" Spacing="6">
+      <TextBlock Text="{Binding Title}" Classes="h1" />
+      <ItemsControl ItemsSource="{Binding Conditions}">
+        <ItemsControl.ItemsPanel>
+          <ItemsPanelTemplate>
+            <WrapPanel />
+          </ItemsPanelTemplate>
+        </ItemsControl.ItemsPanel>
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="vm:ConditionRow">
+            <controls:ConditionBadge Label="{Binding Label}" Value="{Binding Value}" Margin="0,0,6,4" />
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
     </StackPanel>
 
     <!-- Предупреждение об окружении -->
@@ -129,14 +141,16 @@
         </Grid>
 
         <Grid ColumnDefinitions="Auto,220,Auto,*">
-          <TextBlock Grid.Column="0" Text="Сохранить как пресет:" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}"
+          <TextBlock Grid.Column="0" Text="Сохранить как пресет:" Classes="body"
+                     Foreground="{StaticResource TextSecondaryBrush}"
                      VerticalAlignment="Center" Margin="0,0,10,0" />
           <TextBox Grid.Column="1" Text="{Binding PresetName}" PlaceholderText="имя пресета" FontSize="12" />
           <Button Grid.Column="2" Content="Сохранить" Command="{Binding SaveAsPresetCommand}"
                   FontSize="12" Padding="12,5" Margin="8,0,0,0" />
-          <TextBlock Grid.Column="3" Text="{Binding StatusLine}" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}"
-                     VerticalAlignment="Center" Margin="16,0,0,0" TextTrimming="CharacterEllipsis" />
         </Grid>
+
+        <!-- Статусу — постоянное место под панелью запуска -->
+        <controls:StatusLine Text="{Binding StatusLine}" State="{Binding StatusState}" />
 
         <TextBlock Text="{Binding ErrorMessage}" FontSize="12"
                    Foreground="{StaticResource DangerBrush}" TextWrapping="Wrap"
@@ -147,28 +161,25 @@
     <!-- Итог: то, ради чего трассировку и открывают -->
     <Border Grid.Row="3" Margin="0,12,0,0" Padding="14,10" CornerRadius="6"
             Background="{StaticResource PanelBrush}">
+      <!-- Четыре разножанровые строки развели по формам: вердикт со знаком уровня,
+           деградация — оговоркой, объяснение непостоянной длины пути — карточкой
+           «почему так». Раньше всё это шло одинаковым серым столбиком. -->
       <Grid ColumnDefinitions="*,Auto,Auto">
-        <StackPanel Grid.Column="0" Spacing="3" Margin="0,0,16,0">
-          <TextBlock Text="{Binding Verdict}" FontSize="13" TextWrapping="Wrap" />
-          <TextBlock Text="{Binding Degradation}" FontSize="12" TextWrapping="Wrap"
-                     Foreground="{StaticResource DangerBrush}"
-                     IsVisible="{Binding Degradation, Converter={x:Static ObjectConverters.IsNotNull}}" />
-          <TextBlock Text="{Binding PathLengthNote}" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap"
-                     IsVisible="{Binding PathLengthNote, Converter={x:Static ObjectConverters.IsNotNull}}" />
-          <TextBlock Text="{Binding RouteChanges}" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap"
+        <StackPanel Grid.Column="0" Spacing="6" Margin="0,0,16,0">
+          <controls:VerdictLine Text="{Binding Verdict}" Level="{Binding VerdictLevel}" />
+          <controls:Caveat Text="{Binding Degradation}" />
+          <controls:MethodCard Thesis="{Binding PathLengthNote}"
+                               IsVisible="{Binding PathLengthNote, Converter={x:Static ObjectConverters.IsNotNull}}" />
+          <TextBlock Text="{Binding RouteChanges}" Classes="label" TextWrapping="Wrap"
                      IsVisible="{Binding RouteChanges, Converter={x:Static ObjectConverters.IsNotNull}}" />
-          <TextBlock Text="{Binding AsnHint}" FontSize="11" Foreground="{StaticResource TextMutedBrush}" TextWrapping="Wrap"
+          <TextBlock Text="{Binding AsnHint}" Classes="caption" TextWrapping="Wrap"
                      IsVisible="{Binding AsnHint, Converter={x:Static ObjectConverters.IsNotNull}}" />
+          <controls:CopyChip Text="{Binding AsnFolder}"
+                             IsVisible="{Binding AsnFolder, Converter={x:Static ObjectConverters.IsNotNull}}" />
         </StackPanel>
 
-        <StackPanel Grid.Column="1" Spacing="2" Width="90">
-          <TextBlock Text="Хопов" FontSize="11" Foreground="{StaticResource TextMutedBrush}" />
-          <TextBlock Text="{Binding HopCount}" FontSize="18" />
-        </StackPanel>
-        <StackPanel Grid.Column="2" Spacing="2" Width="90">
-          <TextBlock Text="Молчащих" FontSize="11" Foreground="{StaticResource TextMutedBrush}" />
-          <TextBlock Text="{Binding SilentHops}" FontSize="18" />
-        </StackPanel>
+        <controls:StatTile Grid.Column="1" Width="90" Caption="Хопов" Value="{Binding HopCount}" />
+        <controls:StatTile Grid.Column="2" Width="90" Caption="Молчащих" Value="{Binding SilentHops}" />
       </Grid>
     </Border>
 
@@ -238,8 +249,11 @@
             </ItemsControl>
           </ScrollViewer>
 
-          <TextBlock Grid.Row="2" Margin="4,8,4,0" FontSize="10" Foreground="{StaticResource TextMutedBrush}" TextWrapping="Wrap"
-                     Text="MOS на транзитных хопах считается по задержке и дрожанию, без потерь: потери на транзитном узле — это ограничение его собственных ответов, а не потеря проходящего трафика." />
+          <!-- Главная методическая оговорка экрана: ради неё разбор и строился.
+               До волны 2 она стояла здесь же, но самым мелким кеглем. -->
+          <controls:MethodCard Grid.Row="2" Margin="4,8,4,0"
+                               Thesis="MOS на транзитных хопах считается по задержке и дрожанию, без потерь."
+                               Detail="Потери на транзитном узле — это ограничение его собственных ответов, а не потеря проходящего трафика." />
         </Grid>
       </Border>
 

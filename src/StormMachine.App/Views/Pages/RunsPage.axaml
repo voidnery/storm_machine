@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:StormMachine.App.ViewModels"
+             xmlns:controls="using:StormMachine.App.Controls"
              xmlns:results="using:StormMachine.Domain.Results"
              x:Class="StormMachine.App.Views.Pages.RunsPage"
              x:DataType="vm:RunsPageViewModel">
@@ -32,7 +33,21 @@
         <Button Grid.Column="4" Content="Обновить" Command="{Binding RefreshCommand}" Padding="12,5" Margin="0,0,8,0" />
         <Button Grid.Column="5" Content="Удалить" Command="{Binding DeleteSelectedCommand}" Padding="12,5" />
       </Grid>
-      <TextBlock Text="{Binding Usage}" FontSize="11" Foreground="{StaticResource TextMutedBrush}" TextWrapping="Wrap" />
+      <!-- Сводка плитками, путь — копируемым чипом: раньше четыре числа и путь шли
+           одной серой строкой, и путь в ней обрезался. -->
+      <Grid ColumnDefinitions="Auto,Auto,Auto,*" Margin="0,6,0,2">
+        <controls:StatTile Grid.Column="0" Width="110" Caption="Прогонов" Value="{Binding RunCountText}" />
+        <controls:StatTile Grid.Column="1" Width="130" Caption="Сэмплов" Value="{Binding SampleCountText}" />
+        <controls:StatTile Grid.Column="2" Width="130" Caption="Размер файла" Value="{Binding SizeText}" />
+        <StackPanel Grid.Column="3" Spacing="2" VerticalAlignment="Center">
+          <TextBlock Text="Файл журнала" Classes="caption" />
+          <controls:CopyChip Text="{Binding StorePath}" />
+        </StackPanel>
+      </Grid>
+
+      <controls:Caveat Text="{Binding FreeSpaceNotice}" />
+      <controls:Caveat Text="{Binding UsageError}" />
+
       <TextBlock Text="{Binding Message}" FontSize="12" Foreground="{StaticResource SuccessBrush}" TextWrapping="Wrap"
                  IsVisible="{Binding Message, Converter={x:Static ObjectConverters.IsNotNull}}" />
       <TextBlock Text="{Binding ErrorMessage}" FontSize="12" Foreground="{StaticResource DangerBrush}" TextWrapping="Wrap"
@@ -72,11 +87,9 @@
           <StackPanel Spacing="12">
             <TextBlock Text="{Binding Details}" FontSize="13" TextWrapping="Wrap" LineHeight="20" />
 
-            <Border Padding="10,7" CornerRadius="4" Background="{StaticResource WarningSurfaceBrush}"
-                    IsVisible="{Binding RetentionNotice, Converter={x:Static ObjectConverters.IsNotNull}}">
-              <TextBlock Text="{Binding RetentionNotice}" FontSize="12" TextWrapping="Wrap"
-                         Foreground="{StaticResource WarningBrush}" />
-            </Border>
+            <!-- Оговорка честности: сырья у этого прогона больше нет, и графика по нему
+                 не будет. В ряду с остальными строками она терялась. -->
+            <controls:Caveat Text="{Binding RetentionNotice}" />
 
             <!-- Ряды: фазы, резолверы, хопы или весь прогон — зависит от формы результата.
                  Таблица собрана из ItemsControl намеренно: DataGrid потянул бы отдельный

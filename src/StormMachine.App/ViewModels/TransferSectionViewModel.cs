@@ -30,9 +30,23 @@ public sealed partial class TransferSectionViewModel(SettingsTransfer transfer, 
     [ObservableProperty]
     private bool _keepExisting;
 
-    public static string Note =>
-        "Переносятся профили окружения, мониторы, эталоны и сценарии. Пресеты переносятся "
-        + "со страницы «Библиотека». " + SettingsTransfer.SecretsNote;
+    public static string Note => "Переносятся профили окружения, мониторы, эталоны и сценарии.";
+
+    public static string NoteWhy => "Пресеты живут отдельно и переносятся со страницы «Библиотека».";
+
+    /// <summary>
+    /// Чего перенос не делает.
+    /// </summary>
+    /// <remarks>
+    /// Текст общий с консолью и живёт в прикладном слое: обещание «всё переехало»
+    /// разойдись оно между клиентами, стоило бы оператору молчащих оповещений
+    /// у заказчика.
+    /// </remarks>
+    public static string SecretsCaveat => SettingsTransfer.SecretsNote;
+
+    public static string SnmpCredsCommand => "storm snmp creds add";
+
+    public static string AlertsCommand => "storm alerts set";
 
     [RelayCommand]
     private async Task ExportAsync(CancellationToken cancellationToken)

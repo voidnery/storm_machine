@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:StormMachine.App.ViewModels"
+             xmlns:controls="using:StormMachine.App.Controls"
              x:Class="StormMachine.App.Views.Pages.InspectPage"
              x:DataType="vm:InspectPageViewModel">
 
@@ -54,9 +55,12 @@
 
         <!-- Разложение по рядам. Что это за ряды и складываются ли они,
              сказано подписью, а не оставлено на догадку. -->
-        <StackPanel Spacing="4" IsVisible="{Binding HasSeries}">
-          <TextBlock Text="Разложение" FontSize="13" FontWeight="SemiBold" />
-          <TextBlock Text="{Binding SeriesCaption}" FontSize="11" Foreground="{StaticResource TextMutedBrush}" TextWrapping="Wrap" />
+        <StackPanel Spacing="6" IsVisible="{Binding HasSeries}">
+          <TextBlock Text="Разложение" Classes="h2" />
+          <!-- Складываются ряды или нет — методика, а не подпись: от ответа зависит,
+               законно ли складывать числа под ней. -->
+          <controls:MethodCard Thesis="{Binding SeriesCaption}"
+                               IsVisible="{Binding SeriesCaption, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
 
           <ItemsControl ItemsSource="{Binding Series}" Margin="0,4,0,0">
             <ItemsControl.ItemTemplate>
@@ -78,18 +82,31 @@
           </ItemsControl>
         </StackPanel>
 
-        <!-- Факты: то, ради чего инспектор и открывают. -->
-        <StackPanel Spacing="4" IsVisible="{Binding HasFacts}">
-          <TextBlock Text="Что установлено" FontSize="13" FontWeight="SemiBold" />
-          <ItemsControl ItemsSource="{Binding Facts}">
+        <!-- Факты: то, ради чего инспектор и открывают. Разложены по категориям —
+             в сплошном потоке записи резолверов, согласованность и подписи DNSSEC
+             сливались в одну простыню, и найти в ней ответ на свой вопрос было нечем. -->
+        <StackPanel Spacing="12" IsVisible="{Binding HasFacts}">
+          <TextBlock Text="Что установлено" Classes="h2" />
+          <ItemsControl ItemsSource="{Binding FactGroups}">
             <ItemsControl.ItemTemplate>
-              <DataTemplate x:DataType="vm:InspectFactRow">
-                <Grid ColumnDefinitions="70,220,*" Margin="0,2">
-                  <TextBlock Grid.Column="0" Text="{Binding Category}" FontSize="11" Foreground="{StaticResource TextMutedBrush}" />
-                  <TextBlock Grid.Column="1" Text="{Binding Name}" FontSize="12" />
-                  <TextBlock Grid.Column="2" Text="{Binding Value}" FontSize="12" TextWrapping="Wrap"
-                             Foreground="{Binding IsWarning, Converter={x:Static vm:FactBrushes.ByWarning}}" />
-                </Grid>
+              <DataTemplate x:DataType="vm:InspectFactGroup">
+                <StackPanel Spacing="3" Margin="0,0,0,10">
+                  <TextBlock Text="{Binding Category}" Classes="label" FontWeight="SemiBold" />
+                  <Border Height="1" Background="{StaticResource DividerBrush}" Margin="0,0,0,3" />
+                  <ItemsControl ItemsSource="{Binding Rows}">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate x:DataType="vm:InspectFactRow">
+                        <Grid ColumnDefinitions="260,*" Margin="0,2">
+                          <TextBlock Grid.Column="0" Text="{Binding Name}" Classes="body"
+                                     Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap"
+                                     Margin="0,0,12,0" />
+                          <TextBlock Grid.Column="1" Text="{Binding Value}" Classes="body" TextWrapping="Wrap"
+                                     Foreground="{Binding IsWarning, Converter={x:Static vm:FactBrushes.ByWarning}}" />
+                        </Grid>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                </StackPanel>
               </DataTemplate>
             </ItemsControl.ItemTemplate>
           </ItemsControl>
@@ -100,10 +117,10 @@
                 Margin="0,4,0,20">
           <StackPanel Spacing="8">
             <Grid ColumnDefinitions="*,Auto">
-              <StackPanel Grid.Column="0" Spacing="2">
-                <TextBlock Text="Как сеть видна снаружи" FontSize="13" FontWeight="SemiBold" />
-                <TextBlock FontSize="11" Foreground="{StaticResource TextMutedBrush}" TextWrapping="Wrap"
-                           Text="Внешний адрес и поведение NAT изнутри сети неизвестны в принципе: ответ есть только у собеседника за пределами трансляции. Проверка обращается к публичным серверам STUN." />
+              <StackPanel Grid.Column="0" Spacing="6" Margin="0,0,12,0">
+                <TextBlock Text="Как сеть видна снаружи" Classes="h2" />
+                <controls:MethodCard Thesis="Внешний адрес и поведение NAT изнутри сети неизвестны в принципе."
+                                     Detail="Ответ есть только у собеседника за пределами трансляции — поэтому проверка обращается к публичным серверам STUN." />
               </StackPanel>
               <Button Grid.Column="1" Content="Посмотреть" VerticalAlignment="Center"
                       Command="{Binding LookOutsideCommand}"

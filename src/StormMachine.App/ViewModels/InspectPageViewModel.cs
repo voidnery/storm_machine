@@ -14,6 +14,9 @@ namespace StormMachine.App.ViewModels;
 /// <summary>Строка факта: то, что проба установила, но не измерила числом.</summary>
 public sealed record InspectFactRow(string Category, string Name, string Value, bool IsWarning);
 
+/// <summary>Факты одной категории под общим подзаголовком.</summary>
+public sealed record InspectFactGroup(string Category, IReadOnlyList<InspectFactRow> Rows);
+
 /// <summary>Строка ряда: фаза водопада или отдельный резолвер.</summary>
 public sealed record InspectSeriesRow(string Label, string Median, string Loss, double BarWidth, string Share);
 
@@ -117,6 +120,9 @@ public sealed partial class InspectPageViewModel : PageViewModel, ITargetAware, 
 
     public ObservableCollection<InspectFactRow> Facts { get; } = [];
 
+    /// <summary>Те же факты, разложенные по категориям для показа.</summary>
+    public ObservableCollection<InspectFactGroup> FactGroups { get; } = [];
+
     public ObservableCollection<InspectSeriesRow> Series { get; } = [];
 
     public ObservableCollection<OutsideMappingRow> Mappings { get; } = [];
@@ -152,6 +158,7 @@ public sealed partial class InspectPageViewModel : PageViewModel, ITargetAware, 
 
         Error = null;
         Facts.Clear();
+        FactGroups.Clear();
         Series.Clear();
         Summary = string.Empty;
         OnPropertyChanged(nameof(HasFacts));
@@ -239,6 +246,15 @@ public sealed partial class InspectPageViewModel : PageViewModel, ITargetAware, 
         foreach (var fact in result.Facts)
         {
             Facts.Add(new InspectFactRow(fact.Category, fact.Name, fact.Value, fact.IsWarning));
+        }
+
+        // Разбор по группам, а не сплошным потоком: у пробы DNS в одну простыню
+        // сливались записи, согласованность резолверов и подписи DNSSEC — три
+        // разных вопроса, и найти среди них ответ на свой было нечем. Порядок групп
+        // сохраняется тот, в котором факты выдала проба: она знает, что важнее.
+        foreach (var group in Facts.GroupBy(f => f.Category, StringComparer.Ordinal))
+        {
+            FactGroups.Add(new InspectFactGroup(group.Key, [.. group]));
         }
 
         var series = SeriesBreakdown.Compute(shape, result.Samples);

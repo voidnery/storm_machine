@@ -60,8 +60,34 @@ public sealed partial class RunsPageViewModel(
     [ObservableProperty]
     private string? _retentionNotice;
 
+    // Сводка журнала плитками, а не предложением: чтобы узнать одно число,
+    // приходилось прочитать все четыре, а путь в конце строки обрезался.
+
     [ObservableProperty]
-    private string _usage = string.Empty;
+    private string _runCountText = "—";
+
+    [ObservableProperty]
+    private string _sampleCountText = "—";
+
+    [ObservableProperty]
+    private string _sizeText = "—";
+
+    /// <summary>
+    /// Свободное место внутри файла.
+    /// </summary>
+    /// <remarks>
+    /// Говорится отдельно и только когда его заметно: после уборки размер файла
+    /// не меняется, и без этой строки уборка выглядит не сработавшей.
+    /// </remarks>
+    [ObservableProperty]
+    private string? _freeSpaceNotice;
+
+    /// <summary>Путь к файлу базы: первый вопрос, когда журнал выглядит не так.</summary>
+    public string StorePath => _store.Location;
+
+    /// <summary>Отказ самой сводки — не отказ журнала: список уже загружен и виден.</summary>
+    [ObservableProperty]
+    private string? _usageError;
 
     [ObservableProperty]
     private string? _errorMessage;
@@ -114,19 +140,19 @@ public sealed partial class RunsPageViewModel(
         {
             var usage = await _store.GetUsageAsync(cancellationToken).ConfigureAwait(true);
 
-            // Свободное место названо отдельно и только когда его заметно: после уборки
-            // размер файла не меняется, и без этой строки уборка выглядит не сработавшей.
-            var free = usage.HasNotableFreeSpace
-                ? $" (свободно внутри файла {usage.ReusableBytes / 1024.0 / 1024.0:0.00} МБ — уйдёт под новые записи)"
-                : string.Empty;
+            RunCountText = usage.RunCount.ToString("N0", CultureInfo.InvariantCulture);
+            SampleCountText = usage.SampleCount.ToString("N0", CultureInfo.InvariantCulture);
+            SizeText = (usage.SizeBytes / 1024.0 / 1024.0).ToString("0.00", CultureInfo.InvariantCulture) + " МБ";
 
-            Usage = $"Журнал: {usage.RunCount} прогонов, "
-                    + $"{usage.SampleCount.ToString("N0", CultureInfo.InvariantCulture)} сэмплов, "
-                    + $"{usage.SizeBytes / 1024.0 / 1024.0:0.00} МБ{free} · {_store.Location}";
+            FreeSpaceNotice = usage.HasNotableFreeSpace
+                ? $"Внутри файла свободно {usage.ReusableBytes / 1024.0 / 1024.0:0.00} МБ — уйдёт под новые записи. Размер файла после уборки не уменьшается."
+                : null;
+
+            UsageError = null;
         }
         catch (Exception ex)
         {
-            Usage = "Сводка не посчиталась: " + (StorageProblem.ExplainCorruption(ex) ?? ex.Message);
+            UsageError = "Сводка не посчиталась: " + (StorageProblem.ExplainCorruption(ex) ?? ex.Message);
         }
     }
 

@@ -35,9 +35,15 @@ public sealed partial class RetentionSectionViewModel(RetentionSettings settings
     private string? _error;
 
     public static string Note =>
-        "Сырые сэмплы старше горизонта удаляются, агрегаты остаются — история и отчёты "
-        + "продолжают работать. Политика применяется при каждом запуске продукта "
-        + "и командой storm runs purge.";
+        "Сырые сэмплы старше горизонта удаляются, агрегаты остаются — история "
+        + "и отчёты продолжают работать.";
+
+    public static string NoteWhy =>
+        "Политика применяется при каждом запуске продукта, а не только по кнопке: "
+        + "уборка, о которой надо помнить, не выполняется.";
+
+    /// <summary>Та же уборка из консоли — чипом, чтобы не набирать руками.</summary>
+    public static string PurgeCommand => "storm runs purge";
 
     public async Task LoadAsync(CancellationToken cancellationToken = default)
     {

@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:StormMachine.App.ViewModels"
+             xmlns:controls="using:StormMachine.App.Controls"
              xmlns:sp="using:ScottPlot.Avalonia"
              xmlns:results="using:StormMachine.Domain.Results"
              x:Class="StormMachine.App.Views.Pages.LatencyPage"
@@ -8,10 +9,22 @@
 
   <Grid RowDefinitions="Auto,Auto,Auto,*,Auto" Margin="24,20">
 
-    <!-- Заголовок -->
-    <StackPanel Grid.Row="0" Spacing="4">
-      <TextBlock Text="{Binding Title}" FontSize="24" FontWeight="SemiBold" />
-      <TextBlock Text="{Binding MeasurementConditions}" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" />
+    <!-- Заголовок. Условия измерения — бейджами: их сравнивают между запусками,
+         а в предложении границы значений искать глазами. -->
+    <StackPanel Grid.Row="0" Spacing="6">
+      <TextBlock Text="{Binding Title}" Classes="h1" />
+      <ItemsControl ItemsSource="{Binding Conditions}">
+        <ItemsControl.ItemsPanel>
+          <ItemsPanelTemplate>
+            <WrapPanel />
+          </ItemsPanelTemplate>
+        </ItemsControl.ItemsPanel>
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="vm:ConditionRow">
+            <controls:ConditionBadge Label="{Binding Label}" Value="{Binding Value}" Margin="0,0,6,4" />
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
     </StackPanel>
 
     <!-- Предупреждение об окружении -->
@@ -108,14 +121,17 @@
         <!-- Сквозной принцип: пресет рождается не из формы, а из измерения,
              которое только что оказалось полезным. -->
         <Grid ColumnDefinitions="Auto,220,Auto,*">
-          <TextBlock Grid.Column="0" Text="Сохранить как пресет:" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}"
+          <TextBlock Grid.Column="0" Text="Сохранить как пресет:" Classes="body"
+                     Foreground="{StaticResource TextSecondaryBrush}"
                      VerticalAlignment="Center" Margin="0,0,10,0" />
           <TextBox Grid.Column="1" Text="{Binding PresetName}" PlaceholderText="имя пресета" FontSize="12" />
           <Button Grid.Column="2" Content="Сохранить" Command="{Binding SaveAsPresetCommand}"
                   FontSize="12" Padding="12,5" Margin="8,0,0,0" />
-          <TextBlock Grid.Column="3" Text="{Binding StatusLine}" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}"
-                     VerticalAlignment="Center" Margin="16,0,0,0" TextTrimming="CharacterEllipsis" />
         </Grid>
+
+        <!-- Статусу — постоянное место под панелью запуска. Справа от имени пресета
+             он терялся, и «идёт» от «кончилось отказом» ничем не отличалось. -->
+        <controls:StatusLine Text="{Binding StatusLine}" State="{Binding StatusState}" />
 
         <TextBlock Text="{Binding ErrorMessage}" FontSize="12"
                    Foreground="{StaticResource DangerBrush}" TextWrapping="Wrap"
@@ -178,30 +194,12 @@
     <Border Grid.Row="4" Margin="0,14,0,0" Padding="14,10" CornerRadius="6"
             Background="{StaticResource PanelBrush}">
       <Grid ColumnDefinitions="*,*,*,*,*,*">
-        <StackPanel Grid.Column="0" Spacing="2">
-          <TextBlock Text="Отправлено" FontSize="11" Foreground="{StaticResource TextMutedBrush}" />
-          <TextBlock Text="{Binding Sent}" FontSize="18" />
-        </StackPanel>
-        <StackPanel Grid.Column="1" Spacing="2">
-          <TextBlock Text="Потери" FontSize="11" Foreground="{StaticResource TextMutedBrush}" />
-          <TextBlock Text="{Binding Loss}" FontSize="18" />
-        </StackPanel>
-        <StackPanel Grid.Column="2" Spacing="2">
-          <TextBlock Text="Последнее" FontSize="11" Foreground="{StaticResource TextMutedBrush}" />
-          <TextBlock Text="{Binding Last}" FontSize="18" />
-        </StackPanel>
-        <StackPanel Grid.Column="3" Spacing="2">
-          <TextBlock Text="Медиана" FontSize="11" Foreground="{StaticResource TextMutedBrush}" />
-          <TextBlock Text="{Binding Median}" FontSize="18" />
-        </StackPanel>
-        <StackPanel Grid.Column="4" Spacing="2">
-          <TextBlock Text="Джиттер RFC 3550" FontSize="11" Foreground="{StaticResource TextMutedBrush}" />
-          <TextBlock Text="{Binding Jitter}" FontSize="18" />
-        </StackPanel>
-        <StackPanel Grid.Column="5" Spacing="2">
-          <TextBlock Text="PDV (p99 − p50)" FontSize="11" Foreground="{StaticResource TextMutedBrush}" />
-          <TextBlock Text="{Binding Pdv}" FontSize="18" />
-        </StackPanel>
+        <controls:StatTile Grid.Column="0" Caption="Отправлено" Value="{Binding Sent}" />
+        <controls:StatTile Grid.Column="1" Caption="Потери" Value="{Binding Loss}" />
+        <controls:StatTile Grid.Column="2" Caption="Последнее" Value="{Binding Last}" />
+        <controls:StatTile Grid.Column="3" Caption="Медиана" Value="{Binding Median}" />
+        <controls:StatTile Grid.Column="4" Caption="Джиттер RFC 3550" Value="{Binding Jitter}" />
+        <controls:StatTile Grid.Column="5" Caption="PDV (p99 − p50)" Value="{Binding Pdv}" />
       </Grid>
     </Border>
 

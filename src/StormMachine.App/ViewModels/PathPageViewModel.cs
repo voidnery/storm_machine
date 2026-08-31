@@ -1,8 +1,9 @@
-﻿using System.Collections.ObjectModel;
+using System.Collections.ObjectModel;
 using System.Globalization;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using StormMachine.App.Controls;
 using StormMachine.App.Services;
 using StormMachine.Application;
 using StormMachine.Application.Abstractions;
@@ -114,8 +115,9 @@ public sealed partial class PathPageViewModel : PageViewModel, ITargetAware
     [ObservableProperty]
     private string _statusLine = "Готово к запуску.";
 
+    /// <summary>Состояние операции: им управляется знак у строки статуса.</summary>
     [ObservableProperty]
-    private string _measurementConditions = string.Empty;
+    private OperationState _statusState = OperationState.None;
 
     [ObservableProperty]
     private string? _timingWarning;
@@ -124,10 +126,28 @@ public sealed partial class PathPageViewModel : PageViewModel, ITargetAware
     [ObservableProperty]
     private string? _asnHint;
 
+    /// <summary>Каталог, куда кладут базу принадлежности: путь копируется чипом.</summary>
+    [ObservableProperty]
+    private string? _asnFolder;
+
+    /// <summary>Условия измерения бейджами: их сравнивают между запусками.</summary>
+    public ObservableCollection<ConditionRow> Conditions { get; } = [];
+
     // ------------------------------------------------------------------ итог
 
     [ObservableProperty]
     private string _verdict = "Маршрут ещё не построен.";
+
+    /// <summary>
+    /// Уровень итога: им выбирается знак вердикта.
+    /// </summary>
+    /// <remarks>
+    /// Молчащая цель — предупреждение, а не отказ: последние хопы могут фильтровать
+    /// ICMP, и ставить здесь «✗» значило бы объявить недоступным то, что продукт
+    /// проверить не может.
+    /// </remarks>
+    [ObservableProperty]
+    private VerdictLevel _verdictLevel = VerdictLevel.Unknown;
 
     [ObservableProperty]
     private string? _degradation;
@@ -251,6 +271,7 @@ public sealed partial class PathPageViewModel : PageViewModel, ITargetAware
         StatusLine = Continuous
             ? "Идёт непрерывное наблюдение. Остановить можно кнопкой или из Run Drawer."
             : $"Идёт наблюдение: {Rounds} циклов с интервалом {IntervalMs} мс.";
+        StatusState = OperationState.Running;
 
         _timer.Start();
     }
@@ -260,6 +281,7 @@ public sealed partial class PathPageViewModel : PageViewModel, ITargetAware
     {
         _current?.Cancel();
         StatusLine = "Останавливаю — измеренное будет сохранено.";
+        StatusState = OperationState.Running;
     }
 
     [RelayCommand]
@@ -291,6 +313,7 @@ public sealed partial class PathPageViewModel : PageViewModel, ITargetAware
         StatusLine = run.Summary.HasRawSamples
             ? $"Показана трассировка от {run.Summary.StartedUtc.ToLocalTime():dd.MM HH:mm:ss}."
             : "У этого прогона сырые сэмплы удалены политикой хранения — таблица собрана из агрегатов.";
+        StatusState = OperationState.Done;
     }
 
     [RelayCommand]
@@ -334,12 +357,15 @@ public sealed partial class PathPageViewModel : PageViewModel, ITargetAware
             StatusLine = existing is null
                 ? $"Сохранено как пресет «{saved.Name}» (редакция {saved.Version}). Он в разделе «Библиотека»."
                 : $"Пресет «{saved.Name}» обновлён (редакция {saved.Version}).";
+            StatusState = OperationState.Done;
 
             PresetName = string.Empty;
         }
         catch (Exception ex)
         {
             ErrorMessage = $"Пресет не сохранён: {ex.Message}";
+            StatusLine = "Пресет не сохранён.";
+            StatusState = OperationState.Failed;
         }
     }
 
@@ -368,6 +394,7 @@ public sealed partial class PathPageViewModel : PageViewModel, ITargetAware
 
         _resolvedAddress = null;
         Verdict = "Маршрут ещё не построен.";
+        VerdictLevel = VerdictLevel.Unknown;
         Degradation = null;
         RouteChanges = null;
         PathLengthNote = null;
@@ -421,6 +448,7 @@ public sealed partial class PathPageViewModel : PageViewModel, ITargetAware
         SilentHops = analysis.SilentHops.ToString(CultureInfo.InvariantCulture);
 
         Verdict = DescribeVerdict(analysis);
+        VerdictLevel = LevelOf(analysis);
         Degradation = DescribeDegradation(analysis);
         RouteChanges = DescribeRouteChanges(analysis);
         PathLengthNote = DescribePathLength(analysis);
@@ -440,6 +468,29 @@ public sealed partial class PathPageViewModel : PageViewModel, ITargetAware
               + "длина пути непостоянна — обычное дело для туннелей MPLS без переноса TTL "
               + "и балансировки по каналам. Потери на этих строках — доля пакетов, ушедших "
               + "длинным путём, а не потерянных.";
+
+    /// <summary>
+    /// Уровень итога — тот же разбор, что и у формулировки, и потому рядом с ней.
+    /// </summary>
+    /// <remarks>
+    /// Молчащая цель — предупреждение: последние хопы часто фильтруют ICMP, и знак
+    /// отказа объявил бы недоступным то, чего проба не проверяла. Деградация по пути
+    /// цель достигнутой быть не мешает, но и «в норме» это уже не назвать.
+    /// </remarks>
+    private static VerdictLevel LevelOf(PathAnalysis analysis)
+    {
+        if (analysis.Hops.Count == 0)
+        {
+            return VerdictLevel.Unknown;
+        }
+
+        if (!analysis.DestinationReached)
+        {
+            return VerdictLevel.Warn;
+        }
+
+        return analysis.DegradationPoint is null ? VerdictLevel.Pass : VerdictLevel.Warn;
+    }
 
     private static string DescribeVerdict(PathAnalysis analysis)
     {
@@ -541,14 +592,17 @@ public sealed partial class PathPageViewModel : PageViewModel, ITargetAware
         {
             ErrorMessage = error;
             StatusLine = "Прогон завершился ошибкой.";
+            StatusState = OperationState.Failed;
         }
         else if (outcome?.Result.WasCancelled == true)
         {
             StatusLine = "Наблюдение остановлено. Измеренное сохранено.";
+            StatusState = OperationState.Done;
         }
         else
         {
             StatusLine = "Наблюдение завершено.";
+            StatusState = OperationState.Done;
         }
 
         _current = null;
@@ -588,17 +642,23 @@ public sealed partial class PathPageViewModel : PageViewModel, ITargetAware
 
         var context = Application.Runs.MeasurementConditions.Build(adapter, _clock, Methodology.Traceroute);
 
-        MeasurementConditions = $"{context.InterfaceName} · порог "
-                                + $"{context.CalibrationBaselineMs.ToString("0.000", CultureInfo.InvariantCulture)} мс "
-                                + $"· {Methodology.Traceroute}";
+        Conditions.Clear();
+
+        foreach (var condition in ConditionRows.From(context))
+        {
+            Conditions.Add(condition);
+        }
 
         TimingWarning = context.TimingWarning;
 
+        // Инструкция и путь разведены: путь копируется чипом, а не выделяется
+        // мышью из середины предложения.
         AsnHint = _annotator.HasAsnData
             ? null
             : "Принадлежность узлов к автономным системам не показана: база не найдена. "
-              + $"Положите базу DB-IP Lite (.mmdb) в каталог {_annotator.AsnDatabaseHint} — "
-              + "имена узлов работают и без неё.";
+              + "Положите базу DB-IP Lite (.mmdb) в каталог — имена узлов работают и без неё.";
+
+        AsnFolder = _annotator.HasAsnData ? null : _annotator.AsnDatabaseHint;
     }
 
     private static Target ParseTarget(string raw) => TargetInput.Parse(raw);

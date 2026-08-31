@@ -174,10 +174,20 @@ public sealed partial class SettingsPageViewModel : PageViewModel
 
     public string DatabasePath => _runs.Location;
 
-    public static string StorageHint =>
-        $"Другой файл базы задаётся переменной {StorageEnvironment.PathVariable} или ключом "
-        + "--база у консоли. Путь показан не для полноты: когда журнал выглядит не так, "
-        + "как ожидалось, первый вопрос всегда один — с каким файлом мы разговариваем.";
+    // Тексты разложены на тезис и обоснование: тезис виден всегда, обоснование —
+    // по кнопке карточки. До волны 2 всё это шло сплошными абзацами десятым кеглем,
+    // и лучший текст продукта читался как оформление.
+
+    public static string StorageNote =>
+        "Путь показан не для полноты: когда журнал выглядит не так, как ожидалось, "
+        + "первый вопрос всегда один — с каким файлом мы разговариваем.";
+
+    public static string StorageNoteWhy =>
+        "Продукт умеет работать с несколькими базами: проверки не должны попадать "
+        + "в рабочую историю. Файл выбирается одним из двух способов ниже.";
+
+    /// <summary>Имя переменной окружения — для чипа, который копируется одним нажатием.</summary>
+    public static string StoragePathVariable => StorageEnvironment.PathVariable;
 
     [RelayCommand]
     private void ToggleCredentialEditor() => IsCredentialEditorOpen = !IsCredentialEditorOpen;
@@ -263,8 +273,11 @@ public sealed partial class SettingsPageViewModel : PageViewModel
 
     public static string SnmpNote =>
         "Наборы пробуются по возрастанию порядка, пока какой-нибудь не подойдёт — "
-        + "и только против узла, который назвали вы. Ни словарей, ни обхода подсети "
-        + "в продукте нет: это граница, за которой диагностика становится взломом.";
+        + "и только против узла, который назвали вы.";
+
+    public static string SnmpNoteWhy =>
+        "Ни словарей, ни обхода подсети в продукте нет: это граница, за которой "
+        + "диагностика становится взломом.";
 
     [RelayCommand]
     private Task CheckUpdateAsync(CancellationToken cancellationToken) => Updates.CheckAsync(cancellationToken);
@@ -275,14 +288,17 @@ public sealed partial class SettingsPageViewModel : PageViewModel
     [RelayCommand]
     private void ApplyUpdate() => Updates.Apply();
 
-    public static string UpdateNote =>
-        "Проверка идёт сама, установка — по команде. Продукт измеряет, и подменить "
-        + "свою версию посреди суточного мониторинга значило бы разорвать ряд измерений "
-        + "надвое, не сказав об этом.";
+    public static string UpdateNote => "Проверка идёт сама, установка — по команде.";
 
-    public static string LicenceNote =>
-        "Продукт распространяется по лицензии MIT. Драйвер захвата Npcap не входит "
-        + "в поставку ни при каких условиях: его лицензия NPSL это запрещает.";
+    public static string UpdateNoteWhy =>
+        "Продукт измеряет, и подменить свою версию посреди суточного мониторинга "
+        + "значило бы разорвать ряд измерений надвое, не сказав об этом.";
+
+    public static string LicenceNote => "Продукт распространяется по лицензии MIT.";
+
+    public static string LicenceNoteWhy =>
+        "Драйвер захвата Npcap не входит в поставку ни при каких условиях: "
+        + "его лицензия NPSL это запрещает.";
 
     public override async Task ActivateAsync(CancellationToken cancellationToken = default)
     {

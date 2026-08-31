@@ -3,6 +3,7 @@ using System.Globalization;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using StormMachine.App.Controls;
 using StormMachine.App.Services;
 using StormMachine.Application;
 using StormMachine.Application.Abstractions;
@@ -111,11 +112,15 @@ public sealed partial class LatencyPageViewModel : PageViewModel, ITargetAware
     [ObservableProperty]
     private string _statusLine = "Готово к запуску.";
 
+    /// <summary>Состояние операции: им управляется знак у строки статуса.</summary>
     [ObservableProperty]
-    private string _measurementConditions = string.Empty;
+    private OperationState _statusState = OperationState.None;
 
     [ObservableProperty]
     private string? _timingWarning;
+
+    /// <summary>Условия измерения бейджами: их сравнивают между запусками.</summary>
+    public ObservableCollection<ConditionRow> Conditions { get; } = [];
 
     // ------------------------------------------------------------------ показатели
 
@@ -270,6 +275,7 @@ public sealed partial class LatencyPageViewModel : PageViewModel, ITargetAware
         StatusLine = Continuous
             ? "Идёт непрерывное измерение. Остановить можно кнопкой или из Run Drawer."
             : $"Идёт измерение: {Count} проб с интервалом {IntervalMs} мс.";
+        StatusState = OperationState.Running;
 
         _timer.Start();
     }
@@ -279,6 +285,7 @@ public sealed partial class LatencyPageViewModel : PageViewModel, ITargetAware
     {
         _current?.Cancel();
         StatusLine = "Останавливаю — измеренное будет сохранено.";
+        StatusState = OperationState.Running;
     }
 
     [RelayCommand]
@@ -312,6 +319,7 @@ public sealed partial class LatencyPageViewModel : PageViewModel, ITargetAware
         StatusLine = run.Summary.HasRawSamples
             ? $"Показан прогон от {run.Summary.StartedUtc.ToLocalTime():dd.MM HH:mm:ss}."
             : "У этого прогона сырые сэмплы удалены политикой хранения — остались только агрегаты.";
+        StatusState = OperationState.Done;
     }
 
     [RelayCommand]
@@ -364,12 +372,15 @@ public sealed partial class LatencyPageViewModel : PageViewModel, ITargetAware
             StatusLine = existing is null
                 ? $"Сохранено как пресет «{saved.Name}» (редакция {saved.Version}). Он в разделе «Библиотека»."
                 : $"Пресет «{saved.Name}» обновлён (редакция {saved.Version}).";
+            StatusState = OperationState.Done;
 
             PresetName = string.Empty;
         }
         catch (Exception ex)
         {
             ErrorMessage = $"Пресет не сохранён: {ex.Message}";
+            StatusLine = "Пресет не сохранён.";
+            StatusState = OperationState.Failed;
         }
     }
 
@@ -441,14 +452,17 @@ public sealed partial class LatencyPageViewModel : PageViewModel, ITargetAware
         {
             ErrorMessage = error;
             StatusLine = "Прогон завершился ошибкой.";
+            StatusState = OperationState.Failed;
         }
         else if (outcome?.Result.WasCancelled == true)
         {
             StatusLine = "Прогон остановлен. Измеренное сохранено.";
+            StatusState = OperationState.Done;
         }
         else
         {
             StatusLine = "Прогон завершён.";
+            StatusState = OperationState.Done;
         }
 
         _current = null;
@@ -488,8 +502,12 @@ public sealed partial class LatencyPageViewModel : PageViewModel, ITargetAware
 
         var context = Application.Runs.MeasurementConditions.Build(adapter, _clock, Methodology.IcmpEcho);
 
-        MeasurementConditions =
-            $"{context.InterfaceName} · порог {context.CalibrationBaselineMs.ToString("0.000", CultureInfo.InvariantCulture)} мс · {Methodology.IcmpEcho}";
+        Conditions.Clear();
+
+        foreach (var condition in ConditionRows.From(context))
+        {
+            Conditions.Add(condition);
+        }
 
         TimingWarning = context.TimingWarning;
     }
