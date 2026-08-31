@@ -15,21 +15,54 @@ namespace StormMachine.App.UnitTests;
 /// </remarks>
 public sealed class TransferSectionTests
 {
-    /// <summary>На пустой базе выгрузка честно говорит, что переносить нечего.</summary>
+    /// <summary>
+    /// На пустой базе выгрузка честно говорит, что переносить нечего.
+    /// </summary>
+    /// <remarks>
+    /// База своя, а не общая на сборку тестов: соседние тесты заводят сценарии,
+    /// и «пусто» на общей базе зависело бы от порядка их выполнения.
+    /// </remarks>
     [Fact]
     public async Task Export_WithNothingToTransfer_SaysSo()
     {
-        await using var services = AppServices.Build();
+        var directory = Path.Combine(Path.GetTempPath(), "storm-tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
 
-        var section = new TransferSectionViewModel(
-            services.GetRequiredService<SettingsTransfer>(),
-            new PickerStub(null, null));
+        try
+        {
+            var runStore = new Storage.SqliteRunStore(new Storage.StorageOptions
+            {
+                DatabasePath = Path.Combine(directory, "storm.db"),
+                ApplyRetentionOnStartup = false,
+            });
 
-        await section.ExportCommand.ExecuteAsync(null);
+            var transfer = new SettingsTransfer(
+                new Storage.SqliteProfileStore(runStore),
+                new Storage.SqliteMonitorStore(runStore),
+                new Storage.SqliteBaselineStore(runStore),
+                new Storage.SqliteScenarioStore(runStore));
 
-        Assert.Null(section.Error);
-        Assert.NotNull(section.Message);
-        Assert.Contains("Переносить нечего", section.Message, StringComparison.Ordinal);
+            var section = new TransferSectionViewModel(transfer, new PickerStub(null, null));
+
+            await section.ExportCommand.ExecuteAsync(null);
+
+            Assert.Null(section.Error);
+            Assert.NotNull(section.Message);
+            Assert.Contains("Переносить нечего", section.Message, StringComparison.Ordinal);
+        }
+        finally
+        {
+            Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+
+            try
+            {
+                Directory.Delete(directory, recursive: true);
+            }
+            catch (IOException)
+            {
+                // Файл мог остаться заблокированным — временный каталог уберёт система.
+            }
+        }
     }
 
     /// <summary>Загрузка файла проходит до механизма и показывает итог.</summary>

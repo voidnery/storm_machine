@@ -36,8 +36,12 @@
         <Grid ColumnDefinitions="2*,2*,Auto,Auto,Auto">
           <StackPanel Grid.Column="0" Spacing="4" Margin="0,0,12,0">
             <TextBlock Text="Сценарий" FontSize="11" Opacity="0.6" />
-            <ComboBox ItemsSource="{Binding Templates}" SelectedItem="{Binding Template}"
-                      HorizontalAlignment="Stretch" IsEnabled="{Binding CanStart}" />
+            <Grid ColumnDefinitions="*,Auto">
+              <ComboBox Grid.Column="0" ItemsSource="{Binding Templates}" SelectedItem="{Binding Template}"
+                        HorizontalAlignment="Stretch" IsEnabled="{Binding CanStart}" />
+              <Button Grid.Column="1" Content="Править" FontSize="11" Padding="8,4" Margin="6,0,0,0"
+                      Command="{Binding EditSelectedCommand}" IsVisible="{Binding CanEditSelected}" />
+            </Grid>
           </StackPanel>
 
           <StackPanel Grid.Column="1" Spacing="4" Margin="0,0,12,0">
@@ -81,6 +85,81 @@
                    IsVisible="{Binding IsRunning}" />
         <TextBlock Text="{Binding Error}" FontSize="12" Foreground="#E05252" TextWrapping="Wrap"
                    IsVisible="{Binding Error, Converter={x:Static ObjectConverters.IsNotNull}}" />
+
+        <!-- Конструктор. До И-24 своя цепочка собиралась только консолью,
+             а экран предлагал готовые шаблоны. -->
+        <Expander Header="Собрать свой сценарий" IsExpanded="{Binding Editor.IsOpen}" FontSize="12">
+          <StackPanel Spacing="8" Margin="0,8,0,0" DataContext="{Binding Editor}">
+            <StackPanel x:DataType="vm:ScenarioEditorViewModel" Spacing="8">
+
+              <TextBlock Text="{x:Static vm:ScenarioEditorViewModel.Note}" FontSize="10" Opacity="0.5"
+                         TextWrapping="Wrap" LineHeight="15" />
+
+              <Grid ColumnDefinitions="*,8,2*">
+                <TextBox Grid.Column="0" PlaceholderText="имя сценария" Text="{Binding Name}" />
+                <TextBox Grid.Column="2" PlaceholderText="что он проверяет (необязательно)"
+                         Text="{Binding Description}" />
+              </Grid>
+
+              <ItemsControl ItemsSource="{Binding Steps}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="vm:ScenarioStepDraftViewModel">
+                    <Border Padding="8,6" CornerRadius="4" Background="#232B3B" Margin="0,2">
+                      <Grid ColumnDefinitions="130,*,*,Auto" RowDefinitions="Auto,Auto">
+
+                        <ComboBox Grid.Row="0" Grid.Column="0" Margin="0,0,6,4"
+                                  ItemsSource="{Binding $parent[ItemsControl].((vm:ScenarioEditorViewModel)DataContext).ProbeNames}"
+                                  SelectedItem="{Binding ProbeName}" HorizontalAlignment="Stretch" />
+                        <TextBox Grid.Row="0" Grid.Column="1" Margin="0,0,6,4"
+                                 PlaceholderText="цель — пусто: как у предыдущего"
+                                 Text="{Binding Target}" FontSize="12" />
+                        <TextBox Grid.Row="0" Grid.Column="2" Margin="0,0,6,4"
+                                 PlaceholderText="название шага в отчёте"
+                                 Text="{Binding Title}" FontSize="12" />
+
+                        <TextBox Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2" Margin="0,0,6,0"
+                                 PlaceholderText="параметры: count=4 interval=200"
+                                 Text="{Binding ParametersText}" FontSize="12" />
+                        <TextBox Grid.Row="1" Grid.Column="2" Margin="0,0,6,0"
+                                 PlaceholderText="пороги: p95 &lt; 100; потери &lt;= 0"
+                                 Text="{Binding ThresholdsText}" FontSize="12" />
+
+                        <StackPanel Grid.Row="0" Grid.RowSpan="2" Grid.Column="3"
+                                    Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                          <Button Content="↑" Padding="7,3" FontSize="11"
+                                  Command="{Binding $parent[ItemsControl].((vm:ScenarioEditorViewModel)DataContext).MoveUpCommand}"
+                                  CommandParameter="{Binding}" />
+                          <Button Content="↓" Padding="7,3" FontSize="11"
+                                  Command="{Binding $parent[ItemsControl].((vm:ScenarioEditorViewModel)DataContext).MoveDownCommand}"
+                                  CommandParameter="{Binding}" />
+                          <Button Content="✕" Padding="7,3" FontSize="11"
+                                  Command="{Binding $parent[ItemsControl].((vm:ScenarioEditorViewModel)DataContext).RemoveStepCommand}"
+                                  CommandParameter="{Binding}" />
+                        </StackPanel>
+                      </Grid>
+                    </Border>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+
+              <Grid ColumnDefinitions="Auto,Auto,Auto,*">
+                <Button Grid.Column="0" Content="Добавить шаг" Command="{Binding AddStepCommand}"
+                        Padding="10,5" Margin="0,0,6,0" />
+                <Button Grid.Column="1" Content="Сохранить сценарий" Command="{Binding SaveCommand}"
+                        Padding="12,5" Margin="0,0,6,0"
+                        Background="{StaticResource AccentBrush}" Foreground="White" />
+                <Button Grid.Column="2" Content="Удалить" Command="{Binding DeleteCommand}"
+                        Padding="10,5" IsVisible="{Binding HasSteps}" />
+              </Grid>
+
+              <TextBlock Text="{Binding Message}" FontSize="11" Foreground="#7DD3A0" TextWrapping="Wrap"
+                         IsVisible="{Binding Message, Converter={x:Static ObjectConverters.IsNotNull}}" />
+              <TextBlock Text="{Binding Error}" FontSize="11" Foreground="#E05252" TextWrapping="Wrap"
+                         IsVisible="{Binding Error, Converter={x:Static ObjectConverters.IsNotNull}}" />
+
+            </StackPanel>
+          </StackPanel>
+        </Expander>
       </StackPanel>
     </Border>
 

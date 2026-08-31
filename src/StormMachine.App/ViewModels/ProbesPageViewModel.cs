@@ -4,6 +4,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using StormMachine.App.Services;
 using StormMachine.Application.Abstractions;
+using StormMachine.Application.Probes;
 using StormMachine.Application.Scenarios;
 using StormMachine.Domain.Results;
 using StormMachine.Domain.Scenarios;
@@ -13,10 +14,11 @@ namespace StormMachine.App.ViewModels;
 /// <summary>Итог одной цели в наборе.</summary>
 public sealed record ScenarioTargetRow(string Target, string Mark, string Verdict, string Where);
 
-/// <summary>Шаблон сценария в выпадающем списке.</summary>
-public sealed record ScenarioTemplateOption(string Key, string Title, string About)
+/// <summary>Сценарий в выпадающем списке: шаблон или собранный оператором.</summary>
+public sealed record ScenarioTemplateOption(string Key, string Title, string About, bool IsTemplate, Scenario? Custom = null)
 {
-    public override string ToString() => $"{Title} — {About}";
+    public override string ToString() =>
+        IsTemplate ? $"{Title} — {About}" : $"{Title} · свой — {About}";
 }
 
 /// <summary>
@@ -72,13 +74,18 @@ public sealed partial class ProbesPageViewModel : PageViewModel, ITargetAware, I
     [ObservableProperty]
     private string _note = string.Empty;
 
+    private readonly ScenarioLibrary _library;
+
     public ProbesPageViewModel(
         NavigationSection section,
         ScenarioRunner runner,
         IHighResolutionClock clock,
         INetworkEnvironment environment,
         IRunStore store,
-        RunnerService operations)
+        RunnerService operations,
+        ScenarioLibrary library,
+        IScenarioStore scenarios,
+        IProbeRegistry registry)
         : base(section)
     {
         _runner = runner ?? throw new ArgumentNullException(nameof(runner));
@@ -86,14 +93,64 @@ public sealed partial class ProbesPageViewModel : PageViewModel, ITargetAware, I
         _clock = clock ?? throw new ArgumentNullException(nameof(clock));
         _environment = environment ?? throw new ArgumentNullException(nameof(environment));
         _store = store ?? throw new ArgumentNullException(nameof(store));
+        _library = library ?? throw new ArgumentNullException(nameof(library));
 
-        Templates = [.. ScenarioTemplates.All.Select(t => new ScenarioTemplateOption(t.Key, t.Title, t.About))];
+        Editor = new ScenarioEditorViewModel(
+            scenarios ?? throw new ArgumentNullException(nameof(scenarios)),
+            registry ?? throw new ArgumentNullException(nameof(registry)),
+            RefreshScenariosAsync);
+
+        // Шаблоны доступны сразу, ещё до первого обращения к базе: своё дольётся
+        // при активации страницы.
+        foreach (var template in ScenarioTemplates.All)
+        {
+            Templates.Add(new ScenarioTemplateOption(template.Key, template.Title, template.About, IsTemplate: true));
+        }
+
         Template = Templates[0];
 
         Sets = [.. TargetSets.All.Select(t => t.Key)];
     }
 
-    public IReadOnlyList<ScenarioTemplateOption> Templates { get; }
+    /// <summary>Шаблоны и свои сценарии: до И-24 своё отсюда было не запустить.</summary>
+    public ObservableCollection<ScenarioTemplateOption> Templates { get; } = [];
+
+    /// <summary>Конструктор сценариев мышью.</summary>
+    public ScenarioEditorViewModel Editor { get; }
+
+    /// <summary>Выбран свой сценарий — его можно открыть в конструкторе.</summary>
+    public bool CanEditSelected => Template is { IsTemplate: false };
+
+    partial void OnTemplateChanged(ScenarioTemplateOption? value) => OnPropertyChanged(nameof(CanEditSelected));
+
+    public override Task ActivateAsync(CancellationToken cancellationToken = default) =>
+        RefreshScenariosAsync(cancellationToken);
+
+    [RelayCommand]
+    private void EditSelected()
+    {
+        if (Template is { Custom: { } custom })
+        {
+            Editor.Load(custom);
+        }
+    }
+
+    /// <summary>Перечитывает список сценариев, сохраняя выбор.</summary>
+    private async Task RefreshScenariosAsync(CancellationToken cancellationToken)
+    {
+        var selected = Template?.Key;
+
+        var entries = await _library.ListAsync(cancellationToken).ConfigureAwait(true);
+
+        Templates.Clear();
+        foreach (var entry in entries)
+        {
+            Templates.Add(new ScenarioTemplateOption(entry.Key, entry.Title, entry.About, entry.IsTemplate, entry.Custom));
+        }
+
+        Template = Templates.FirstOrDefault(t => string.Equals(t.Key, selected, StringComparison.OrdinalIgnoreCase))
+                   ?? Templates.FirstOrDefault();
+    }
 
     /// <summary>Имена готовых наборов — подставляются в поле цели одним нажатием.</summary>
     public IReadOnlyList<string> Sets { get; }
@@ -177,7 +234,8 @@ public sealed partial class ProbesPageViewModel : PageViewModel, ITargetAware, I
             {
                 _operation.SetTarget(set.Targets.Count > 1 ? target : null);
 
-                var scenario = ScenarioTemplates.Create(Template.Key, target);
+                // Библиотека решает, что это — шаблон или своё, и подставляет цель.
+                var scenario = await _library.CreateAsync(Template.Key, target, _cts.Token).ConfigureAwait(true);
                 var run = await RunOneAsync(scenario, set.Targets.Count > 1 ? target : null).ConfigureAwait(true);
 
                 Targets.Add(new ScenarioTargetRow(
