@@ -404,6 +404,79 @@
             <TextBlock Text="{x:Static vm:SettingsPageViewModel.StorageHint}" FontSize="10" Opacity="0.5"
                        TextWrapping="Wrap" LineHeight="15" />
 
+            <!-- Политика хранения. До И-24 жила только умолчаниями и ключами консоли. -->
+            <StackPanel Spacing="10" DataContext="{Binding Retention}">
+              <StackPanel x:DataType="vm:RetentionSectionViewModel" Spacing="10">
+
+                <TextBlock Text="Политика хранения" FontSize="12" FontWeight="SemiBold" Opacity="0.85" />
+
+                <TextBlock Text="{x:Static vm:RetentionSectionViewModel.Note}" FontSize="10" Opacity="0.5"
+                           TextWrapping="Wrap" LineHeight="15" />
+
+                <Grid ColumnDefinitions="*,8,*">
+                  <StackPanel Grid.Column="0" Spacing="2">
+                    <TextBlock Text="Сырые сэмплы, дней" FontSize="10" Opacity="0.6" />
+                    <NumericUpDown Value="{Binding RawDays}" Minimum="1" Maximum="3650" Increment="1"
+                                   FormatString="0" />
+                  </StackPanel>
+                  <StackPanel Grid.Column="2" Spacing="2">
+                    <TextBlock Text="Прогоны с агрегатами, дней" FontSize="10" Opacity="0.6" />
+                    <NumericUpDown Value="{Binding RunDays}" Minimum="1" Maximum="3650" Increment="1"
+                                   FormatString="0" />
+                  </StackPanel>
+                </Grid>
+
+                <Grid ColumnDefinitions="Auto,Auto,Auto,*">
+                  <Button Grid.Column="0" Content="Сохранить" Command="{Binding SaveCommand}"
+                          Padding="12,5" Margin="0,0,6,0"
+                          Background="{StaticResource AccentBrush}" Foreground="White" />
+                  <Button Grid.Column="1" Content="Прикинуть уборку" Command="{Binding PreviewCommand}"
+                          Padding="12,5" Margin="0,0,6,0" />
+                  <Button Grid.Column="2" Content="Прибраться сейчас" Command="{Binding CleanupNowCommand}"
+                          Padding="12,5" />
+                </Grid>
+
+                <TextBlock Text="{Binding Message}" FontSize="11" Foreground="#7DD3A0" TextWrapping="Wrap"
+                           IsVisible="{Binding Message, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                <TextBlock Text="{Binding Error}" FontSize="11" Foreground="{StaticResource DangerBrush}"
+                           TextWrapping="Wrap"
+                           IsVisible="{Binding Error, Converter={x:Static ObjectConverters.IsNotNull}}" />
+
+              </StackPanel>
+            </StackPanel>
+
+            <Border Height="1" Background="#2E3746" Margin="0,6" />
+
+            <!-- Перенос настроек. Механизм И-22 (сценарии — И-23), экранная форма — И-24:
+                 «настроил у себя, разворачиваю у заказчика» — сценарий и того,
+                 кто консолью не пользуется. -->
+            <StackPanel Spacing="10" DataContext="{Binding Transfer}">
+              <StackPanel x:DataType="vm:TransferSectionViewModel" Spacing="10">
+
+                <TextBlock Text="Перенос настроек" FontSize="13" FontWeight="SemiBold" />
+
+                <TextBlock Text="{x:Static vm:TransferSectionViewModel.Note}" FontSize="10" Opacity="0.5"
+                           TextWrapping="Wrap" LineHeight="15" />
+
+                <Grid ColumnDefinitions="Auto,Auto,*">
+                  <Button Grid.Column="0" Content="Выгрузить в файл" Command="{Binding ExportCommand}"
+                          Padding="12,5" Margin="0,0,6,0" />
+                  <Button Grid.Column="1" Content="Загрузить из файла" Command="{Binding ImportCommand}"
+                          Padding="12,5" />
+                </Grid>
+
+                <CheckBox Content="Не трогать существующие — только добавлять новое"
+                          IsChecked="{Binding KeepExisting}" FontSize="11" />
+
+                <TextBlock Text="{Binding Message}" FontSize="11" Foreground="#7DD3A0" TextWrapping="Wrap"
+                           IsVisible="{Binding Message, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                <TextBlock Text="{Binding Error}" FontSize="11" Foreground="{StaticResource DangerBrush}"
+                           TextWrapping="Wrap"
+                           IsVisible="{Binding Error, Converter={x:Static ObjectConverters.IsNotNull}}" />
+
+              </StackPanel>
+            </StackPanel>
+
             <Border Height="1" Background="#2E3746" Margin="0,6" />
 
             <TextBlock Text="О продукте" FontSize="13" FontWeight="SemiBold" />

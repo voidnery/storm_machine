@@ -115,10 +115,19 @@ public sealed partial class SettingsPageViewModel : PageViewModel
         UpdateService updates,
         ISnmpCredentialStore credentials,
         SnmpService snmp,
-        IAgentDirectory agents)
+        IAgentDirectory agents,
+        SettingsTransfer transfer,
+        IFilePicker picker,
+        Application.Storage.RetentionSettings retention)
         : base(section)
     {
         Agents = new AgentsSectionViewModel(agents ?? throw new ArgumentNullException(nameof(agents)));
+        Transfer = new TransferSectionViewModel(
+            transfer ?? throw new ArgumentNullException(nameof(transfer)),
+            picker ?? throw new ArgumentNullException(nameof(picker)));
+        Retention = new RetentionSectionViewModel(
+            retention ?? throw new ArgumentNullException(nameof(retention)),
+            runs ?? throw new ArgumentNullException(nameof(runs)));
         _capabilities = capabilities ?? throw new ArgumentNullException(nameof(capabilities));
         _profiles = profiles ?? throw new ArgumentNullException(nameof(profiles));
         _runs = runs ?? throw new ArgumentNullException(nameof(runs));
@@ -139,6 +148,12 @@ public sealed partial class SettingsPageViewModel : PageViewModel
     /// когда заводит вторую точку измерения, и не возвращается, пока она работает.
     /// </remarks>
     public AgentsSectionViewModel Agents { get; }
+
+    /// <summary>Перенос настроек между машинами: выгрузка и загрузка файла.</summary>
+    public TransferSectionViewModel Transfer { get; }
+
+    /// <summary>Политика хранения: горизонты, прикидка и уборка.</summary>
+    public RetentionSectionViewModel Retention { get; }
 
     public ObservableCollection<CredentialRow> Credentials { get; } = [];
 
@@ -308,6 +323,7 @@ public sealed partial class SettingsPageViewModel : PageViewModel
     {
         await RefreshAsync(cancellationToken).ConfigureAwait(true);
         await Agents.RefreshAsync(cancellationToken).ConfigureAwait(true);
+        await Retention.LoadAsync(cancellationToken).ConfigureAwait(true);
     }
 
     /// <summary>

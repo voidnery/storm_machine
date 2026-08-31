@@ -2,6 +2,7 @@
 using System.Globalization;
 using Microsoft.Extensions.DependencyInjection;
 using StormMachine.Application.Abstractions;
+using StormMachine.Application.Storage;
 using StormMachine.Cli.Rendering;
 using StormMachine.Domain.Results;
 
@@ -22,8 +23,71 @@ internal static class RunsCommand
             CreateExport(services),
             CreateDelete(services),
             CreatePurge(services),
+            CreatePolicy(services),
             CreateUsage(services),
         };
+
+        return command;
+    }
+
+    /// <summary>
+    /// <c>storm runs policy</c> — показать или сохранить политику хранения.
+    /// </summary>
+    /// <remarks>
+    /// Сохранённая политика действует на уборку при старте и на <c>purge</c> без
+    /// ключей. Появилась в И-24 вместе с экранной формой — настройка, которой нет
+    /// в консоли, нарушала бы паритет клиентов.
+    /// </remarks>
+    private static Command CreatePolicy(IServiceProvider services)
+    {
+        var rawDaysOption = new Option<int?>("--raw-days") { Description = "Сколько дней хранить сырые сэмплы." };
+        var runDaysOption = new Option<int?>("--run-days") { Description = "Сколько дней хранить прогоны с агрегатами." };
+
+        var command = new Command("policy", "Политика хранения: показать или сохранить.")
+        {
+            rawDaysOption,
+            runDaysOption,
+        };
+
+        command.SetAction(async (parseResult, cancellationToken) =>
+        {
+            var settings = services.GetRequiredService<RetentionSettings>();
+            var current = await settings.GetAsync(cancellationToken).ConfigureAwait(false);
+
+            var rawDays = parseResult.GetValue(rawDaysOption);
+            var runDays = parseResult.GetValue(runDaysOption);
+
+            if (rawDays is null && runDays is null)
+            {
+                Console.WriteLine($"Сырые сэмплы : {current.RawSampleHorizon.TotalDays:0} дн.");
+                Console.WriteLine($"Прогоны      : {current.RunHorizon.TotalDays:0} дн.");
+                Console.WriteLine();
+                Console.WriteLine("Изменить: storm runs policy --raw-days N --run-days N");
+                Console.WriteLine("Политика применяется при каждом запуске и командой storm runs purge.");
+
+                return 0;
+            }
+
+            try
+            {
+                var saved = await settings.SetAsync(
+                    rawDays ?? (int)current.RawSampleHorizon.TotalDays,
+                    runDays ?? (int)current.RunHorizon.TotalDays,
+                    cancellationToken).ConfigureAwait(false);
+
+                Console.WriteLine($"Сохранено: сырые сэмплы {saved.RawSampleHorizon.TotalDays:0} дн., "
+                                  + $"прогоны {saved.RunHorizon.TotalDays:0} дн.");
+                Console.WriteLine("Применится при следующем запуске или сразу: storm runs purge.");
+
+                return 0;
+            }
+            catch (ArgumentException ex)
+            {
+                Console.Error.WriteLine(ex.Message);
+
+                return 1;
+            }
+        });
 
         return command;
     }
@@ -286,8 +350,8 @@ internal static class RunsCommand
     private static Command CreatePurge(IServiceProvider services)
     {
         var dryRunOption = new Option<bool>("--dry-run") { Description = "Показать, что будет удалено, не удаляя." };
-        var rawDaysOption = new Option<int>("--raw-days") { Description = "Сколько дней хранить сырые сэмплы.", DefaultValueFactory = _ => 90 };
-        var runDaysOption = new Option<int>("--run-days") { Description = "Сколько дней хранить прогоны.", DefaultValueFactory = _ => 365 };
+        var rawDaysOption = new Option<int?>("--raw-days") { Description = "Сколько дней хранить сырые сэмплы. Без ключа — по сохранённой политике." };
+        var runDaysOption = new Option<int?>("--run-days") { Description = "Сколько дней хранить прогоны. Без ключа — по сохранённой политике." };
 
         var command = new Command("purge", "Применить политику хранения.") { dryRunOption, rawDaysOption, runDaysOption };
 
@@ -296,11 +360,23 @@ internal static class RunsCommand
             var store = services.GetRequiredService<IRunStore>();
             await store.InitializeAsync(cancellationToken).ConfigureAwait(false);
 
+            // Ключи перекрывают сохранённую политику на один запуск, не меняя её:
+            // «прибраться агрессивнее один раз» — не то же самое, что «отныне так».
+            var saved = await services.GetRequiredService<RetentionSettings>()
+                .GetAsync(cancellationToken).ConfigureAwait(false);
+
             var policy = new RetentionPolicy
             {
-                RawSampleHorizon = TimeSpan.FromDays(parseResult.GetValue(rawDaysOption)),
-                RunHorizon = TimeSpan.FromDays(parseResult.GetValue(runDaysOption)),
+                RawSampleHorizon = parseResult.GetValue(rawDaysOption) is { } rawDays
+                    ? TimeSpan.FromDays(rawDays)
+                    : saved.RawSampleHorizon,
+                RunHorizon = parseResult.GetValue(runDaysOption) is { } runDays
+                    ? TimeSpan.FromDays(runDays)
+                    : saved.RunHorizon,
             };
+
+            Console.WriteLine($"Политика: сырые сэмплы {policy.RawSampleHorizon.TotalDays:0} дн., "
+                              + $"прогоны {policy.RunHorizon.TotalDays:0} дн.");
 
             var dryRun = parseResult.GetValue(dryRunOption);
             var report = await store.ApplyRetentionAsync(policy, dryRun, cancellationToken).ConfigureAwait(false);

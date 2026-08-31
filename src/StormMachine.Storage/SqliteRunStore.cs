@@ -114,7 +114,10 @@ public sealed class SqliteRunStore : IRunStore, IStorageLocation
 
         if (_options.ApplyRetentionOnStartup)
         {
-            var report = ApplyRetention(connection, _options.Retention, dryRun: false);
+            // Сохранённая политика весомее зашитой в параметры: то, что оператор
+            // задал в настройках, обязано действовать и при уборке на старте —
+            // иначе это надпись, а не политика (И-24).
+            var report = ApplyRetention(connection, ReadStoredPolicy(connection) ?? _options.Retention, dryRun: false);
 
             if (!report.IsEmpty && _logger?.IsEnabled(LogLevel.Information) == true)
             {
@@ -436,6 +439,56 @@ public sealed class SqliteRunStore : IRunStore, IStorageLocation
                 "Найдено незавершённых прогонов: {Count}. Помечены как прерванные сбоем; измеренное сохранено.",
                 affected);
         }
+    }
+
+    /// <summary>
+    /// Политика хранения, сохранённая оператором, — из таблицы настроек этой же базы.
+    /// </summary>
+    /// <remarks>
+    /// Читается прямым запросом, а не через <see cref="Application.Storage.RetentionSettings" />:
+    /// служба настроек сама открывает это хранилище, и звать её отсюда значило бы
+    /// завести круг на инициализации. Имена ключей — общие константы.
+    /// </remarks>
+    private static RetentionPolicy? ReadStoredPolicy(SqliteConnection connection)
+    {
+        using var command = connection.CreateCommand();
+        command.CommandText = "SELECT key, value FROM settings WHERE key IN ($raw, $run);";
+        command.Parameters.AddWithValue("$raw", Application.Storage.RetentionSettings.RawDaysKey);
+        command.Parameters.AddWithValue("$run", Application.Storage.RetentionSettings.RunDaysKey);
+
+        int? rawDays = null;
+        int? runDays = null;
+
+        using var reader = command.ExecuteReader();
+        while (reader.Read())
+        {
+            if (reader.IsDBNull(1)
+                || !int.TryParse(reader.GetString(1), NumberStyles.Integer, CultureInfo.InvariantCulture, out var days)
+                || days < 1)
+            {
+                continue;
+            }
+
+            if (reader.GetString(0) == Application.Storage.RetentionSettings.RawDaysKey)
+            {
+                rawDays = days;
+            }
+            else
+            {
+                runDays = days;
+            }
+        }
+
+        if (rawDays is null && runDays is null)
+        {
+            return null;
+        }
+
+        return new RetentionPolicy
+        {
+            RawSampleHorizon = rawDays is { } r ? TimeSpan.FromDays(r) : RetentionPolicy.Default.RawSampleHorizon,
+            RunHorizon = runDays is { } n ? TimeSpan.FromDays(n) : RetentionPolicy.Default.RunHorizon,
+        };
     }
 
     private static RetentionReport ApplyRetention(SqliteConnection connection, RetentionPolicy policy, bool dryRun)

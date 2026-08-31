@@ -131,6 +131,10 @@ public static class StormMachineServiceCollectionExtensions
             (SqliteRunStore)provider.GetRequiredService<IRunStore>(),
             provider.GetRequiredService<ISecretProtector>()));
 
+        // Политика хранения, заданная оператором (И-24). Действует и на уборку
+        // при старте — хранилище само читает эти же ключи из своей таблицы.
+        services.AddSingleton<Application.Storage.RetentionSettings>();
+
         // Мониторы. Расписание, состояние, проверки и лента алертов — в той же базе.
         services.AddSingleton<IMonitorStore>(provider => new SqliteMonitorStore(
             (SqliteRunStore)provider.GetRequiredService<IRunStore>()));
@@ -245,8 +249,12 @@ public static class StormMachineServiceCollectionExtensions
         // ровно тем же способом, от которого политика хранения и защищает.
         try
         {
+            var retention = await services.GetRequiredService<Application.Storage.RetentionSettings>()
+                .GetAsync(cancellationToken)
+                .ConfigureAwait(false);
+
             await services.GetRequiredService<IObservationStore>()
-                .ApplyRetentionAsync(Domain.Results.RetentionPolicy.Default.RunHorizon, cancellationToken)
+                .ApplyRetentionAsync(retention.RunHorizon, cancellationToken)
                 .ConfigureAwait(false);
         }
         catch (Exception ex) when (ex is InvalidOperationException or IOException)
