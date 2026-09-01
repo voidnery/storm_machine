@@ -41,28 +41,46 @@ public sealed class TopologyCanvas : Control
 
     // ------------------------------------------------------------------ оформление
 
-    private static readonly IBrush Background = new SolidColorBrush(Color.Parse("#151922"));
-    private static readonly IBrush NodeFill = new SolidColorBrush(Color.Parse("#1E2635"));
-    private static readonly IBrush NodeText = new SolidColorBrush(Color.Parse("#DCE3EF"));
-    private static readonly IBrush DimText = new SolidColorBrush(Color.Parse("#8894A8"));
-    private static readonly IBrush Accent = new SolidColorBrush(Color.Parse("#3B82F6"));
-    private static readonly IBrush Warning = new SolidColorBrush(Color.Parse("#D97706"));
-    private static readonly IBrush Selection = new SolidColorBrush(Color.Parse("#60A5FA"));
+    // Цвета берутся из словаря токенов приложения, а не пишутся здесь: половина
+    // прежних кистей дублировала токены App.axaml с точностью до цифры, а сторож
+    // разметки кода не видит. Свойствами, а не полями: словарь приложения к моменту
+    // загрузки типа ещё не готов.
+
+    private static IBrush Background => DesignTokens.Brush(DesignTokens.Surface);
+
+    private static IBrush NodeFill => DesignTokens.Brush(DesignTokens.Node);
+
+    private static IBrush NodeText => DesignTokens.Brush(DesignTokens.Text);
+
+    private static IBrush DimText => DesignTokens.Brush(DesignTokens.TextSecondary);
+
+    private static IBrush Accent => DesignTokens.Brush(DesignTokens.Accent);
+
+    private static IBrush Warning => DesignTokens.Brush(DesignTokens.Warning);
+
+    private static IBrush Selection => DesignTokens.Brush(DesignTokens.Selection);
+
+    private static IPen? _confirmedPen;
+    private static IPen? _inferredPen;
+    private static IPen? _assumedPen;
 
     /// <summary>Подтверждённая связь — сплошная и яркая.</summary>
-    private static readonly IPen ConfirmedPen = new Pen(new SolidColorBrush(Color.Parse("#4B7FD1")), 1.6);
+    private static IPen ConfirmedPen =>
+        _confirmedPen ??= new Pen(DesignTokens.Brush(DesignTokens.LinkConfirmed), 1.6);
 
     /// <summary>Выведенная по правилу — пунктир.</summary>
-    private static readonly IPen InferredPen = new Pen(new SolidColorBrush(Color.Parse("#7A8AA5")), 1.3)
-    {
-        DashStyle = new DashStyle([5, 4], 0),
-    };
+    private static IPen InferredPen =>
+        _inferredPen ??= new Pen(DesignTokens.Brush(DesignTokens.LinkInferred), 1.3)
+        {
+            DashStyle = new DashStyle([5, 4], 0),
+        };
 
     /// <summary>Допущение — редкие точки, самая слабая линия из трёх.</summary>
-    private static readonly IPen AssumedPen = new Pen(new SolidColorBrush(Color.Parse("#5D6B82")), 1.1)
-    {
-        DashStyle = new DashStyle([1.5, 4], 0),
-    };
+    private static IPen AssumedPen =>
+        _assumedPen ??= new Pen(DesignTokens.Brush(DesignTokens.LinkAssumed), 1.1)
+        {
+            DashStyle = new DashStyle([1.5, 4], 0),
+        };
 
     private PlacedGraph _placed = PlacedGraph.Empty;
     private double _scale = 1;
@@ -340,23 +358,33 @@ public sealed class TopologyCanvas : Control
             return null;
         }
 
-        return RoleBrushes.TryGetValue(role.TrimEnd('?'), out var brush) ? brush : null;
+        return RoleTokens.TryGetValue(role.TrimEnd('?'), out var token)
+            ? DesignTokens.Brush(token)
+            : null;
     }
 
-    private static readonly Dictionary<string, IBrush> RoleBrushes = new(StringComparer.OrdinalIgnoreCase)
-    {
-        ["маршрутизатор"] = new SolidColorBrush(Color.Parse("#5B8DEF")),
-        ["шлюз"] = new SolidColorBrush(Color.Parse("#5B8DEF")),
-        ["коммутатор"] = new SolidColorBrush(Color.Parse("#9A6CFF")),
-        ["точка доступа"] = new SolidColorBrush(Color.Parse("#E0C341")),
-        ["сервер"] = new SolidColorBrush(Color.Parse("#4C9A5A")),
-        ["хранилище"] = new SolidColorBrush(Color.Parse("#2FB5A0")),
-        ["принтер"] = new SolidColorBrush(Color.Parse("#D9A441")),
-        ["камера"] = new SolidColorBrush(Color.Parse("#E05252")),
-        ["компьютер"] = new SolidColorBrush(Color.Parse("#7A9BC8")),
-        ["телефон"] = new SolidColorBrush(Color.Parse("#5CB8E0")),
-        ["медиа"] = new SolidColorBrush(Color.Parse("#C05CC0")),
-    };
+    /// <summary>
+    /// Категория устройства — ключ токена. Одна таблица на карту и на легенду.
+    /// </summary>
+    /// <remarks>
+    /// Маршрутизатор и шлюз делят цвет намеренно: для читающего карту это одна роль,
+    /// а различает их не цвет, а текст тега.
+    /// </remarks>
+    public static IReadOnlyDictionary<string, string> RoleTokens { get; } =
+        new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["маршрутизатор"] = "RoleRouterBrush",
+            ["шлюз"] = "RoleRouterBrush",
+            ["коммутатор"] = "RoleSwitchBrush",
+            ["точка доступа"] = "RoleAccessPointBrush",
+            ["сервер"] = "RoleServerBrush",
+            ["хранилище"] = "RoleStorageBrush",
+            ["принтер"] = "RolePrinterBrush",
+            ["камера"] = "RoleCameraBrush",
+            ["компьютер"] = "RoleComputerBrush",
+            ["телефон"] = "RolePhoneBrush",
+            ["медиа"] = "RoleMediaBrush",
+        };
 
     private static IBrush BorderFor(TopologyNodeKind kind) => kind switch
     {
@@ -365,11 +393,11 @@ public sealed class TopologyCanvas : Control
 
         // Коммутатор — свой цвет: он появляется только при опросе по SNMP,
         // и отличать его от выведенного по правилам маршрутизатора важно.
-        TopologyNodeKind.Switch => new SolidColorBrush(Color.Parse("#7DD3A0")),
-        TopologyNodeKind.Subnet => new SolidColorBrush(Color.Parse("#4B5A72")),
+        TopologyNodeKind.Switch => DesignTokens.Brush(DesignTokens.Success),
+        TopologyNodeKind.Subnet => DesignTokens.Brush(DesignTokens.NodeOutline),
         TopologyNodeKind.Internet => Warning,
-        TopologyNodeKind.HostGroup => new SolidColorBrush(Color.Parse("#4B5A72")),
-        _ => new SolidColorBrush(Color.Parse("#333D4E")),
+        TopologyNodeKind.HostGroup => DesignTokens.Brush(DesignTokens.NodeOutline),
+        _ => DesignTokens.Brush(DesignTokens.Divider),
     };
 
     private static string? Secondary(TopologyNode node)

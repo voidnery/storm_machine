@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:StormMachine.App.ViewModels"
+             xmlns:forms="using:StormMachine.App.Controls"
              x:Class="StormMachine.App.Views.Pages.ProbesPage"
              x:DataType="vm:ProbesPageViewModel">
 
@@ -150,8 +151,8 @@
           <StackPanel Spacing="8" Margin="0,8,0,0" DataContext="{Binding Editor}">
             <StackPanel x:DataType="vm:ScenarioEditorViewModel" Spacing="8">
 
-              <TextBlock Text="{x:Static vm:ScenarioEditorViewModel.Note}" FontSize="10" Foreground="{StaticResource TextMutedBrush}"
-                         TextWrapping="Wrap" LineHeight="15" />
+              <forms:MethodCard Thesis="Шаг — это проба с целью, параметрами и порогами."
+                                Detail="{x:Static vm:ScenarioEditorViewModel.Note}" />
 
               <Grid ColumnDefinitions="*,8,2*">
                 <TextBox Grid.Column="0" PlaceholderText="имя сценария" Text="{Binding Name}" />
@@ -302,8 +303,9 @@
           </ItemsControl.ItemTemplate>
         </ItemsControl>
 
-        <TextBlock Text="{Binding Note}" FontSize="11" Foreground="{StaticResource TextMutedBrush}" TextWrapping="Wrap"
-                   IsVisible="{Binding HasSteps}" />
+        <!-- Ключевая методическая оговорка экрана: шаги измеряют пересекающиеся
+             отрезки и не складываются. До волны 3 — мелким серым под шагами. -->
+        <forms:MethodCard Thesis="{Binding Note}" IsVisible="{Binding HasSteps}" />
 
         <!-- Сводка по набору: одна упавшая цель из пяти и пять из пяти —
              разные неисправности. -->
@@ -326,7 +328,7 @@
           </StackPanel>
         </Border>
 
-        <TextBlock Text="{Binding Conclusion}" FontSize="13" TextWrapping="Wrap" Margin="0,0,0,20" />
+        <forms:VerdictLine Text="{Binding Conclusion}" Level="{Binding ConclusionLevel}" Margin="0,0,0,20" />
 
       </StackPanel>
     </ScrollViewer>

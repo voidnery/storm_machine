@@ -81,9 +81,8 @@ public sealed partial class ScenarioEditorViewModel : ObservableObject
     private string? _error;
 
     public static string Note =>
-        "Шаг — это проба с целью, параметрами и порогами. Параметры пишутся через пробел: "
-        + "count=4 interval=200. Пороги — через точку с запятой: p95 < 100; потери <= 0. "
-        + "Пустая цель шага наследует цель предыдущего.";
+        "Параметры пишутся через пробел: count=4 interval=200. Пороги — через точку "
+        + "с запятой: p95 < 100; потери <= 0. Пустая цель шага наследует цель предыдущего.";
 
     [RelayCommand]
     private void Toggle() => IsOpen = !IsOpen;

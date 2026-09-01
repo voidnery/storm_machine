@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:StormMachine.App.ViewModels"
+             xmlns:forms="using:StormMachine.App.Controls"
              x:Class="StormMachine.App.Views.Pages.DiscoveryPage"
              x:DataType="vm:DiscoveryPageViewModel">
 
@@ -88,15 +89,24 @@
             Background="{StaticResource PanelBrush}">
       <StackPanel Spacing="6">
         <Grid ColumnDefinitions="*,Auto">
-          <TextBlock Grid.Column="0" Text="{Binding StatusLine}" FontSize="13" TextWrapping="Wrap" />
-          <TextBlock Grid.Column="1" Text="{Binding ProgressText}" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}"
-                     VerticalAlignment="Center" />
+          <forms:StatusLine Grid.Column="0" Text="{Binding StatusLine}" />
+          <TextBlock Grid.Column="1" Text="{Binding ProgressText}" Classes="body"
+                     Foreground="{StaticResource TextSecondaryBrush}" VerticalAlignment="Center" />
         </Grid>
 
         <ProgressBar Minimum="0" Maximum="100" Value="{Binding ProgressPercent}" Height="4" />
 
-        <TextBlock Text="{Binding Conclusion}" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap"
-                   IsVisible="{Binding Conclusion, Converter={x:Static ObjectConverters.IsNotNull}}" />
+        <!-- Итог скана плитками: в строке «найдено X, отвечают Y, MAC у Z», чтобы
+             увидеть одно число, приходилось прочитать все три. -->
+        <Grid ColumnDefinitions="Auto,Auto,Auto,*" IsVisible="{Binding HasResult}" Margin="0,4,0,0">
+          <forms:StatTile Grid.Column="0" Width="120" Caption="Найдено" Value="{Binding FoundText}" />
+          <forms:StatTile Grid.Column="1" Width="120" Caption="Отвечают" Value="{Binding RespondedText}" />
+          <forms:StatTile Grid.Column="2" Width="140" Caption="MAC известен" Value="{Binding WithMacText}" />
+        </Grid>
+
+        <forms:MethodCard Thesis="{Binding ArpNote}"
+                          IsVisible="{Binding ArpNote, Converter={x:Static ObjectConverters.IsNotNull}}" />
+        <forms:Caveat Text="{Binding VirtualNote}" />
       </StackPanel>
     </Border>
 

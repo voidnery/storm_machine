@@ -46,6 +46,16 @@
       <Setter Property="FontFamily" Value="Consolas,Menlo,monospace" />
     </Style>
 
+    <!-- Мишени нажатия: не мельче 32×28 (docs/UI-DESIGN-PLAN.md). Продукт работает
+         на ноутбуке в шкафу с оборудованием, где мышь лежит на коленке, и промах
+         по «отменить» рядом с «удалить» стоит дороже восьми сэкономленных пикселей.
+         Селектор берёт только сам Button, не наследников: у полосы прокрутки
+         и счётчика внутри шаблонов свои кнопки, и им эта норма ни к чему. -->
+    <Style Selector="Button">
+      <Setter Property="MinHeight" Value="28" />
+      <Setter Property="MinWidth" Value="32" />
+    </Style>
+
     <!-- Формы поверхностей -->
     <Style Selector="Border.card">
       <Setter Property="Background" Value="{DynamicResource PanelBrush}" />
@@ -99,11 +109,28 @@
     <SolidColorBrush x:Key="WarningSurfaceBrush">#3A2E12</SolidColorBrush>
     <SolidColorBrush x:Key="DangerSurfaceBrush">#3A1E1E</SolidColorBrush>
 
-    <!-- Линии карты. Значения обязаны совпадать с TopologyCanvas: рисовалка держит
-         кэшированные кисти у себя и переводится на чтение этих ресурсов волной 3. -->
+    <!-- Карта сети. Рисовалка читает эти же ресурсы через DesignTokens: до волны 3
+         она держала свои двадцать кистей, половина из которых дублировала токены
+         с точностью до цифры, а сторож разметки кода не видит. -->
     <SolidColorBrush x:Key="LinkConfirmedBrush">#4B7FD1</SolidColorBrush>
     <SolidColorBrush x:Key="LinkInferredBrush">#7A8AA5</SolidColorBrush>
     <SolidColorBrush x:Key="LinkAssumedBrush">#5D6B82</SolidColorBrush>
+    <SolidColorBrush x:Key="NodeBrush">#1E2635</SolidColorBrush>
+    <SolidColorBrush x:Key="NodeOutlineBrush">#4B5A72</SolidColorBrush>
+    <SolidColorBrush x:Key="SelectionBrush">#60A5FA</SolidColorBrush>
+
+    <!-- Категории устройств. Цвет отвечает на «что это», не утверждая, откуда
+         известно: догадка красится так же, как факт, а вопрос остаётся в подписи. -->
+    <SolidColorBrush x:Key="RoleRouterBrush">#5B8DEF</SolidColorBrush>
+    <SolidColorBrush x:Key="RoleSwitchBrush">#9A6CFF</SolidColorBrush>
+    <SolidColorBrush x:Key="RoleAccessPointBrush">#E0C341</SolidColorBrush>
+    <SolidColorBrush x:Key="RoleServerBrush">#4C9A5A</SolidColorBrush>
+    <SolidColorBrush x:Key="RoleStorageBrush">#2FB5A0</SolidColorBrush>
+    <SolidColorBrush x:Key="RolePrinterBrush">#D9A441</SolidColorBrush>
+    <SolidColorBrush x:Key="RoleCameraBrush">#E05252</SolidColorBrush>
+    <SolidColorBrush x:Key="RoleComputerBrush">#7A9BC8</SolidColorBrush>
+    <SolidColorBrush x:Key="RolePhoneBrush">#5CB8E0</SolidColorBrush>
+    <SolidColorBrush x:Key="RoleMediaBrush">#C05CC0</SolidColorBrush>
   </Application.Resources>
 
 </Application>

@@ -3,6 +3,7 @@ using System.Globalization;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using StormMachine.App.Controls;
 using StormMachine.App.Services;
 using StormMachine.Application.Abstractions;
 using StormMachine.Application.Probes;
@@ -174,8 +175,16 @@ public sealed partial class ProbeRunnerViewModel : ObservableObject
     [ObservableProperty]
     private string _status = "Готово к запуску.";
 
+    /// <summary>Состояние операции: им управляется знак у строки статуса.</summary>
+    [ObservableProperty]
+    private OperationState _statusState = OperationState.None;
+
     [ObservableProperty]
     private string? _verdictLine;
+
+    /// <summary>Номер сохранённого прогона: по нему его ищут в журнале.</summary>
+    [ObservableProperty]
+    private string? _savedRunId;
 
     public bool NeedsTarget => Probe?.Descriptor.RequiresTarget ?? false;
 
@@ -282,6 +291,7 @@ public sealed partial class ProbeRunnerViewModel : ObservableObject
 
         Error = null;
         VerdictLine = null;
+        SavedRunId = null;
         Series.Clear();
         Facts.Clear();
         OnPropertyChanged(nameof(HasSeries));
@@ -338,6 +348,7 @@ public sealed partial class ProbeRunnerViewModel : ObservableObject
 
         IsRunning = true;
         Status = "Идёт измерение…";
+        StatusState = OperationState.Running;
         _timer.Start();
     }
 
@@ -346,6 +357,7 @@ public sealed partial class ProbeRunnerViewModel : ObservableObject
     {
         _current?.Cancel();
         Status = "Останавливаю — измеренное будет сохранено.";
+        StatusState = OperationState.Running;
     }
 
     private void OnFinished(object? sender, EventArgs e)
@@ -364,7 +376,8 @@ public sealed partial class ProbeRunnerViewModel : ObservableObject
         if (run.Outcome is not { } outcome)
         {
             Error = run.Error ?? "Прогон не удался.";
-            Status = "Готово к запуску.";
+            Status = "Прогон не удался.";
+            StatusState = OperationState.Failed;
 
             return;
         }
@@ -397,8 +410,12 @@ public sealed partial class ProbeRunnerViewModel : ObservableObject
 
         Status = (result.WasCancelled ? "Остановлено оператором. " : "Завершено. ")
                  + $"Отправлено {result.SentCount}, получено {result.SuccessCount}, "
-                 + $"потери {result.LossPercent:0.#}%."
-                 + (outcome.RunId is { } id ? $" В журнале: {id.ToString()[..8]}." : string.Empty);
+                 + $"потери {result.LossPercent:0.#}%.";
+        StatusState = OperationState.Done;
+
+        // Номер прогона — не украшение статуса: по нему прогон ищут в журнале,
+        // и набирать его с экрана руками незачем.
+        SavedRunId = outcome.RunId is { } id ? id.ToString() : null;
 
         if (outcome.ProfileVerdict is { } verdict)
         {

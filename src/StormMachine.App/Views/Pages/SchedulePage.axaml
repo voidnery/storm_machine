@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:StormMachine.App.ViewModels"
+             xmlns:forms="using:StormMachine.App.Controls"
              x:Class="StormMachine.App.Views.Pages.SchedulePage"
              x:DataType="vm:SchedulePageViewModel">
 
@@ -54,8 +55,8 @@
         <StackPanel Spacing="10">
           <TextBlock Text="Окна обслуживания" FontSize="13" FontWeight="SemiBold" />
 
-          <TextBlock FontSize="10" Foreground="{StaticResource TextMutedBrush}" TextWrapping="Wrap"
-                     Text="В окне проверки не идут, и это время исключается из расчёта доступности. Считать плановые работы простоем — завышать нарушение SLA, считать их работой — занижать." />
+          <forms:MethodCard Thesis="В окне проверки не идут, и это время исключается из расчёта доступности."
+                            Detail="Считать плановые работы простоем — завышать нарушение SLA, считать их работой — занижать." />
 
           <ItemsControl ItemsSource="{Binding Maintenance}">
             <ItemsControl.ItemTemplate>

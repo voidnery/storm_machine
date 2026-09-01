@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:StormMachine.App.ViewModels"
+             xmlns:forms="using:StormMachine.App.Controls"
              x:Class="StormMachine.App.Views.Pages.AlertsPage"
              x:DataType="vm:AlertsPageViewModel">
 
@@ -83,8 +84,9 @@
               </ItemsControl.ItemTemplate>
             </ItemsControl>
 
-            <TextBlock FontSize="10" Foreground="{StaticResource TextMutedBrush}" TextWrapping="Wrap"
-                       Text="Настраиваются из консоли: storm alerts set. Пароли хранятся зашифрованными средствами Windows и привязаны к этой учётной записи." />
+            <forms:MethodCard Thesis="Каналы настраиваются из консоли."
+                              Detail="Пароли хранятся зашифрованными средствами Windows и привязаны к этой учётной записи." />
+            <forms:CopyChip Text="storm alerts set" />
           </StackPanel>
         </ScrollViewer>
       </Border>

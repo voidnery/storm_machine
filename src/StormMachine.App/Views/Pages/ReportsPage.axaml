@@ -3,6 +3,7 @@
              xmlns:vm="using:StormMachine.App.ViewModels"
              xmlns:monitors="using:StormMachine.Domain.Monitors"
              xmlns:reports="using:StormMachine.Domain.Reports"
+             xmlns:forms="using:StormMachine.App.Controls"
              x:Class="StormMachine.App.Views.Pages.ReportsPage"
              x:DataType="vm:ReportsPageViewModel">
 
@@ -64,8 +65,8 @@
                   </DataTemplate>
                 </ComboBox.ItemTemplate>
               </ComboBox>
-              <TextBlock FontSize="10" Foreground="{StaticResource TextMutedBrush}" TextWrapping="Wrap"
-                         Text="Эталоны снимаются из консоли: storm baseline capture." />
+              <TextBlock Text="Эталоны снимаются из консоли" Classes="caption" />
+              <forms:CopyChip Text="storm baseline capture" />
             </StackPanel>
 
             <StackPanel Spacing="6">
@@ -85,8 +86,8 @@
                        Text="{Binding Conclusion}"
                        AcceptsReturn="True" MinHeight="70" TextWrapping="Wrap" />
 
-              <TextBlock FontSize="10" Foreground="{StaticResource TextMutedBrush}" TextWrapping="Wrap"
-                         Text="Продукт заключение не составляет: он показывает измеренное и вердикты по заданным порогам, а оценку пригодности даёт подписавший." />
+              <forms:MethodCard Thesis="Продукт заключение не составляет."
+                                Detail="Он показывает измеренное и вердикты по заданным порогам, а оценку пригодности даёт подписавший." />
             </StackPanel>
 
           </StackPanel>

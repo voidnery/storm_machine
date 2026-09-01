@@ -48,6 +48,20 @@ public sealed partial class DashboardPageViewModel(
     [ObservableProperty]
     private string _journalInfo = string.Empty;
 
+    // Сводка журнала плитками: число отдельно, совет отдельно.
+
+    [ObservableProperty]
+    private bool _hasJournal;
+
+    [ObservableProperty]
+    private string _runCountText = "—";
+
+    [ObservableProperty]
+    private string _sampleCountText = "—";
+
+    [ObservableProperty]
+    private string _sizeText = "—";
+
     /// <summary>
     /// Первый запуск: инвентарь пуст и оператору некуда смотреть.
     /// </summary>
@@ -161,11 +175,18 @@ public sealed partial class DashboardPageViewModel(
         {
             var usage = await _store.GetUsageAsync(cancellationToken).ConfigureAwait(true);
 
+            // Числа — плитками, совет — отдельной строкой: склеенные в одну серую
+            // фразу, они читались как одна надпись, и ни числа, ни совета в ней
+            // видно не было.
+            HasJournal = usage.RunCount > 0;
+
+            RunCountText = usage.RunCount.ToString("N0", CultureInfo.InvariantCulture);
+            SampleCountText = usage.SampleCount.ToString("N0", CultureInfo.InvariantCulture);
+            SizeText = (usage.SizeBytes / 1024.0 / 1024.0).ToString("0.00", CultureInfo.InvariantCulture) + " МБ";
+
             JournalInfo = usage.RunCount == 0
                 ? "Журнал пуст. Запусти измерение — прогоны сохраняются автоматически."
-                : $"В журнале {usage.RunCount} прогонов, "
-                  + $"{usage.SampleCount.ToString("N0", CultureInfo.InvariantCulture)} сэмплов, "
-                  + $"{usage.SizeBytes / 1024.0 / 1024.0:0.00} МБ";
+                : string.Empty;
         }
         catch (Exception ex)
         {

@@ -131,6 +131,21 @@
     </Setter>
   </Style>
 
+  <!-- Легенда парой: знак слева, значение справа -->
+  <Style Selector="controls|LegendPair">
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Grid ColumnDefinitions="110,*">
+          <TextBlock Grid.Column="0" Text="{TemplateBinding Sign}" FontSize="10"
+                     Margin="0,0,10,0" TextWrapping="Wrap"
+                     Foreground="{DynamicResource TextSecondaryBrush}" />
+          <TextBlock Grid.Column="1" Text="{TemplateBinding Meaning}" FontSize="10"
+                     TextWrapping="Wrap" Foreground="{DynamicResource TextMutedBrush}" />
+        </Grid>
+      </ControlTemplate>
+    </Setter>
+  </Style>
+
   <!-- Статус операции: знак состояния + текст -->
   <Style Selector="controls|StatusLine">
     <Setter Property="Template">

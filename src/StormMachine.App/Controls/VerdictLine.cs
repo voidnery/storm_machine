@@ -14,6 +14,10 @@ namespace StormMachine.App.Controls;
 /// словарь вердиктов один на консоль и окно, и разойтись им незачем — экраны сказали бы
 /// об одном измерении разными знаками, и оператор решил бы, что видит разные вещи.
 /// Цвет уровня — не единственный носитель смысла: знак читается и без цвета.
+/// <para>
+/// Видимостью распоряжается сам вердикт: пустой текст — нет строки. Привязывать
+/// <see cref="Avalonia.Visual.IsVisible"/> снаружи не нужно, как и у <see cref="Caveat"/>.
+/// </para>
 /// </remarks>
 public class VerdictLine : TemplatedControl
 {
@@ -27,6 +31,8 @@ public class VerdictLine : TemplatedControl
         AvaloniaProperty.RegisterDirect<VerdictLine, string>(nameof(Mark), o => o.Mark);
 
     private string _mark = VerdictWording.Mark(VerdictLevel.Unknown);
+
+    public VerdictLine() => IsVisible = false;
 
     public string? Text
     {
@@ -52,6 +58,15 @@ public class VerdictLine : TemplatedControl
         ArgumentNullException.ThrowIfNull(change);
 
         base.OnPropertyChanged(change);
+
+        // Пустой вердикт — не вердикт: знак без слова читался как мусор на экране
+        // (найдено стендом снимков на «Внешних пробах» до первого запуска).
+        if (change.Property == TextProperty)
+        {
+            IsVisible = !string.IsNullOrWhiteSpace(Text);
+
+            return;
+        }
 
         if (change.Property != LevelProperty)
         {

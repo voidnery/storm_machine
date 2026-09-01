@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:StormMachine.App.ViewModels"
+             xmlns:forms="using:StormMachine.App.Controls"
              xmlns:discovery="using:StormMachine.Domain.Discovery"
              x:Class="StormMachine.App.Views.Pages.DevicesPage"
              x:DataType="vm:DevicesPageViewModel">
@@ -42,8 +43,8 @@
 
           <Button Grid.Column="6" Content="Обновить" Command="{Binding RefreshCommand}"
                   FontSize="12" Padding="12,5" Margin="8,0,0,0" />
-          <TextBlock Grid.Column="7" Text="{Binding StatusLine}" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}"
-                     VerticalAlignment="Center" Margin="16,0,0,0" TextWrapping="Wrap" />
+          <forms:StatusLine Grid.Column="7" Text="{Binding StatusLine}"
+                            VerticalAlignment="Center" Margin="16,0,0,0" />
         </Grid>
 
         <TextBlock Text="{Binding ErrorMessage}" FontSize="12"
@@ -102,8 +103,14 @@
             </ListBox.ItemTemplate>
           </ListBox>
 
-          <TextBlock Grid.Row="2" Margin="8,8,4,0" FontSize="10" Foreground="{StaticResource TextMutedBrush}" TextWrapping="Wrap"
-                     Text="Приглушённая строка — устройство известно, но в последнем сканировании не ответило. Пометка ✎ означает имя, присвоенное оператором: оно сильнее любого наблюдения." />
+          <!-- Легенда парами: в одном предложении, чтобы понять один знак,
+               приходилось прочитать про оба. -->
+          <StackPanel Grid.Row="2" Margin="8,8,4,0" Spacing="3">
+            <forms:LegendPair Sign="приглушённая строка"
+                              Meaning="устройство известно, но в последнем сканировании не ответило" />
+            <forms:LegendPair Sign="✎ у имени"
+                              Meaning="имя присвоено оператором: оно сильнее любого наблюдения" />
+          </StackPanel>
         </Grid>
       </Border>
 

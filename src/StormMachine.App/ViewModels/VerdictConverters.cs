@@ -1,6 +1,6 @@
 using System.Globalization;
 using Avalonia.Data.Converters;
-using Avalonia.Media;
+using StormMachine.App.Views.Controls;
 using StormMachine.Domain.Results;
 
 namespace StormMachine.App.ViewModels;
@@ -34,19 +34,14 @@ public sealed class VerdictBrushConverter : IValueConverter
 {
     public static readonly VerdictBrushConverter Instance = new();
 
-    private static readonly IBrush Pass = new SolidColorBrush(Color.FromRgb(0x7D, 0xD3, 0xA0));
-    private static readonly IBrush Warn = new SolidColorBrush(Color.FromRgb(0xE0, 0xB1, 0x5C));
-    private static readonly IBrush Fail = new SolidColorBrush(Color.FromRgb(0xE0, 0x6C, 0x6C));
-    private static readonly IBrush Unknown = new SolidColorBrush(Color.FromRgb(0x5A, 0x63, 0x75));
-
     public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture) =>
-        value switch
+        DesignTokens.Brush(value switch
         {
-            VerdictLevel.Pass => Pass,
-            VerdictLevel.Warn => Warn,
-            VerdictLevel.Fail => Fail,
-            _ => Unknown,
-        };
+            VerdictLevel.Pass => DesignTokens.Success,
+            VerdictLevel.Warn => DesignTokens.Warning,
+            VerdictLevel.Fail => DesignTokens.Danger,
+            _ => DesignTokens.TextMuted,
+        });
 
     public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) =>
         throw new NotSupportedException("Свойство только для показа.");

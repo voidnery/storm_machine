@@ -30,7 +30,10 @@ public sealed class LocalTestsPageViewModel : PageViewModel
 
     public static string Note =>
         "Скорость, качество канала и задержка под нагрузкой требуют вторую точку — "
-        + "сопряжённого агента (настройки, раздел «Агенты»). Сравнение резолверов DNS "
+        + "сопряжённого агента.";
+
+    public static string NoteWhy =>
+        "Агент сопрягается в настройках, раздел «Агенты». Сравнение резолверов DNS "
         + "работает без него.";
 
     public override Task ActivateAsync(CancellationToken cancellationToken = default) =>
@@ -55,10 +58,12 @@ public sealed class SpeedPageViewModel : PageViewModel
 
     public ProbeRunnerViewModel Runner { get; }
 
-    public static string Note =>
-        "Скорость наружу меряется до публичного сервера M-Lab — сервер выбирает их "
-        + "служба, у неё есть данные о загрузке узлов, которых нет у нас. iperf3 — "
-        + "мост к существующему «iperf3 -s» там, где своего агента поставить нельзя.";
+    public static string Note => "Скорость наружу меряется до публичного сервера M-Lab.";
+
+    public static string NoteWhy =>
+        "Сервер выбирает их служба: у неё есть данные о загрузке узлов, которых нет "
+        + "у нас. iperf3 — мост к существующему «iperf3 -s» там, где своего агента "
+        + "поставить нельзя.";
 
     public override Task ActivateAsync(CancellationToken cancellationToken = default) =>
         Runner.LoadAgentsAsync(cancellationToken);

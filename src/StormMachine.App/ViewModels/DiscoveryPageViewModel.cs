@@ -143,8 +143,27 @@ public sealed partial class DiscoveryPageViewModel : PageViewModel, IDisposable
     [ObservableProperty]
     private string _progressText = string.Empty;
 
+    // Итог скана: числа отдельно, объяснения отдельно.
+
     [ObservableProperty]
-    private string? _conclusion;
+    private bool _hasResult;
+
+    [ObservableProperty]
+    private string _foundText = "—";
+
+    [ObservableProperty]
+    private string _respondedText = "—";
+
+    [ObservableProperty]
+    private string _withMacText = "—";
+
+    /// <summary>Устройства, найденные только по ARP: обычный ping-sweep их не видит.</summary>
+    [ObservableProperty]
+    private string? _arpNote;
+
+    /// <summary>Виртуальные адреса среди найденного — оговорка о том, что это не сеть.</summary>
+    [ObservableProperty]
+    private string? _virtualNote;
 
     public ObservableCollection<DeviceRow> Devices { get; } = [];
 
@@ -199,7 +218,9 @@ public sealed partial class DiscoveryPageViewModel : PageViewModel, IDisposable
         }
 
         Devices.Clear();
-        Conclusion = null;
+        HasResult = false;
+        ArpNote = null;
+        VirtualNote = null;
         ProgressPercent = 0;
         ProgressText = string.Empty;
 
@@ -319,12 +340,20 @@ public sealed partial class DiscoveryPageViewModel : PageViewModel, IDisposable
 
         var virtualAddresses = scan.Devices.Any(d => MacAddresses.DescribeVirtual(d.MacAddress) is not null);
 
-        Conclusion = $"Найдено {scan.Devices.Count}, отвечают {scan.Responded}, MAC известен у {scan.WithMac}."
-                     + (arpOnly > 0
-                         ? $" Из них {arpOnly} найдены по ответу на ARP: они молчат на ICMP и на проверяемые "
-                           + "порты, но на втором уровне отвечают. Обычный ping-sweep их не находит."
-                         : string.Empty)
-                     + (virtualAddresses ? " " + MacAddresses.VirtualExplanation : string.Empty);
+        // Числа плитками, объяснения — своими формами: в одной строке, чтобы узнать
+        // одно число, приходилось прочитать всё, а объяснение про ARP терялось в хвосте.
+        FoundText = scan.Devices.Count.ToString(CultureInfo.InvariantCulture);
+        RespondedText = scan.Responded.ToString(CultureInfo.InvariantCulture);
+        WithMacText = scan.WithMac.ToString(CultureInfo.InvariantCulture);
+        HasResult = true;
+
+        ArpNote = arpOnly > 0
+            ? $"Из найденных {arpOnly} отозвались только на ARP: они молчат на ICMP "
+              + "и на проверяемые порты, но на втором уровне отвечают. Обычный "
+              + "ping-sweep их не находит."
+            : null;
+
+        VirtualNote = virtualAddresses ? MacAddresses.VirtualExplanation : null;
     }
 
     private void PumpProgress()

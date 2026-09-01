@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:StormMachine.App.ViewModels"
+             xmlns:forms="using:StormMachine.App.Controls"
              x:Class="StormMachine.App.Views.Pages.MonitorsPage"
              x:DataType="vm:MonitorsPageViewModel">
 
@@ -126,8 +127,7 @@
                   </ItemsControl.ItemTemplate>
                 </ItemsControl>
 
-                <TextBlock FontSize="10" Foreground="{StaticResource TextMutedBrush}" TextWrapping="Wrap"
-                           Text="Без порогов монитор копит историю, но ни о чём не судит." />
+                <forms:Caveat Text="Без порогов монитор копит историю, но ни о чём не судит." />
               </StackPanel>
 
               <CheckBox Content="Оповещать" IsChecked="{Binding Alert}" />
@@ -209,12 +209,10 @@
                 <TextBlock Text="Доступность" FontSize="12" FontWeight="SemiBold" />
                 <TextBlock Text="{Binding AvailabilityText}" FontSize="12" TextWrapping="Wrap" LineHeight="19" />
 
-                <!-- Оговорка о покрытии не прячется: 100% при покрытии 4% —
-                     это отсутствие данных, а не отличная сеть -->
-                <Border Padding="9,6" CornerRadius="3" Background="{StaticResource WarningSurfaceBrush}"
-                        IsVisible="{Binding CoverageNotice, Converter={x:Static ObjectConverters.IsNotNull}}">
-                  <TextBlock Text="{Binding CoverageNotice}" FontSize="11" TextWrapping="Wrap" />
-                </Border>
+                <!-- Оговорка о покрытии не прячется: 100 % при покрытии 4 % —
+                     это отсутствие данных, а не отличная сеть. Она обязана звучать
+                     громче самого числа, а не тише его. -->
+                <forms:Caveat Text="{Binding CoverageNotice}" />
               </StackPanel>
             </Border>
 
@@ -243,8 +241,9 @@
               </ItemsControl>
             </StackPanel>
 
-            <TextBlock FontSize="11" Foreground="{StaticResource TextMutedBrush}" TextWrapping="Wrap"
-                       Text="Форма даёт разумные умолчания; полная власть над расписанием и гистерезисом — у storm monitors add. Экран и консоль работают с одной базой и одним планировщиком." />
+            <forms:MethodCard Thesis="Форма даёт разумные умолчания; полная власть над расписанием и гистерезисом — у консоли."
+                              Detail="Экран и консоль работают с одной базой и одним планировщиком: заведённое здесь видно там, и наоборот." />
+            <forms:CopyChip Text="storm monitors add" />
 
           </StackPanel>
         </ScrollViewer>

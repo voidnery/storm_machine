@@ -68,6 +68,10 @@ public sealed partial class ProbesPageViewModel : PageViewModel, ITargetAware, I
     [ObservableProperty]
     private string _conclusion = string.Empty;
 
+    /// <summary>Уровень итога по набору: им выбирается знак вердикта.</summary>
+    [ObservableProperty]
+    private VerdictLevel _conclusionLevel = VerdictLevel.Unknown;
+
     [ObservableProperty]
     private string _caption = string.Empty;
 
@@ -199,6 +203,7 @@ public sealed partial class ProbesPageViewModel : PageViewModel, ITargetAware, I
         Steps.Clear();
         Targets.Clear();
         Conclusion = string.Empty;
+        ConclusionLevel = VerdictLevel.Unknown;
         Note = string.Empty;
         OnPropertyChanged(nameof(HasSteps));
         OnPropertyChanged(nameof(HasTargets));
@@ -258,6 +263,10 @@ public sealed partial class ProbesPageViewModel : PageViewModel, ITargetAware, I
                     VerdictWording.Mark(run.Level),
                     VerdictWording.Outcome(run.Level),
                     run.FirstFailure?.Name ?? "—"));
+
+                // Итог по набору — худший из исходов: одна упавшая цель из пяти
+                // остаётся отказом, а не растворяется в четырёх успешных.
+                ConclusionLevel = Worse(ConclusionLevel, run.Level);
             }
 
             OnPropertyChanged(nameof(HasTargets));
@@ -266,6 +275,7 @@ public sealed partial class ProbesPageViewModel : PageViewModel, ITargetAware, I
         catch (OperationCanceledException)
         {
             Conclusion = "Сценарий прерван.";
+            ConclusionLevel = VerdictLevel.Unknown;
         }
         catch (ArgumentException ex)
         {
@@ -338,6 +348,24 @@ public sealed partial class ProbesPageViewModel : PageViewModel, ITargetAware, I
 
         return TargetSetConclusion.Describe(Targets.Count, failed, set.Title);
     }
+
+    /// <summary>
+    /// Худший из двух исходов.
+    /// </summary>
+    /// <remarks>
+    /// «Не оценено» слабее всех: набор, где ни одна цель не дошла до вердикта,
+    /// не считается успешным.
+    /// </remarks>
+    private static VerdictLevel Worse(VerdictLevel current, VerdictLevel next) =>
+        Rank(next) > Rank(current) ? next : current;
+
+    private static int Rank(VerdictLevel level) => level switch
+    {
+        VerdictLevel.Fail => 3,
+        VerdictLevel.Warn => 2,
+        VerdictLevel.Pass => 1,
+        _ => 0,
+    };
 
     [RelayCommand(CanExecute = nameof(IsRunning))]
     private void Stop() => _cts?.Cancel();

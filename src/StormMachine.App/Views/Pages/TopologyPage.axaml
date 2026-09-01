@@ -2,20 +2,20 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:StormMachine.App.ViewModels"
              xmlns:controls="using:StormMachine.App.Views.Controls"
+             xmlns:forms="using:StormMachine.App.Controls"
              x:Class="StormMachine.App.Views.Pages.TopologyPage"
              x:DataType="vm:TopologyPageViewModel">
 
   <Grid RowDefinitions="Auto,Auto,*" Margin="24,20">
 
-    <StackPanel Grid.Row="0" Spacing="4">
-      <TextBlock Text="{Binding Title}" FontSize="24" FontWeight="SemiBold" />
-      <TextBlock Text="{Binding Summary}" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap" />
+    <StackPanel Grid.Row="0" Spacing="6">
+      <TextBlock Text="{Binding Title}" Classes="h1" />
+      <TextBlock Text="{Binding Summary}" Classes="body"
+                 Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap" />
 
       <!-- Оговорки заметнее сводки: они говорят не о достоверности связей,
            а о том, что карту нельзя читать буквально. -->
-      <TextBlock Text="{Binding Caveats}" FontSize="12" TextWrapping="Wrap"
-                 Foreground="{StaticResource WarningBrush}"
-                 IsVisible="{Binding Caveats, Converter={x:Static ObjectConverters.IsNotNull}}" />
+      <forms:Caveat Text="{Binding Caveats}" />
     </StackPanel>
 
     <Border Grid.Row="1" Margin="0,12,0,0" Padding="14,10" CornerRadius="6"
@@ -42,8 +42,8 @@
           <Button Grid.Column="4" Content="Развернуть выбранное" Command="{Binding ExpandCommand}"
                   FontSize="12" Padding="10,4" Margin="0,0,10,0" />
 
-          <TextBlock Grid.Column="5" Text="{Binding StatusLine}" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}"
-                     VerticalAlignment="Center" Margin="10,0" TextTrimming="CharacterEllipsis" />
+          <forms:StatusLine Grid.Column="5" Text="{Binding StatusLine}"
+                            VerticalAlignment="Center" Margin="10,0" />
 
           <Button Grid.Column="6" Content="PNG" Command="{Binding ExportPngCommand}"
                   FontSize="12" Padding="12,4" Margin="0,0,6,0" />
@@ -109,21 +109,38 @@
                        FontSize="11" Foreground="{StaticResource TextMutedBrush}" TextWrapping="Wrap" />
           </StackPanel>
 
-          <StackPanel Grid.Row="1" Spacing="2" Margin="0,0,0,10"
+          <!-- Свойства парами «подпись: значение»: голым столбиком адрес от MAC
+               отличался только формой записи, и догадываться приходилось глазом. -->
+          <StackPanel Grid.Row="1" Spacing="3" Margin="0,0,0,10"
                       IsVisible="{Binding SelectedNode, Converter={x:Static ObjectConverters.IsNotNull}}">
-            <TextBlock Text="{Binding SelectedNode.Label}" FontSize="13" TextWrapping="Wrap" />
-            <TextBlock Text="{Binding SelectedNode.Address}" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}"
-                       IsVisible="{Binding SelectedNode.Address, Converter={x:Static ObjectConverters.IsNotNull}}" />
-            <TextBlock Text="{Binding SelectedNode.MacAddress}" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}"
-                       IsVisible="{Binding SelectedNode.MacAddress, Converter={x:Static ObjectConverters.IsNotNull}}" />
-            <TextBlock Text="{Binding SelectedNode.Vendor}" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}"
-                       TextWrapping="Wrap"
-                       IsVisible="{Binding SelectedNode.Vendor, Converter={x:Static ObjectConverters.IsNotNull}}" />
-            <TextBlock Text="{Binding SelectedNode.Role}" FontSize="12"
-                       Foreground="{StaticResource AccentBrush}"
-                       IsVisible="{Binding SelectedNode.Role, Converter={x:Static ObjectConverters.IsNotNull}}" />
-            <TextBlock Text="{Binding SelectedNode.Detail}" FontSize="11" Foreground="{StaticResource TextMutedBrush}"
-                       TextWrapping="Wrap"
+            <TextBlock Text="{Binding SelectedNode.Label}" Classes="h2" TextWrapping="Wrap" />
+
+            <Grid ColumnDefinitions="70,*"
+                  IsVisible="{Binding SelectedNode.Address, Converter={x:Static ObjectConverters.IsNotNull}}">
+              <TextBlock Grid.Column="0" Text="адрес" Classes="caption" />
+              <TextBlock Grid.Column="1" Text="{Binding SelectedNode.Address}" Classes="body mono" />
+            </Grid>
+
+            <Grid ColumnDefinitions="70,*"
+                  IsVisible="{Binding SelectedNode.MacAddress, Converter={x:Static ObjectConverters.IsNotNull}}">
+              <TextBlock Grid.Column="0" Text="MAC" Classes="caption" />
+              <TextBlock Grid.Column="1" Text="{Binding SelectedNode.MacAddress}" Classes="body mono" />
+            </Grid>
+
+            <Grid ColumnDefinitions="70,*"
+                  IsVisible="{Binding SelectedNode.Vendor, Converter={x:Static ObjectConverters.IsNotNull}}">
+              <TextBlock Grid.Column="0" Text="вендор" Classes="caption" />
+              <TextBlock Grid.Column="1" Text="{Binding SelectedNode.Vendor}" Classes="body" TextWrapping="Wrap" />
+            </Grid>
+
+            <Grid ColumnDefinitions="70,*"
+                  IsVisible="{Binding SelectedNode.Role, Converter={x:Static ObjectConverters.IsNotNull}}">
+              <TextBlock Grid.Column="0" Text="категория" Classes="caption" />
+              <TextBlock Grid.Column="1" Text="{Binding SelectedNode.Role}" Classes="body"
+                         Foreground="{StaticResource AccentBrush}" />
+            </Grid>
+
+            <TextBlock Text="{Binding SelectedNode.Detail}" Classes="caption" TextWrapping="Wrap"
                        IsVisible="{Binding SelectedNode.Detail, Converter={x:Static ObjectConverters.IsNotNull}}" />
           </StackPanel>
 

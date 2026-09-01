@@ -2,6 +2,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:StormMachine.App.ViewModels"
              xmlns:results="using:StormMachine.Domain.Results"
+             xmlns:forms="using:StormMachine.App.Controls"
              x:Class="StormMachine.App.Views.Pages.DashboardPage"
              x:DataType="vm:DashboardPageViewModel">
 
@@ -70,8 +71,19 @@
                     FontSize="12" Padding="10,3" />
           </Grid>
 
-          <TextBlock Text="{Binding JournalInfo}" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap" />
-          <TextBlock Text="{Binding InventoryInfo}" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap" />
+          <!-- Числа плитками, совет строкой: склеенные в одну серую фразу,
+               они читались как одна надпись — ни числа, ни совета. -->
+          <Grid ColumnDefinitions="Auto,Auto,Auto,*" IsVisible="{Binding HasJournal}">
+            <forms:StatTile Grid.Column="0" Width="110" Caption="Прогонов" Value="{Binding RunCountText}" />
+            <forms:StatTile Grid.Column="1" Width="130" Caption="Сэмплов" Value="{Binding SampleCountText}" />
+            <forms:StatTile Grid.Column="2" Width="130" Caption="Размер файла" Value="{Binding SizeText}" />
+          </Grid>
+
+          <TextBlock Text="{Binding JournalInfo}" Classes="body"
+                     Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap"
+                     IsVisible="{Binding JournalInfo, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+          <TextBlock Text="{Binding InventoryInfo}" Classes="body"
+                     Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap" />
 
           <ItemsControl ItemsSource="{Binding RecentRuns}">
             <ItemsControl.ItemTemplate>
