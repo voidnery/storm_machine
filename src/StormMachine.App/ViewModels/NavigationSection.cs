@@ -14,12 +14,27 @@ namespace StormMachine.App.ViewModels;
 /// итераций после И-13. Обещание срока заменено фактом, который сверяется
 /// проверкой: названные команды обязаны существовать в продукте.
 /// </param>
+/// <param name="Group">
+/// Группа бокового меню: «Своя сеть», «Интернет» и так далее.
+/// </param>
 public sealed record NavigationSection(
     string Route,
     string Title,
     string Description,
-    string? ConsoleCommands)
+    string? ConsoleCommands,
+    string Group = "")
 {
+    /// <summary>
+    /// Заголовок группы — только у первого её раздела, иначе <c>null</c>.
+    /// </summary>
+    /// <remarks>
+    /// Считается один раз при сборке карты, а не размечается руками: помеченный
+    /// вручную заголовок отстаёт от порядка при первой же перестановке разделов.
+    /// Так восемнадцать строк подряд превращаются в шесть коротких списков,
+    /// не заводя второго списка с собственным выделением.
+    /// </remarks>
+    public string? GroupHeader { get; init; }
+
     public bool IsReady => ConsoleCommands is null;
 
     /// <summary>

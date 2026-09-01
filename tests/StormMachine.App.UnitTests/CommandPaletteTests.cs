@@ -1,6 +1,8 @@
 using Avalonia;
 using Avalonia.Headless;
+using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.VisualTree;
 using Microsoft.Extensions.DependencyInjection;
 using StormMachine.App.Services;
 using StormMachine.App.ViewModels;
@@ -46,6 +48,52 @@ public sealed class CommandPaletteTests(HeadlessSessionFixture fixture)
                     window.MouseUp(new Point(60, window.Bounds.Height - 60), MouseButton.Left);
 
                     Assert.False(shell.Palette.IsOpen);
+                }
+                finally
+                {
+                    window.Close();
+                }
+            },
+            CancellationToken.None);
+    }
+
+    /// <summary>Щелчок по строке — переход: список, умеющий только выделять, сломан.</summary>
+    [Fact]
+    public async Task ClickOnItem_NavigatesAndCloses()
+    {
+        await _session.Dispatch(
+            async () =>
+            {
+                await using var services = AppServices.Build();
+                var shell = services.GetRequiredService<MainWindowViewModel>();
+
+                var window = new Views.MainWindow { DataContext = shell };
+                window.Show();
+
+                try
+                {
+                    var first = shell.SelectedSection;
+
+                    shell.Palette.Open();
+                    shell.Palette.Query = "журнал";
+                    window.UpdateLayout();
+
+                    Assert.NotEmpty(shell.Palette.Items);
+
+                    var list = window.GetVisualDescendants().OfType<ListBox>()
+                        .First(l => l.Name == "PaletteList");
+
+                    var row = list.GetVisualDescendants().OfType<ListBoxItem>().First();
+                    var point = row.Bounds.Center;
+                    var inWindow = row.TranslatePoint(new Point(point.X - row.Bounds.X, point.Y - row.Bounds.Y), window);
+
+                    Assert.NotNull(inWindow);
+
+                    window.MouseDown(inWindow!.Value, MouseButton.Left);
+                    window.MouseUp(inWindow.Value, MouseButton.Left);
+
+                    Assert.False(shell.Palette.IsOpen);
+                    Assert.NotEqual(first?.Route, shell.SelectedSection?.Route);
                 }
                 finally
                 {

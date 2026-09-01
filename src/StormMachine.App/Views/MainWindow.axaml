@@ -96,16 +96,61 @@
                  SelectedItem="{Binding SelectedSection}"
                  Background="Transparent"
                  BorderThickness="0">
+          <ListBox.Styles>
+            <!-- Подсветка выбранного переезжает с контейнера на саму строку раздела:
+                 заголовок группы живёт в том же контейнере, и выделение накрывало
+                 его вместе с разделом. -->
+            <Style Selector="ListBoxItem">
+              <Setter Property="Padding" Value="0" />
+            </Style>
+            <!-- Гасится и выбранное, и наведённое состояние контейнера: тема Fluent
+                 красит их отдельными правилами, и одного общего мало. -->
+            <Style Selector="ListBoxItem /template/ ContentPresenter#PART_ContentPresenter">
+              <Setter Property="Background" Value="Transparent" />
+            </Style>
+            <Style Selector="ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
+              <Setter Property="Background" Value="Transparent" />
+            </Style>
+            <Style Selector="ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+              <Setter Property="Background" Value="Transparent" />
+            </Style>
+            <Style Selector="ListBoxItem:selected:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+              <Setter Property="Background" Value="Transparent" />
+            </Style>
+            <!-- Умолчание задаётся стилем, а не атрибутом: локальное значение
+                 в разметке перебило бы стиль выделения. -->
+            <Style Selector="ListBoxItem Border.row">
+              <Setter Property="Background" Value="Transparent" />
+            </Style>
+            <Style Selector="ListBoxItem:selected Border.row">
+              <Setter Property="Background" Value="{DynamicResource AccentBrush}" />
+            </Style>
+            <Style Selector="ListBoxItem:pointerover Border.row">
+              <Setter Property="Background" Value="{DynamicResource ChipBrush}" />
+            </Style>
+            <Style Selector="ListBoxItem:selected:pointerover Border.row">
+              <Setter Property="Background" Value="{DynamicResource AccentBrush}" />
+            </Style>
+          </ListBox.Styles>
           <ListBox.ItemTemplate>
             <DataTemplate x:DataType="vm:NavigationSection">
-              <StackPanel Spacing="1" Margin="0,3">
-                <StackPanel Orientation="Horizontal" Spacing="6">
-                  <TextBlock Text="{Binding Title}" FontSize="13" />
-                  <TextBlock Text="консоль" FontSize="10" Foreground="{StaticResource TextMutedBrush}"
-                             VerticalAlignment="Center"
-                             IsVisible="{Binding !IsReady}" />
-                </StackPanel>
-                <TextBlock Text="{Binding Route}" FontSize="10" Foreground="{StaticResource TextMutedBrush}" />
+              <!-- Заголовок группы живёт в строке своего первого раздела: так
+                   восемнадцать строк подряд читаются как шесть коротких списков,
+                   и при этом выделение остаётся одно на всё меню.
+                   Путь раздела (/local/tests/latency) ушёл в подсказку: это адрес
+                   для будущего web-варианта, оператору он ничего не говорит. -->
+              <StackPanel Spacing="1" ToolTip.Tip="{Binding Description}">
+                <TextBlock Text="{Binding GroupHeader}" Classes="caption"
+                           Margin="12,12,0,4" FontWeight="SemiBold"
+                           IsVisible="{Binding GroupHeader, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                <Border Classes="row" Padding="12,7" CornerRadius="4"
+                        Margin="4,0">
+                  <StackPanel Orientation="Horizontal" Spacing="6">
+                    <TextBlock Text="{Binding Title}" FontSize="13" />
+                    <TextBlock Text="консоль" Classes="caption" VerticalAlignment="Center"
+                               IsVisible="{Binding !IsReady}" />
+                  </StackPanel>
+                </Border>
               </StackPanel>
             </DataTemplate>
           </ListBox.ItemTemplate>
@@ -262,7 +307,10 @@
           <TextBlock Grid.Row="2" Text="Ничего не нашлось." FontSize="12" Foreground="{StaticResource TextMutedBrush}"
                      Margin="2,4" IsVisible="{Binding IsEmpty}" />
 
-          <ListBox Grid.Row="2" ItemsSource="{Binding Items}" SelectedItem="{Binding Selected}"
+          <!-- Строка выполняется щелчком, а не только клавишей Enter: поиск,
+               в котором мышь умеет лишь выделять, выглядит сломанным. -->
+          <ListBox x:Name="PaletteList" Grid.Row="2"
+                   ItemsSource="{Binding Items}" SelectedItem="{Binding Selected}"
                    Background="Transparent" BorderThickness="0"
                    IsVisible="{Binding !IsEmpty}">
             <ListBox.ItemTemplate>

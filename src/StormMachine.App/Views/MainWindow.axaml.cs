@@ -29,6 +29,24 @@ public partial class MainWindow : Window
         // Escape: окно, которое закрывается единственным способом, и тот с клавиатуры,
         // ловит мышь в тупик (замечание оператора).
         PaletteOverlay.AddHandler(PointerPressedEvent, ClosePaletteOnClickOutside, RoutingStrategies.Tunnel);
+
+        // Щелчок по строке — переход. Список умел только выделять, и мышью
+        // из палитры было никуда не попасть (замечание оператора).
+        PaletteList.AddHandler(PointerReleasedEvent, RunPaletteItemOnClick, RoutingStrategies.Bubble);
+    }
+
+    private void RunPaletteItemOnClick(object? sender, PointerReleasedEventArgs e)
+    {
+        if (DataContext is not MainWindowViewModel shell || e.InitialPressMouseButton != MouseButton.Left)
+        {
+            return;
+        }
+
+        // Только попадание в строку: щелчок по пустому месту списка ничего не выполняет.
+        if (e.Source is Visual clicked && clicked.GetSelfAndVisualAncestors().OfType<ListBoxItem>().Any())
+        {
+            shell.Palette.Run();
+        }
     }
 
     private void ClosePaletteOnClickOutside(object? sender, PointerPressedEventArgs e)
