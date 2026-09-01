@@ -85,7 +85,7 @@ public partial class LatencyPage : UserControl
         plot.Grid.MajorLineColor = Token(DesignTokens.Panel);
 
         plot.XLabel("проба");
-        plot.YLabel("RTT, мс");
+        plot.YLabel("время оборота (RTT), мс");
 
         // Легенда включается ОДИН раз, при настройке.
         // ShowLegend() добавляет панель на каждый вызов, а перерисовка идёт десять раз
@@ -123,7 +123,7 @@ public partial class LatencyPage : UserControl
             var signal = plot.Add.Signal(ys);
             signal.Color = Token(DesignTokens.Accent);
             signal.LineWidth = 1.5f;
-            signal.LegendText = "RTT";
+            signal.LegendText = "время оборота";
 
             // Порог разрешения рисуется линией: значения ниже него неотличимы
             // от собственной работы измерительного стека, и это должно быть видно,
@@ -137,7 +137,7 @@ public partial class LatencyPage : UserControl
 
                 // Пояснение вынесено в легенду, а не в подпись самой линии: подпись
                 // ScottPlot рисует поверх оси Y и она перекрывает и шкалу, и данные.
-                floor.LegendText = "порог достоверности";
+                floor.LegendText = "порог часов — ниже него измерять нечем";
             }
 
             plot.Axes.AutoScale();

@@ -269,7 +269,7 @@ public sealed partial class PathPageViewModel : PageViewModel, ITargetAware
         OnPropertyChanged(nameof(CanStop));
 
         StatusLine = Continuous
-            ? "Идёт непрерывное наблюдение. Остановить можно кнопкой или из Run Drawer."
+            ? "Идёт непрерывное наблюдение. Остановить можно кнопкой или из панели операций."
             : $"Идёт наблюдение: {Rounds} циклов с интервалом {IntervalMs} мс.";
         StatusState = OperationState.Running;
 
@@ -305,14 +305,14 @@ public sealed partial class PathPageViewModel : PageViewModel, ITargetAware
         _resolvedAddress = run.Summary.ResolvedAddress;
         ReadAnnotations(run.Facts);
 
-        // Сырых сэмплов может уже не быть — тогда разбор восстанавливается из агрегатов.
+        // Сырых измерений может уже не быть — тогда разбор восстанавливается из сводок.
         Apply(run.Samples.Count > 0
             ? PathAnalysis.Compute(run.Samples, _resolvedAddress)
             : PathAnalysis.FromSeries(run.Series, _resolvedAddress));
 
         StatusLine = run.Summary.HasRawSamples
             ? $"Показана трассировка от {run.Summary.StartedUtc.ToLocalTime():dd.MM HH:mm:ss}."
-            : "У этого прогона сырые сэмплы удалены политикой хранения — таблица собрана из агрегатов.";
+            : "У этого прогона сырые измерения удалены политикой хранения — таблица собрана из сводок.";
         StatusState = OperationState.Done;
     }
 

@@ -37,7 +37,7 @@
                взгляде на карту продукт не станет. -->
           <CheckBox Grid.Column="3" IsChecked="{Binding UseSnmp}" FontSize="12"
                     Content="Опросить SNMP" Margin="0,0,14,0"
-                    ToolTip.Tip="Порты коммутаторов и соседей по LLDP. Требует заведённых учётных данных" />
+                    ToolTip.Tip="SNMP — стандартный протокол опроса оборудования. Даёт порты коммутаторов и соседей по LLDP. Требует заведённых учётных данных" />
 
           <Button Grid.Column="4" Content="Развернуть выбранное" Command="{Binding ExpandCommand}"
                   FontSize="12" Padding="10,4" Margin="0,0,10,0" />
@@ -45,11 +45,11 @@
           <forms:StatusLine Grid.Column="5" Text="{Binding StatusLine}"
                             VerticalAlignment="Center" Margin="10,0" />
 
-          <Button Grid.Column="6" Content="PNG" Command="{Binding ExportPngCommand}"
+          <Button Grid.Column="6" Content="PNG" ToolTip.Tip="Картинка карты — вставить в письмо или отчёт" Command="{Binding ExportPngCommand}"
                   FontSize="12" Padding="12,4" Margin="0,0,6,0" />
-          <Button Grid.Column="7" Content="SVG" Command="{Binding ExportSvgCommand}"
+          <Button Grid.Column="7" Content="SVG" ToolTip.Tip="Векторная картинка — не мылится при увеличении" Command="{Binding ExportSvgCommand}"
                   FontSize="12" Padding="12,4" Margin="0,0,6,0" />
-          <Button Grid.Column="8" Content="JSON" Command="{Binding ExportJsonCommand}"
+          <Button Grid.Column="8" Content="JSON" ToolTip.Tip="Данные карты для чужой программы" Command="{Binding ExportJsonCommand}"
                   FontSize="12" Padding="12,4" />
         </Grid>
 
@@ -123,13 +123,13 @@
 
             <Grid ColumnDefinitions="70,*"
                   IsVisible="{Binding SelectedNode.MacAddress, Converter={x:Static ObjectConverters.IsNotNull}}">
-              <TextBlock Grid.Column="0" Text="MAC" Classes="caption" />
+              <TextBlock Grid.Column="0" Text="MAC" Classes="caption" ToolTip.Tip="Аппаратный адрес сетевой карты" />
               <TextBlock Grid.Column="1" Text="{Binding SelectedNode.MacAddress}" Classes="body mono" />
             </Grid>
 
             <Grid ColumnDefinitions="70,*"
                   IsVisible="{Binding SelectedNode.Vendor, Converter={x:Static ObjectConverters.IsNotNull}}">
-              <TextBlock Grid.Column="0" Text="вендор" Classes="caption" />
+              <TextBlock Grid.Column="0" Text="производитель" Classes="caption" />
               <TextBlock Grid.Column="1" Text="{Binding SelectedNode.Vendor}" Classes="body" TextWrapping="Wrap" />
             </Grid>
 

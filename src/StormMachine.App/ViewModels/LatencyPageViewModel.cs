@@ -1,4 +1,4 @@
-﻿using System.Collections.ObjectModel;
+using System.Collections.ObjectModel;
 using System.Globalization;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -208,7 +208,7 @@ public sealed partial class LatencyPageViewModel : PageViewModel, ITargetAware
     public override void Deactivate()
     {
         // Прогон намеренно не останавливается при уходе со страницы: он виден
-        // в Run Drawer и продолжает писаться в журнал. Останавливать измерение
+        // в панели операций и продолжает писаться в журнал. Останавливать измерение
         // потому, что оператор переключил вкладку, — потеря данных без причины.
         _timer.Stop();
     }
@@ -273,7 +273,7 @@ public sealed partial class LatencyPageViewModel : PageViewModel, ITargetAware
         OnPropertyChanged(nameof(CanStop));
 
         StatusLine = Continuous
-            ? "Идёт непрерывное измерение. Остановить можно кнопкой или из Run Drawer."
+            ? "Идёт непрерывное измерение. Остановить можно кнопкой или из панели операций."
             : $"Идёт измерение: {Count} проб с интервалом {IntervalMs} мс.";
         StatusState = OperationState.Running;
 
@@ -318,7 +318,7 @@ public sealed partial class LatencyPageViewModel : PageViewModel, ITargetAware
 
         StatusLine = run.Summary.HasRawSamples
             ? $"Показан прогон от {run.Summary.StartedUtc.ToLocalTime():dd.MM HH:mm:ss}."
-            : "У этого прогона сырые сэмплы удалены политикой хранения — остались только агрегаты.";
+            : "У этого прогона сырые измерения удалены политикой хранения — остались только сводки.";
         StatusState = OperationState.Done;
     }
 

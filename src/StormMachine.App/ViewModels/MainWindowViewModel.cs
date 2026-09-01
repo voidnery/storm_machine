@@ -147,6 +147,20 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     public static string LevelText => "Уровень 0 — ядро";
 
+    /// <summary>
+    /// Что означают уровни.
+    /// </summary>
+    /// <remarks>
+    /// Шкала объяснялась только в разделе «Разработка», а он временный и уйдёт
+    /// из релизной версии. После его удаления «Уровень 0» в шапке остался бы
+    /// надписью без единого объяснения во всём продукте.
+    /// </remarks>
+    public static string LevelHint =>
+        "Уровень 0 — то, что работает у любого без прав администратора и без "
+        + "дополнительных программ: измерения, инвентарь, карта, отчёты. "
+        + "Уровень 1 добавляет опрос оборудования по SNMP — нужны учётные данные. "
+        + "Уровень 2 добавляет захват пакетов — нужен драйвер Npcap.";
+
     partial void OnSelectedSectionChanged(NavigationSection? value)
     {
         if (value is not null)
@@ -255,7 +269,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         }
 
         FloorLine = _clock.CalibrationBaselineMs > 0
-            ? $"порог {_clock.CalibrationBaselineMs.ToString("0.000", CultureInfo.InvariantCulture)} мс"
+            ? $"порог часов {_clock.CalibrationBaselineMs.ToString("0.000", CultureInfo.InvariantCulture)} мс"
             : "порог не измерен";
     }
 

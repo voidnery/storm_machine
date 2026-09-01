@@ -7,6 +7,7 @@ using StormMachine.App.Controls;
 using StormMachine.App.Services;
 using StormMachine.Application.Abstractions;
 using StormMachine.Application.Probes;
+using StormMachine.Domain.Measurements;
 using StormMachine.Domain.Results;
 
 namespace StormMachine.App.ViewModels;
@@ -138,8 +139,8 @@ public sealed partial class ProbeRunnerViewModel : ObservableObject
         Probes = options;
         Probe = options[0];
 
-        // Очередь сэмплов разбирается по таймеру, как на странице задержки:
-        // счётчик проб в Run Drawer живёт, а дёрганья на каждый сэмпл нет.
+        // Очередь сырых измерений разбирается по таймеру, как на странице задержки:
+        // счётчик проб в панели операций живёт, а дёрганья на каждый сэмпл нет.
         _timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(500) };
         _timer.Tick += (_, _) => _current?.Drain();
     }
@@ -185,6 +186,10 @@ public sealed partial class ProbeRunnerViewModel : ObservableObject
     /// <summary>Номер сохранённого прогона: по нему его ищут в журнале.</summary>
     [ObservableProperty]
     private string? _savedRunId;
+
+    /// <summary>В чём измерены ряды — подписью под таблицей.</summary>
+    [ObservableProperty]
+    private string _seriesUnit = string.Empty;
 
     public bool NeedsTarget => Probe?.Descriptor.RequiresTarget ?? false;
 
@@ -384,6 +389,11 @@ public sealed partial class ProbeRunnerViewModel : ObservableObject
 
         var result = outcome.Result;
 
+        // Единица берётся у результата, а не подразумевается: у пробы скорости
+        // ряды — мегабиты в секунду, и подпись «времена в миллисекундах» была
+        // не отсутствием единицы, а неверной единицей.
+        SeriesUnit = Units.TableCaption(result.Unit);
+
         // Раскладка та же, что в журнале и хранилище, — по объявленной форме.
         foreach (var series in SeriesBreakdown.Compute(run.Descriptor.Shape, result.Samples))
         {
@@ -394,15 +404,19 @@ public sealed partial class ProbeRunnerViewModel : ObservableObject
                 series.Label,
                 series.SentCount.ToString(CultureInfo.InvariantCulture),
                 $"{series.LossPercent:0} %",
-                empty ? "—" : Milliseconds(stats.MinMs),
-                empty ? "—" : Milliseconds(stats.P50Ms),
-                empty ? "—" : Milliseconds(stats.MaxMs),
-                empty ? "—" : Milliseconds(stats.JitterRfc3550Ms)));
+                empty ? "—" : Measured(stats.MinMs, result.Unit),
+                empty ? "—" : Measured(stats.P50Ms, result.Unit),
+                empty ? "—" : Measured(stats.MaxMs, result.Unit),
+                empty ? "—" : Measured(stats.JitterRfc3550Ms, result.Unit)));
         }
 
         foreach (var fact in result.Facts)
         {
-            Facts.Add(new FactRow(fact.Category, fact.Name, fact.Value, fact.IsWarning));
+            Facts.Add(new FactRow(
+                fact.Category,
+                fact.Name,
+                fact.Value + Units.Suffix(fact.Unit),
+                fact.IsWarning));
         }
 
         OnPropertyChanged(nameof(HasSeries));
@@ -424,6 +438,13 @@ public sealed partial class ProbeRunnerViewModel : ObservableObject
         }
     }
 
-    private static string Milliseconds(double value) =>
-        value.ToString("0.###", CultureInfo.InvariantCulture);
+    /// <summary>
+    /// Значение ряда без единицы: единица названа один раз подписью таблицы.
+    /// </summary>
+    /// <remarks>
+    /// В колонке с семью числами единица у каждого превращает таблицу в частокол
+    /// букв; в подписи она читается один раз и относится ко всем.
+    /// </remarks>
+    private static string Measured(double value, MeasurementUnit unit) =>
+        value.ToString(unit == MeasurementUnit.MegabitsPerSecond ? "0.#" : "0.###", CultureInfo.InvariantCulture);
 }

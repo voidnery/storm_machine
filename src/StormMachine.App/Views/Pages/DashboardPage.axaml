@@ -75,7 +75,7 @@
                они читались как одна надпись — ни числа, ни совета. -->
           <Grid ColumnDefinitions="Auto,Auto,Auto,*" IsVisible="{Binding HasJournal}">
             <forms:StatTile Grid.Column="0" Width="110" Caption="Прогонов" Value="{Binding RunCountText}" />
-            <forms:StatTile Grid.Column="1" Width="130" Caption="Сэмплов" Value="{Binding SampleCountText}" />
+            <forms:StatTile Grid.Column="1" Width="130" Caption="Сырых измерений" Value="{Binding SampleCountText}" />
             <forms:StatTile Grid.Column="2" Width="130" Caption="Размер файла" Value="{Binding SizeText}" />
           </Grid>
 

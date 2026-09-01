@@ -84,8 +84,8 @@ public sealed class BufferbloatProbe(AgentDirectory directory, Lazy<IProbeRegist
             new ProbeParameter
             {
                 Name = "direction", Label = "Чем грузить", Type = ProbeParameterType.Choice,
-                DefaultValue = "upload",
-                Choices = ["upload", "download"],
+                DefaultValue = Directions.Upload,
+                Choices = [Directions.Upload, Directions.Download],
                 Description = "Очереди в двух направлениях разные: у домашних каналов раздача обычно хуже.",
             },
         ],
@@ -134,8 +134,7 @@ public sealed class BufferbloatProbe(AgentDirectory directory, Lazy<IProbeRegist
         var idleSeconds = request.GetParameter("idle", 5);
         var loadedSeconds = request.GetParameter("loaded", 10);
         var intervalMs = request.GetParameter("interval", 50);
-        var upload = !request.GetParameter("direction", "upload")
-            .Equals("download", StringComparison.OrdinalIgnoreCase);
+        var upload = !Directions.IsDownload(request.GetParameter("direction", Directions.Upload));
 
         var address = agent.Address ?? throw new InvalidOperationException(
             $"У агента «{agent.DisplayName}» не записан адрес — до него нечем мерить задержку.");

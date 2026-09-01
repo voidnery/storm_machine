@@ -51,6 +51,10 @@ internal static class Describe
     /// <remarks>
     /// Число без единицы бесполезно: «7.497» не даёт понять, много это или мало.
     /// Единица берётся из самого факта — проба знает, что именно она измерила.
+    /// <para>
+    /// Сам словарь единиц живёт в предметной области: окну он нужен тот же самый,
+    /// а расходиться названиям одной и той же величины незачем.
+    /// </para>
     /// </remarks>
     public static string UnitSuffix(ProbeFact fact)
     {
@@ -59,14 +63,7 @@ internal static class Describe
         return UnitSuffix(fact.Unit);
     }
 
-    public static string UnitSuffix(MeasurementUnit? unit) => unit switch
-    {
-        MeasurementUnit.Milliseconds => " мс",
-        MeasurementUnit.MegabitsPerSecond => " Мбит/с",
-        MeasurementUnit.Percent => " %",
-        MeasurementUnit.Bytes => " байт",
-        _ => string.Empty,
-    };
+    public static string UnitSuffix(MeasurementUnit? unit) => Units.Suffix(unit);
 
     /// <summary>Показывает факты, сгруппированные по категориям.</summary>
     public static void WriteFacts(IReadOnlyList<ProbeFact> facts)

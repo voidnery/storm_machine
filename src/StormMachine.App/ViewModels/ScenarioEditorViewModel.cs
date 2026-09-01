@@ -84,6 +84,15 @@ public sealed partial class ScenarioEditorViewModel : ObservableObject
         "Параметры пишутся через пробел: count=4 interval=200. Пороги — через точку "
         + "с запятой: p95 < 100; потери <= 0. Пустая цель шага наследует цель предыдущего.";
 
+    /// <summary>
+    /// Что такое метрики порога — тот же словарь, что и у мониторов.
+    /// </summary>
+    /// <remarks>
+    /// Короткий ключ порога ничего не объясняет: «p95 &lt; 100» не говорит ни что
+    /// такое p95, ни в чём эти 100. Здесь на оба вопроса отвечает список метрик.
+    /// </remarks>
+    public static IReadOnlyList<MetricHelp> Metrics => MetricWording.Common;
+
     [RelayCommand]
     private void Toggle() => IsOpen = !IsOpen;
 

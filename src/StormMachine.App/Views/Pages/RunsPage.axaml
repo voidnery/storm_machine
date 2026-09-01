@@ -37,7 +37,7 @@
            одной серой строкой, и путь в ней обрезался. -->
       <Grid ColumnDefinitions="Auto,Auto,Auto,*" Margin="0,6,0,2">
         <controls:StatTile Grid.Column="0" Width="110" Caption="Прогонов" Value="{Binding RunCountText}" />
-        <controls:StatTile Grid.Column="1" Width="130" Caption="Сэмплов" Value="{Binding SampleCountText}" />
+        <controls:StatTile Grid.Column="1" Width="130" Caption="Сырых измерений" Value="{Binding SampleCountText}" />
         <controls:StatTile Grid.Column="2" Width="130" Caption="Размер файла" Value="{Binding SizeText}" />
         <StackPanel Grid.Column="3" Spacing="2" VerticalAlignment="Center">
           <TextBlock Text="Файл журнала" Classes="caption" />
@@ -122,6 +122,8 @@
                   </DataTemplate>
                 </ItemsControl.ItemTemplate>
               </ItemsControl>
+
+              <TextBlock Text="{Binding SeriesUnit}" Classes="caption" />
             </StackPanel>
 
             <!-- Факты: то, что не является числом во временном ряду -->

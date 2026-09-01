@@ -1,4 +1,5 @@
 using System.Globalization;
+using StormMachine.Domain.Measurements;
 using CommunityToolkit.Mvvm.ComponentModel;
 using StormMachine.Domain.Results;
 
@@ -106,5 +107,12 @@ public sealed partial class HopRowViewModel(int hop) : ObservableObject
             : statistics.Voice.Mos.ToString("0.0", CultureInfo.InvariantCulture);
     }
 
-    private static string Format(double value) => value.ToString("0.000", CultureInfo.InvariantCulture);
+    /// <summary>
+    /// Время без единицы: она названа один раз подписью под таблицей маршрута.
+    /// </summary>
+    /// <remarks>
+    /// Точность — общая для продукта, из <see cref="Units"/>: до И-24+ хопы показывали
+    /// три знака всегда, а «Задержка» рядом — по своему правилу.
+    /// </remarks>
+    private static string Format(double value) => Units.Number(value, MeasurementUnit.Milliseconds);
 }

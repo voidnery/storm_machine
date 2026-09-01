@@ -245,7 +245,14 @@ public sealed partial class InspectPageViewModel : PageViewModel, ITargetAware, 
     {
         foreach (var fact in result.Facts)
         {
-            Facts.Add(new InspectFactRow(fact.Category, fact.Name, fact.Value, fact.IsWarning));
+            // Единица приписывается здесь: проба знает, что измерила, а строка
+            // значения её не несёт. Без этого «Время ответа 12» ничем не отличалось
+            // от «Записей 12».
+            Facts.Add(new InspectFactRow(
+                fact.Category,
+                fact.Name,
+                fact.Value + Units.Suffix(fact.Unit),
+                fact.IsWarning));
         }
 
         // Разбор по группам, а не сплошным потоком: у пробы DNS в одну простыню

@@ -1,4 +1,4 @@
-﻿using System.Collections.ObjectModel;
+using System.Collections.ObjectModel;
 using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -399,5 +399,5 @@ public sealed partial class ProbesPageViewModel : PageViewModel, ITargetAware, I
     }
 
     public string BaselineCaption =>
-        $"Порог достоверности {_clock.CalibrationBaselineMs.ToString("0.000", CultureInfo.InvariantCulture)} мс";
+        $"Порог часов {_clock.CalibrationBaselineMs.ToString("0.000", CultureInfo.InvariantCulture)} мс";
 }

@@ -4,7 +4,7 @@ using CommunityToolkit.Mvvm.Input;
 namespace StormMachine.App.ViewModels;
 
 /// <summary>
-/// Длительная операция, видимая в Run Drawer.
+/// Длительная операция, видимая в панели операций.
 /// </summary>
 /// <remarks>
 /// Появилась в И-14 и закрыла долг И-11: список выполняющихся операций знал только

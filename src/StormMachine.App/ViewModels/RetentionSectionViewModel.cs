@@ -35,7 +35,7 @@ public sealed partial class RetentionSectionViewModel(RetentionSettings settings
     private string? _error;
 
     public static string Note =>
-        "Сырые сэмплы старше горизонта удаляются, агрегаты остаются — история "
+        "Сырые измерения старше горизонта удаляются, сводки остаются — история "
         + "и отчёты продолжают работать.";
 
     public static string NoteWhy =>
@@ -64,7 +64,7 @@ public sealed partial class RetentionSectionViewModel(RetentionSettings settings
                 .SetAsync(Days(RawDays), Days(RunDays), cancellationToken)
                 .ConfigureAwait(true);
 
-            Message = $"Сохранено: сырые сэмплы {saved.RawSampleHorizon.TotalDays:0} дн., "
+            Message = $"Сохранено: сырые измерения {saved.RawSampleHorizon.TotalDays:0} дн., "
                       + $"прогоны {saved.RunHorizon.TotalDays:0} дн. Действует со следующего запуска "
                       + "или сразу — кнопкой «Прибраться сейчас».";
         }
@@ -111,8 +111,8 @@ public sealed partial class RetentionSectionViewModel(RetentionSettings settings
             return "Удалять нечего: всё внутри горизонтов.";
         }
 
-        var counts = $"прогонов целиком {report.RunsDeleted}, свёрнуто до агрегатов {report.RunsDownsampled}, "
-                     + $"сырых сэмплов {report.SamplesDeleted.ToString("N0", CultureInfo.InvariantCulture)}";
+        var counts = $"прогонов целиком {report.RunsDeleted}, свёрнуто до сводок {report.RunsDownsampled}, "
+                     + $"сырых измерений {report.SamplesDeleted.ToString("N0", CultureInfo.InvariantCulture)}";
 
         return dryRun
             ? $"Будет удалено: {counts}. Пока не удалено ничего."

@@ -39,7 +39,10 @@
     <Border Grid.Row="0" Grid.ColumnSpan="2" Padding="16,10" Background="{StaticResource ChromeBrush}">
       <Grid ColumnDefinitions="Auto,Auto,*,Auto,Auto">
         <TextBlock Grid.Column="0" Text="Storm Machine" FontSize="18" FontWeight="SemiBold" VerticalAlignment="Center" />
-        <Border Grid.Column="1" Background="{StaticResource DividerBrush}" CornerRadius="4" Padding="8,3" Margin="12,0,0,0" VerticalAlignment="Center">
+        <!-- Шкала уровней объясняется здесь, а не только в разделе «Разработка»:
+             тот временный и уйдёт из релиза вместе с единственным объяснением. -->
+        <Border Grid.Column="1" Background="{StaticResource DividerBrush}" CornerRadius="4" Padding="8,3" Margin="12,0,0,0" VerticalAlignment="Center"
+                ToolTip.Tip="{x:Static vm:MainWindowViewModel.LevelHint}">
           <TextBlock Text="{Binding LevelText}" FontSize="12" />
         </Border>
 
@@ -69,7 +72,7 @@
           </StackPanel>
         </Button>
 
-        <!-- Кнопка Run Drawer: выполняющиеся операции доступны с любого экрана,
+        <!-- Кнопка панели операций: выполняющиеся операции доступны с любого экрана,
              потому что тесты длинные и оператор не обязан сидеть на одном экране. -->
         <Button Grid.Column="4"
                 Command="{Binding ToggleDrawerCommand}"
@@ -172,7 +175,7 @@
       </Grid>
     </Border>
 
-    <!-- Run Drawer -->
+    <!-- панели операций -->
     <Border Grid.Row="3" Grid.ColumnSpan="2"
             Background="{StaticResource SurfaceBrush}"
             BorderBrush="{StaticResource DividerBrush}" BorderThickness="0,1,0,0"
@@ -236,7 +239,8 @@
             Grid.Row="0" Grid.RowSpan="5" Grid.ColumnSpan="2"
             Background="{StaticResource ScrimBrush}" ZIndex="100"
             IsVisible="{Binding Palette.IsOpen}">
-      <Border Width="720" MaxHeight="520" VerticalAlignment="Top" Margin="0,90,0,0"
+      <Border x:Name="PaletteCard"
+              Width="720" MaxHeight="520" VerticalAlignment="Top" Margin="0,90,0,0"
               Background="{StaticResource PanelBrush}" CornerRadius="8"
               BorderBrush="{StaticResource OutlineBrush}" BorderThickness="1" Padding="14">
         <Grid RowDefinitions="Auto,Auto,*" DataContext="{Binding Palette}">

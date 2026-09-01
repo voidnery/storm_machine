@@ -419,17 +419,26 @@ public sealed partial class PresetsPageViewModel(
             return;
         }
 
+        // Имя пробы человеческое, а не ключ из базы: «ICMP Echo», а не «ping».
+        var probe = _presets.TryGetProbe(preset, out var found) ? found.Descriptor : null;
+
         Details =
             $"{preset.Name}"
             + (string.IsNullOrWhiteSpace(preset.Description) ? string.Empty : $"\n{preset.Description}")
-            + $"\n\nПроба: {preset.Subject} · Цель: {preset.Target.DisplayName}"
+            + $"\n\nПроба: {probe?.Title ?? preset.Subject} · Цель: {preset.Target.DisplayName}"
             + $"\nРедакция {preset.Version} · запусков {preset.RunCount}"
             + (preset.LastRunUtc is { } last ? $", последний {last.ToLocalTime():dd.MM.yyyy HH:mm}" : string.Empty)
             + $"\nИзменён {preset.UpdatedUtc.ToLocalTime():dd.MM.yyyy HH:mm}";
 
+        // Параметры подписываются так же, как в форме запуска: у пробы для каждого
+        // объявлена человеческая подпись с единицей («Интервал, мс»), и показывать
+        // вместо неё ключ «interval» значило бы заставить оператора помнить оба.
         foreach (var (key, value) in preset.Parameters.OrderBy(p => p.Key, StringComparer.Ordinal))
         {
-            Parameters.Add(new ParameterRow(key, value ?? "—"));
+            var label = probe?.Parameters.FirstOrDefault(p =>
+                string.Equals(p.Name, key, StringComparison.OrdinalIgnoreCase))?.Label;
+
+            Parameters.Add(new ParameterRow(label ?? key, value ?? "—"));
         }
 
         // Пресет мог быть создан, когда параметры пробы были другими. Узнать об этом

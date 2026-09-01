@@ -190,15 +190,17 @@
         <Grid RowDefinitions="Auto,*,Auto">
 
           <Grid Grid.Row="0" ColumnDefinitions="40,*,70,110,80,80,80,80,50" Margin="4,0,4,6">
-            <TextBlock Grid.Column="0" Text="хоп" FontSize="11" Foreground="{StaticResource TextMutedBrush}" />
-            <TextBlock Grid.Column="1" Text="узел" FontSize="11" Foreground="{StaticResource TextMutedBrush}" />
-            <TextBlock Grid.Column="2" Text="отпр" FontSize="11" Foreground="{StaticResource TextMutedBrush}" />
-            <TextBlock Grid.Column="3" Text="потери" FontSize="11" Foreground="{StaticResource TextMutedBrush}" />
-            <TextBlock Grid.Column="4" Text="мин" FontSize="11" Foreground="{StaticResource TextMutedBrush}" />
-            <TextBlock Grid.Column="5" Text="медиана" FontSize="11" Foreground="{StaticResource TextMutedBrush}" />
-            <TextBlock Grid.Column="6" Text="макс" FontSize="11" Foreground="{StaticResource TextMutedBrush}" />
-            <TextBlock Grid.Column="7" Text="джиттер" FontSize="11" Foreground="{StaticResource TextMutedBrush}" />
-            <TextBlock Grid.Column="8" Text="MOS" FontSize="11" Foreground="{StaticResource TextMutedBrush}" />
+            <TextBlock Grid.Column="0" Text="хоп" Classes="label" ToolTip.Tip="Номер узла на пути пакета" />
+            <TextBlock Grid.Column="1" Text="узел" Classes="label" />
+            <TextBlock Grid.Column="2" Text="отправлено" Classes="label" />
+            <TextBlock Grid.Column="3" Text="потери" Classes="label" />
+            <TextBlock Grid.Column="4" Text="мин" Classes="label" />
+            <TextBlock Grid.Column="5" Text="медиана" Classes="label" />
+            <TextBlock Grid.Column="6" Text="макс" Classes="label" />
+            <TextBlock Grid.Column="7" Text="джиттер" Classes="label"
+                       ToolTip.Tip="Дрожание задержки по RFC 3550: насколько неровно приходят ответы" />
+            <TextBlock Grid.Column="8" Text="MOS" Classes="label"
+                       ToolTip.Tip="Оценка разговорной связи по шкале от 1 до 5" />
           </Grid>
 
           <ScrollViewer Grid.Row="1">
@@ -249,11 +251,17 @@
             </ItemsControl>
           </ScrollViewer>
 
-          <!-- Главная методическая оговорка экрана: ради неё разбор и строился.
-               До волны 2 она стояла здесь же, но самым мелким кеглем. -->
-          <controls:MethodCard Grid.Row="2" Margin="4,8,4,0"
-                               Thesis="MOS на транзитных хопах считается по задержке и дрожанию, без потерь."
-                               Detail="Потери на транзитном узле — это ограничение его собственных ответов, а не потеря проходящего трафика." />
+          <StackPanel Grid.Row="2" Spacing="6" Margin="4,8,4,0">
+            <!-- Единица названа один раз для всей таблицы: у сорока чисел
+                 «мс» у каждого превратило бы её в частокол. -->
+            <TextBlock Text="Времена в миллисекундах. MOS — оценка речи по шкале от 1 до 5."
+                       Classes="caption" />
+
+            <!-- Главная методическая оговорка экрана: ради неё разбор и строился.
+                 До волны 2 она стояла здесь же, но самым мелким кеглем. -->
+            <controls:MethodCard Thesis="MOS на транзитных хопах считается по задержке и дрожанию, без потерь."
+                                 Detail="MOS — оценка разговорной связи по шкале от 1 до 5, вместе с R-фактором она считается по упрощённой E-модели ITU-T G.107. Потери на транзитном узле — это ограничение его собственных ответов, а не потеря проходящего трафика." />
+          </StackPanel>
         </Grid>
       </Border>
 

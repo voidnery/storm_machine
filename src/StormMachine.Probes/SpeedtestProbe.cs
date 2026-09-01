@@ -67,9 +67,9 @@ public sealed class SpeedtestProbe : IProbe, IDisposable
             new ProbeParameter
             {
                 Name = "direction", Label = "Что мерить", Type = ProbeParameterType.Choice,
-                DefaultValue = "both",
-                Choices = ["both", "download", "upload"],
-                Description = "both — обе фазы подряд.",
+                DefaultValue = Directions.Both,
+                Choices = [Directions.Both, Directions.Download, Directions.Upload],
+                Description = "Обе стороны — приём и отдача подряд, двумя фазами.",
             },
         ],
     };
@@ -90,7 +90,7 @@ public sealed class SpeedtestProbe : IProbe, IDisposable
         ArgumentNullException.ThrowIfNull(observer);
 
         var seconds = request.GetParameter("duration", 10);
-        var what = request.GetParameter("direction", "both").ToLowerInvariant();
+        var what = request.GetParameter("direction", Directions.Both);
 
         var server = await Ndt7Client.LocateAsync(_http, cancellationToken).ConfigureAwait(false);
 
@@ -105,7 +105,7 @@ public sealed class SpeedtestProbe : IProbe, IDisposable
         Ndt7Sample? download = null;
         Ndt7Sample? upload = null;
 
-        if (what is "both" or "download")
+        if (Directions.IsBoth(what) || Directions.IsDownload(what))
         {
             using var limit = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             limit.CancelAfter(TimeSpan.FromSeconds(seconds));
@@ -135,7 +135,7 @@ public sealed class SpeedtestProbe : IProbe, IDisposable
             }
         }
 
-        if (what is "both" or "upload")
+        if (Directions.IsBoth(what) || Directions.IsUpload(what))
         {
             await foreach (var sample in Guarded(
                                Ndt7Client.UploadAsync(server, TimeSpan.FromSeconds(seconds), cancellationToken),

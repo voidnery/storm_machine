@@ -1,6 +1,10 @@
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Input;
+using Avalonia.Interactivity;
+using Avalonia.VisualTree;
 using StormMachine.App.Services;
+using StormMachine.App.ViewModels;
 
 namespace StormMachine.App.Views;
 
@@ -20,6 +24,27 @@ public partial class MainWindow : Window
                 PaletteBox.SelectAll();
             }
         };
+
+        // Щелчок мимо палитры закрывает её. Раньше выйти можно было только клавишей
+        // Escape: окно, которое закрывается единственным способом, и тот с клавиатуры,
+        // ловит мышь в тупик (замечание оператора).
+        PaletteOverlay.AddHandler(PointerPressedEvent, ClosePaletteOnClickOutside, RoutingStrategies.Tunnel);
+    }
+
+    private void ClosePaletteOnClickOutside(object? sender, PointerPressedEventArgs e)
+    {
+        if (DataContext is not MainWindowViewModel shell)
+        {
+            return;
+        }
+
+        // Щелчок внутри самой карточки — обычная работа с полем и списком.
+        if (e.Source is Visual clicked && clicked.GetSelfAndVisualAncestors().Contains(PaletteCard))
+        {
+            return;
+        }
+
+        shell.Palette.Close();
     }
 
     /// <summary>

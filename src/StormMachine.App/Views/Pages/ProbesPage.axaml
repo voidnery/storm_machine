@@ -2,6 +2,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:StormMachine.App.ViewModels"
              xmlns:forms="using:StormMachine.App.Controls"
+             xmlns:scenarios="using:StormMachine.Domain.Scenarios"
              x:Class="StormMachine.App.Views.Pages.ProbesPage"
              x:DataType="vm:ProbesPageViewModel">
 
@@ -153,6 +154,21 @@
 
               <forms:MethodCard Thesis="Шаг — это проба с целью, параметрами и порогами."
                                 Detail="{x:Static vm:ScenarioEditorViewModel.Note}" />
+
+              <!-- Метрики порогов прямо в конструкторе: помнить их наизусть незачем -->
+              <Expander Header="Какие бывают метрики порогов" FontSize="11">
+                <ItemsControl ItemsSource="{x:Static vm:ScenarioEditorViewModel.Metrics}" Margin="0,6,0,0">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="scenarios:MetricHelp">
+                      <Grid ColumnDefinitions="90,70,*" Margin="0,2">
+                        <TextBlock Grid.Column="0" Text="{Binding Key}" Classes="body mono" />
+                        <TextBlock Grid.Column="1" Text="{Binding Unit}" Classes="caption" VerticalAlignment="Center" />
+                        <TextBlock Grid.Column="2" Text="{Binding About}" Classes="caption" TextWrapping="Wrap" />
+                      </Grid>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </Expander>
 
               <Grid ColumnDefinitions="*,8,2*">
                 <TextBox Grid.Column="0" PlaceholderText="имя сценария" Text="{Binding Name}" />

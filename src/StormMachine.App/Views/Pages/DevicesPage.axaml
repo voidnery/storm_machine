@@ -59,10 +59,10 @@
         <Grid RowDefinitions="Auto,*,Auto">
           <Grid Grid.Row="0" ColumnDefinitions="130,150,*,180,90" Margin="8,0,4,6">
             <TextBlock Grid.Column="0" Text="адрес" FontSize="11" Foreground="{StaticResource TextMutedBrush}" />
-            <TextBlock Grid.Column="1" Text="MAC" FontSize="11" Foreground="{StaticResource TextMutedBrush}" />
+            <TextBlock Grid.Column="1" Text="MAC" Classes="label" ToolTip.Tip="Аппаратный адрес сетевой карты" />
             <TextBlock Grid.Column="2" Text="имя" FontSize="11" Foreground="{StaticResource TextMutedBrush}" />
-            <TextBlock Grid.Column="3" Text="вендор" FontSize="11" Foreground="{StaticResource TextMutedBrush}" />
-            <TextBlock Grid.Column="4" Text="последний раз" FontSize="11" Foreground="{StaticResource TextMutedBrush}" />
+            <TextBlock Grid.Column="3" Text="производитель" FontSize="11" Foreground="{StaticResource TextMutedBrush}" />
+            <TextBlock Grid.Column="4" Text="последний ответ" FontSize="11" Foreground="{StaticResource TextMutedBrush}" />
           </Grid>
 
           <ListBox Grid.Row="1" ItemsSource="{Binding Rows}" SelectedItem="{Binding Selected}"

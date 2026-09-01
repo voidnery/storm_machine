@@ -62,7 +62,18 @@
           <controls:MethodCard Thesis="{Binding SeriesCaption}"
                                IsVisible="{Binding SeriesCaption, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
 
-          <ItemsControl ItemsSource="{Binding Series}" Margin="0,4,0,0">
+          <!-- Заголовки колонок: до И-24+ таблица шла вовсе без них, и «2 из 6»
+               рядом с «12 мс» приходилось разгадывать. -->
+          <Grid ColumnDefinitions="200,90,50,110,*" Margin="0,4,0,0">
+            <TextBlock Grid.Column="0" Text="что" Classes="label" />
+            <TextBlock Grid.Column="1" Text="медиана" Classes="label" HorizontalAlignment="Right"
+                       Margin="0,0,10,0" />
+            <TextBlock Grid.Column="2" Text="доля" Classes="label" HorizontalAlignment="Right"
+                       Margin="0,0,10,0" />
+            <TextBlock Grid.Column="3" Text="потери" Classes="label" />
+          </Grid>
+
+          <ItemsControl ItemsSource="{Binding Series}">
             <ItemsControl.ItemTemplate>
               <DataTemplate x:DataType="vm:InspectSeriesRow">
                 <Grid ColumnDefinitions="200,90,50,110,*" Margin="0,2">
@@ -120,7 +131,7 @@
               <StackPanel Grid.Column="0" Spacing="6" Margin="0,0,12,0">
                 <TextBlock Text="Как сеть видна снаружи" Classes="h2" />
                 <controls:MethodCard Thesis="Внешний адрес и поведение NAT изнутри сети неизвестны в принципе."
-                                     Detail="Ответ есть только у собеседника за пределами трансляции — поэтому проверка обращается к публичным серверам STUN." />
+                                     Detail="NAT — трансляция адресов: домашний или офисный маршрутизатор подменяет ваш адрес своим. Каким его видят снаружи, знает только собеседник за пределами трансляции — поэтому проверка спрашивает у публичных серверов STUN, созданных ровно для этого вопроса." />
               </StackPanel>
               <Button Grid.Column="1" Content="Посмотреть" VerticalAlignment="Center"
                       Command="{Binding LookOutsideCommand}"

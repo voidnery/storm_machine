@@ -7,6 +7,7 @@ using StormMachine.Application.Abstractions;
 using StormMachine.Application.Topology;
 using StormMachine.Domain.Monitors;
 using StormMachine.Domain.Reports;
+using StormMachine.Domain.Measurements;
 using StormMachine.Domain.Results;
 using StormMachine.Domain.Scenarios;
 using Monitor = StormMachine.Domain.Monitors.Monitor;
@@ -35,7 +36,7 @@ public sealed partial class RunChoice(RunSummary summary) : ObservableObject
     public string When => Summary.StartedUtc.ToLocalTime().ToString("dd.MM HH:mm:ss", CultureInfo.InvariantCulture);
 
     public string Detail => Summary.MedianMs is { } median
-        ? $"{Summary.SentCount} проб, медиана {median.ToString("0.###", CultureInfo.InvariantCulture)}"
+        ? $"{Summary.SentCount} проб, медиана {Units.Milliseconds(median)}"
         : $"{Summary.SentCount} проб";
 
     [ObservableProperty]

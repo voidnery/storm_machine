@@ -185,8 +185,8 @@ public sealed partial class DiscoveryPageViewModel : PageViewModel, IDisposable
                         + (adapter?.IPv4Address is { } ip ? $", {ip}" : string.Empty);
 
         CatalogInfo = _oui.Count > 0
-            ? $"вендоры: {_oui.Count.ToString(CultureInfo.InvariantCulture)} записей реестра IEEE"
-            : "вендоры: база не загрузилась";
+            ? $"производители: {_oui.Count.ToString(CultureInfo.InvariantCulture)} записей реестра IEEE"
+            : "производители: база не загрузилась";
 
         return Task.CompletedTask;
     }

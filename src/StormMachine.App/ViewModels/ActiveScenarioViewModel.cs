@@ -4,7 +4,7 @@ using StormMachine.Application.Scenarios;
 namespace StormMachine.App.ViewModels;
 
 /// <summary>
-/// Выполняющийся сценарий в Run Drawer.
+/// Выполняющийся сценарий в панели операций.
 /// </summary>
 /// <remarks>
 /// Сценарий по восьми целям идёт минутами — это самая длинная операция продукта,

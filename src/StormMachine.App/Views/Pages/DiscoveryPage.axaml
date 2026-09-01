@@ -47,13 +47,13 @@
           </StackPanel>
 
           <StackPanel Grid.Column="1" Spacing="4" Margin="0,0,12,0" Width="110">
-            <TextBlock Text="Одновременно" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" />
+            <TextBlock Text="Адресов сразу" Classes="label" ToolTip.Tip="Сколько адресов опрашивается одновременно. Больше — быстрее, но заметнее для сети" />
             <NumericUpDown Value="{Binding Parallelism}" Minimum="1" Maximum="512" Increment="16"
                            FormatString="0" IsEnabled="{Binding CanStart}" />
           </StackPanel>
 
           <StackPanel Grid.Column="2" Spacing="4" Margin="0,0,12,0" Width="110">
-            <TextBlock Text="Таймаут, мс" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" />
+            <TextBlock Text="Ждать ответа, мс" Classes="label" ToolTip.Tip="Сколько ждать ответа от адреса, прежде чем считать его молчащим" />
             <NumericUpDown Value="{Binding TimeoutMs}" Minimum="50" Maximum="10000" Increment="100"
                            FormatString="0" IsEnabled="{Binding CanStart}" />
           </StackPanel>
@@ -115,10 +115,10 @@
       <Grid RowDefinitions="Auto,*">
         <Grid Grid.Row="0" ColumnDefinitions="150,170,*,220,180" Margin="8,0,4,6">
           <TextBlock Grid.Column="0" Text="адрес" FontSize="11" Foreground="{StaticResource TextMutedBrush}" />
-          <TextBlock Grid.Column="1" Text="MAC" FontSize="11" Foreground="{StaticResource TextMutedBrush}" />
+          <TextBlock Grid.Column="1" Text="MAC" Classes="label" ToolTip.Tip="Аппаратный адрес сетевой карты" />
           <TextBlock Grid.Column="2" Text="имя" FontSize="11" Foreground="{StaticResource TextMutedBrush}" />
-          <TextBlock Grid.Column="3" Text="вендор" FontSize="11" Foreground="{StaticResource TextMutedBrush}" />
-          <TextBlock Grid.Column="4" Text="что ответило" FontSize="11" Foreground="{StaticResource TextMutedBrush}" />
+          <TextBlock Grid.Column="3" Text="производитель" FontSize="11" Foreground="{StaticResource TextMutedBrush}" />
+          <TextBlock Grid.Column="4" Text="что ответило" Classes="label" ToolTip.Tip="Чем узел себя обнаружил: ICMP — ответ на ping, TCP — открытый порт, ARP — отклик соседа по локальной сети" />
         </Grid>
 
         <ScrollViewer Grid.Row="1">

@@ -1,10 +1,11 @@
-﻿using System.Collections.ObjectModel;
+using System.Collections.ObjectModel;
 using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using StormMachine.App.Services;
 using StormMachine.Application.Abstractions;
 using StormMachine.Domain.Reports;
+using StormMachine.Domain.Measurements;
 using StormMachine.Domain.Results;
 using StormMachine.Domain.Scenarios;
 
@@ -89,6 +90,10 @@ public sealed partial class RunsPageViewModel(
     [ObservableProperty]
     private string? _usageError;
 
+    /// <summary>В чём измерены ряды выбранного прогона.</summary>
+    [ObservableProperty]
+    private string _seriesUnit = string.Empty;
+
     [ObservableProperty]
     private string? _errorMessage;
 
@@ -134,7 +139,7 @@ public sealed partial class RunsPageViewModel(
         }
 
         // Сводка считается отдельно от списка: её отказ — это отказ сводки.
-        // На повреждённой базе счётчик сэмплов падал и объявлял недоступным журнал,
+        // На повреждённой базе счётчик сырых измерений падал и объявлял недоступным журнал,
         // который был загружен и виден прямо под этой надписью (И-24).
         try
         {
@@ -216,7 +221,7 @@ public sealed partial class RunsPageViewModel(
 
             Message = $"Выгружено: {path}"
                       + (chosen == ExportFormat.Csv && !run.Summary.HasRawSamples
-                          ? ". Сырые измерения удалены политикой хранения — выгружены агрегаты."
+                          ? ". Сырые измерения удалены политикой хранения — выгружены сводки."
                           : string.Empty);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
@@ -376,9 +381,13 @@ public sealed partial class RunsPageViewModel(
             + (summary.ResolvedAddress is { } resolved ? $"  ({resolved})" : string.Empty)
             + $"\n{summary.StartedUtc.ToLocalTime():dd.MM.yyyy HH:mm:ss}"
             + (summary.Duration is { } duration ? $", длился {duration.TotalSeconds:0.0} с" : string.Empty)
-            + $"\nИнтерфейс: {run.Context.InterfaceName} · порог {run.Context.CalibrationBaselineMs:0.000} мс"
+            + $"\nИнтерфейс: {run.Context.InterfaceName} · порог часов {run.Context.CalibrationBaselineMs:0.000} мс"
             + $"\nМетодика: {run.Context.Methodology}"
             + $"\nОтправлено {summary.SentCount}, получено {summary.SuccessCount}, потеряно {summary.LostCount}";
+
+        // Единица берётся у прогона: журнал показывает и ping в миллисекундах,
+        // и скорость в мегабитах, и подписывать их одинаково нельзя.
+        SeriesUnit = Units.TableCaption(run.Unit);
 
         foreach (var series in run.Series)
         {
@@ -389,24 +398,30 @@ public sealed partial class RunsPageViewModel(
                 series.Label,
                 series.SentCount.ToString(CultureInfo.InvariantCulture),
                 $"{series.LossPercent:0} %",
-                empty ? "—" : F(stats.MinMs),
-                empty ? "—" : F(stats.P50Ms),
-                empty ? "—" : F(stats.MaxMs),
-                empty ? "—" : F(stats.JitterRfc3550Ms)));
+                empty ? "—" : F(stats.MinMs, run.Unit),
+                empty ? "—" : F(stats.P50Ms, run.Unit),
+                empty ? "—" : F(stats.MaxMs, run.Unit),
+                empty ? "—" : F(stats.JitterRfc3550Ms, run.Unit)));
         }
 
         foreach (var fact in run.Facts)
         {
-            Facts.Add(new FactRow(fact.Category, fact.Name, fact.Value, fact.IsWarning));
+            Facts.Add(new FactRow(
+                fact.Category,
+                fact.Name,
+                fact.Value + Units.Suffix(fact.Unit),
+                fact.IsWarning));
         }
 
         if (!summary.HasRawSamples)
         {
             // «Подробности состарились» и «измерений не было» выглядели бы одинаково,
             // если об этом не сказать прямо.
-            RetentionNotice = "Сырые сэмплы удалены политикой хранения. Агрегаты сохранены полностью.";
+            RetentionNotice = "Сырые измерения удалены политикой хранения. Сводки сохранены полностью.";
         }
     }
 
-    private static string F(double value) => value.ToString("0.000", CultureInfo.InvariantCulture);
+    /// <summary>Значение ряда без единицы: единица названа подписью таблицы.</summary>
+    private static string F(double value, MeasurementUnit unit) =>
+        value.ToString(unit == MeasurementUnit.MegabitsPerSecond ? "0.#" : "0.000", CultureInfo.InvariantCulture);
 }

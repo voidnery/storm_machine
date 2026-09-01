@@ -1,4 +1,4 @@
-﻿using System.Globalization;
+using System.Globalization;
 using System.Runtime.CompilerServices;
 using StormMachine.Application.Abstractions;
 using StormMachine.Application.Probes;
@@ -62,8 +62,8 @@ public sealed class ThroughputProbe(AgentDirectory directory) : IProbe
             new ProbeParameter
             {
                 Name = "direction", Label = "Направление", Type = ProbeParameterType.Choice,
-                DefaultValue = "upload",
-                Choices = ["upload", "download"],
+                DefaultValue = Directions.Upload,
+                Choices = [Directions.Upload, Directions.Download],
                 Description = "upload — отдаём мы, download — отдаёт агент.",
             },
         ],
@@ -104,8 +104,7 @@ public sealed class ThroughputProbe(AgentDirectory directory) : IProbe
             Streams = request.GetParameter("streams", 4),
             DurationSeconds = request.GetParameter("duration", 10),
             WarmupSeconds = request.GetParameter("warmup", 2),
-            Direction = request.GetParameter("direction", "upload")
-                .Equals("download", StringComparison.OrdinalIgnoreCase)
+            Direction = Directions.IsDownload(request.GetParameter("direction", Directions.Upload))
                 ? TestDirection.Download
                 : TestDirection.Upload,
         };

@@ -2,6 +2,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:StormMachine.App.ViewModels"
              xmlns:forms="using:StormMachine.App.Controls"
+             xmlns:scenarios="using:StormMachine.Domain.Scenarios"
              x:Class="StormMachine.App.Views.Pages.MonitorsPage"
              x:DataType="vm:MonitorsPageViewModel">
 
@@ -104,8 +105,12 @@
 
               <CheckBox Content="После простоя выполнить один раз" IsChecked="{Binding CatchUp}" />
 
-              <StackPanel Spacing="4">
-                <TextBlock Text="Пороги" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" />
+              <StackPanel Spacing="6">
+                <TextBlock Text="Пороги — при нарушении монитор считает проверку отказом"
+                           Classes="label" TextWrapping="Wrap" />
+
+                <forms:MethodCard Thesis="{x:Static vm:MonitorEditorViewModel.ThresholdNote}"
+                                  Detail="{x:Static vm:MonitorEditorViewModel.ThresholdNoteWhy}" />
 
                 <Grid ColumnDefinitions="*,Auto">
                   <TextBox Grid.Column="0" PlaceholderText="p95 &lt; 50" Text="{Binding ThresholdText}" />
@@ -113,19 +118,40 @@
                           Padding="12,5" Margin="6,0,0,0" />
                 </Grid>
 
+                <!-- Набранное коротко, прочитанное словами: без второй половины
+                     поле не отвечало ни что такое p95, ни в чём эти 50. -->
                 <ItemsControl ItemsSource="{Binding Thresholds}">
                   <ItemsControl.ItemTemplate>
-                    <DataTemplate x:DataType="x:String">
-                      <Grid ColumnDefinitions="*,Auto" Margin="0,2">
-                        <TextBlock Grid.Column="0" Text="{Binding}" FontSize="12" VerticalAlignment="Center"
-                                   FontFamily="Consolas,Menlo,monospace" />
-                        <Button Grid.Column="1" Content="убрать" Padding="8,2" FontSize="10"
+                    <DataTemplate x:DataType="vm:ThresholdRow">
+                      <Grid ColumnDefinitions="Auto,*,Auto" Margin="0,2">
+                        <TextBlock Grid.Column="0" Text="{Binding Text}" Classes="body mono"
+                                   VerticalAlignment="Center" Width="130" />
+                        <TextBlock Grid.Column="1" Text="{Binding Explanation}" Classes="label"
+                                   VerticalAlignment="Center" TextWrapping="Wrap" />
+                        <Button Grid.Column="2" Content="убрать" Padding="8,2" FontSize="10"
                                 Command="{Binding $parent[ItemsControl].((vm:MonitorEditorViewModel)DataContext).RemoveThresholdCommand}"
                                 CommandParameter="{Binding}" />
                       </Grid>
                     </DataTemplate>
                   </ItemsControl.ItemTemplate>
                 </ItemsControl>
+
+                <!-- Список метрик прямо в форме: помнить наизусть незачем -->
+                <Expander Header="Какие бывают метрики" FontSize="11">
+                  <ItemsControl ItemsSource="{x:Static vm:MonitorEditorViewModel.Metrics}" Margin="0,6,0,0">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate x:DataType="scenarios:MetricHelp">
+                        <Grid ColumnDefinitions="90,70,*" Margin="0,2">
+                          <TextBlock Grid.Column="0" Text="{Binding Key}" Classes="body mono" />
+                          <TextBlock Grid.Column="1" Text="{Binding Unit}" Classes="caption"
+                                     VerticalAlignment="Center" />
+                          <TextBlock Grid.Column="2" Text="{Binding About}" Classes="caption"
+                                     TextWrapping="Wrap" />
+                        </Grid>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                </Expander>
 
                 <forms:Caveat Text="Без порогов монитор копит историю, но ни о чём не судит." />
               </StackPanel>
@@ -135,20 +161,22 @@
               <StackPanel Spacing="6" IsVisible="{Binding Alert}" Margin="18,0,0,0">
                 <Grid ColumnDefinitions="*,10,*">
                   <StackPanel Grid.Column="0" Spacing="2">
-                    <TextBlock Text="Поднять после, проверок" FontSize="10" Foreground="{StaticResource TextSecondaryBrush}" />
+                    <TextBlock Text="Поднять алерт после, проверок" Classes="caption" ToolTip.Tip="Столько неудачных проверок подряд нужно, чтобы поднять алерт" />
                     <NumericUpDown Value="{Binding RaiseAfter}" Minimum="1" Maximum="20" Increment="1"
                                    FormatString="0" />
                   </StackPanel>
                   <StackPanel Grid.Column="2" Spacing="2">
-                    <TextBlock Text="Снять после, проверок" FontSize="10" Foreground="{StaticResource TextSecondaryBrush}" />
+                    <TextBlock Text="Снять алерт после, проверок" Classes="caption" ToolTip.Tip="Столько удачных проверок подряд нужно, чтобы снять алерт" />
                     <NumericUpDown Value="{Binding ClearAfter}" Minimum="1" Maximum="20" Increment="1"
                                    FormatString="0" />
                   </StackPanel>
                 </Grid>
 
-                <StackPanel Spacing="2">
-                  <TextBlock Text="Пауза между оповещениями" FontSize="10" Foreground="{StaticResource TextSecondaryBrush}" />
+                <StackPanel Spacing="3">
+                  <TextBlock Text="Пауза между оповещениями" Classes="caption" />
                   <TextBox PlaceholderText="15м" Text="{Binding Cooldown}" />
+                  <TextBlock Text="{x:Static vm:MonitorEditorViewModel.DurationHint}"
+                             Classes="caption" TextWrapping="Wrap" />
                 </StackPanel>
 
                 <TextBlock Text="{x:Static vm:MonitorEditorViewModel.HysteresisHint}"
@@ -163,7 +191,7 @@
               </StackPanel>
 
               <StackPanel Spacing="3">
-                <TextBlock Text="Цель по доступности, %" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" />
+                <TextBlock Text="Цель по доступности за месяц, %" Classes="label" ToolTip.Tip="Уровень услуги (SLA): какую долю времени монитор обязан видеть цель исправной" />
                 <NumericUpDown Value="{Binding ObjectivePercent}" Minimum="50" Maximum="100"
                                Increment="0.1" FormatString="0.###" />
                 <TextBlock Text="{Binding ObjectiveHint}" FontSize="10" Foreground="{StaticResource TextMutedBrush}" TextWrapping="Wrap" />
@@ -206,8 +234,11 @@
             <Border Padding="12,10" CornerRadius="4" Background="{StaticResource TileBrush}"
                     IsVisible="{Binding AvailabilityText, Converter={x:Static ObjectConverters.IsNotNull}}">
               <StackPanel Spacing="6">
-                <TextBlock Text="Доступность" FontSize="12" FontWeight="SemiBold" />
-                <TextBlock Text="{Binding AvailabilityText}" FontSize="12" TextWrapping="Wrap" LineHeight="19" />
+                <TextBlock Text="Доступность" Classes="h2" />
+                <TextBlock Text="{Binding AvailabilityText}" Classes="body" TextWrapping="Wrap" LineHeight="19" />
+
+                <forms:MethodCard Thesis="Бюджет ошибок — сколько простоя допускает цель по доступности."
+                                  Detail="При цели 99.9 % за месяц это 43 минуты. Израсходованный бюджет говорит, сколько из них уже потрачено: число само по себе не показывает, близко ли нарушение." />
 
                 <!-- Оговорка о покрытии не прячется: 100 % при покрытии 4 % —
                      это отсутствие данных, а не отличная сеть. Она обязана звучать
@@ -217,7 +248,14 @@
             </Border>
 
             <StackPanel Spacing="6" IsVisible="{Binding HasChecks}">
-              <TextBlock Text="Последние проверки" FontSize="12" FontWeight="SemiBold" />
+              <TextBlock Text="Последние проверки" Classes="h2" />
+
+              <!-- Заголовки колонок: три столбца без подписей приходилось разгадывать -->
+              <Grid ColumnDefinitions="130,120,*">
+                <TextBlock Grid.Column="0" Text="когда" Classes="caption" />
+                <TextBlock Grid.Column="1" Text="итог" Classes="caption" />
+                <TextBlock Grid.Column="2" Text="что измерено" Classes="caption" />
+              </Grid>
 
               <ItemsControl ItemsSource="{Binding Checks}">
                 <ItemsControl.ItemTemplate>

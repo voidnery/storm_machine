@@ -189,7 +189,7 @@
             </DataTemplate>
           </ItemsControl.ItemTemplate>
         </ItemsControl>
-        <TextBlock Text="Времена в миллисекундах." FontSize="10" Foreground="{StaticResource TextMutedBrush}" />
+        <TextBlock Text="{Binding SeriesUnit}" Classes="caption" />
       </StackPanel>
     </Border>
 

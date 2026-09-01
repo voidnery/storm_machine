@@ -111,7 +111,7 @@
 
                 <StackPanel Spacing="3"
                             IsVisible="{Binding OwnThumbprint, Converter={x:Static ObjectConverters.IsNotNull}}">
-                  <TextBlock Text="Наш отпечаток — его называют тому, кто у агента" Classes="caption" />
+                  <TextBlock Text="Наш отпечаток сертификата — его называют тому, кто у агента" Classes="caption" />
                   <!-- Отпечаток диктуют по телефону или шлют сообщением: чип копируется -->
                   <controls:CopyChip Text="{Binding OwnThumbprint}" />
                 </StackPanel>
@@ -223,7 +223,8 @@
           <StackPanel Spacing="10">
 
             <Grid ColumnDefinitions="*,Auto">
-              <TextBlock Grid.Column="0" Text="Учётные данные SNMP" Classes="h2" />
+              <TextBlock Grid.Column="0" Text="Учётные данные SNMP" Classes="h2"
+                         ToolTip.Tip="SNMP — стандартный протокол опроса сетевого оборудования: порты коммутаторов, соседи, счётчики" />
               <Button Grid.Column="1" Content="Завести" Padding="10,3" FontSize="11"
                       Command="{Binding ToggleCredentialEditorCommand}" />
             </Grid>
@@ -291,14 +292,18 @@
 
                   <Grid ColumnDefinitions="*,8,*">
                     <StackPanel Grid.Column="0" Spacing="2">
-                      <TextBlock Text="Порт" FontSize="10" Foreground="{StaticResource TextSecondaryBrush}" />
+                      <TextBlock Text="Порт" Classes="caption" />
                       <NumericUpDown Value="{Binding Port}" Minimum="1" Maximum="65535" Increment="1"
                                      FormatString="0" />
+                      <!-- Подсказка была написана и никуда не привязана: оператор
+                           не узнавал ни про 161, ни про то, что порт нестандартный. -->
+                      <TextBlock Text="{Binding PortHint}" Classes="caption" />
                     </StackPanel>
                     <StackPanel Grid.Column="2" Spacing="2">
-                      <TextBlock Text="Порядок перебора" FontSize="10" Foreground="{StaticResource TextSecondaryBrush}" />
+                      <TextBlock Text="Порядок перебора" Classes="caption" />
                       <NumericUpDown Value="{Binding Order}" Minimum="0" Maximum="99" Increment="1"
                                      FormatString="0" />
+                      <TextBlock Text="Меньше — пробуется раньше" Classes="caption" />
                     </StackPanel>
                   </Grid>
 
@@ -376,12 +381,12 @@
 
                 <Grid ColumnDefinitions="*,8,*">
                   <StackPanel Grid.Column="0" Spacing="2">
-                    <TextBlock Text="Сырые сэмплы, дней" FontSize="10" Foreground="{StaticResource TextSecondaryBrush}" />
+                    <TextBlock Text="Сырые измерения, дней" Classes="caption" ToolTip.Tip="Каждый отдельный отсчёт прогона. Их больше всего, и место занимают они" />
                     <NumericUpDown Value="{Binding RawDays}" Minimum="1" Maximum="3650" Increment="1"
                                    FormatString="0" />
                   </StackPanel>
                   <StackPanel Grid.Column="2" Spacing="2">
-                    <TextBlock Text="Прогоны с агрегатами, дней" FontSize="10" Foreground="{StaticResource TextSecondaryBrush}" />
+                    <TextBlock Text="Прогоны со сводками, дней" Classes="caption" ToolTip.Tip="Сводка — итоги прогона без отдельных отсчётов: медиана, потери, джиттер. По ним работают история и отчёты" />
                     <NumericUpDown Value="{Binding RunDays}" Minimum="1" Maximum="3650" Increment="1"
                                    FormatString="0" />
                   </StackPanel>

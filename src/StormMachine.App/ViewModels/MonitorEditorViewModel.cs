@@ -26,6 +26,16 @@ public sealed record ScheduleOption(string Title, TimeSpan? Interval, string? Cr
 }
 
 /// <summary>
+/// Набранный порог и та же мысль словами.
+/// </summary>
+/// <remarks>
+/// Набирают короткую запись, читают длинную: «p95 &lt; 50» рядом с «95-й перцентиль
+/// меньше 50 мс». Без второй половины поле порогов не отвечало ни что такое p95,
+/// ни в чём эти 50 (замечание оператора).
+/// </remarks>
+public sealed record ThresholdRow(string Text, string Explanation);
+
+/// <summary>
 /// Форма заведения монитора.
 /// </summary>
 /// <remarks>
@@ -77,7 +87,22 @@ public sealed partial class MonitorEditorViewModel : ObservableObject
     public IReadOnlyList<ScheduleOption> Schedules { get; }
 
     /// <summary>Пороги, набранные в форме.</summary>
-    public ObservableCollection<string> Thresholds { get; } = [];
+    public ObservableCollection<ThresholdRow> Thresholds { get; } = [];
+
+    /// <summary>Метрики, по которым бывают пороги, — с единицами и объяснением.</summary>
+    public static IReadOnlyList<MetricHelp> Metrics => MetricWording.Common;
+
+    public static string ThresholdNote =>
+        "Порог — это метрика, знак сравнения и число: p95 < 50.";
+
+    /// <summary>Формат длительности — он же у окна обслуживания и у консоли.</summary>
+    public static string DurationHint =>
+        "Формат: 30с, 15м, 2ч, 1д. Голое число — минуты.";
+
+    public static string ThresholdNoteWhy =>
+        "Знаки: < ≤ > ≥. Метрику берут из списка ниже, единица у каждой своя — "
+        + "у времён миллисекунды, у потерь проценты. Нарушенный порог даёт монитору "
+        + "отказ, а при включённом оповещении — алерт.";
 
     public ObservableCollection<string> Channels { get; } = [];
 
@@ -170,9 +195,9 @@ public sealed partial class MonitorEditorViewModel : ObservableObject
         {
             // Разбирается сразу: порог, который не разобрался, лучше отвергнуть
             // при вводе, чем при сохранении, когда причина уже не на виду.
-            _ = Threshold.Parse(text);
+            var parsed = Threshold.Parse(text);
 
-            Thresholds.Add(text);
+            Thresholds.Add(new ThresholdRow(text, MetricWording.Explain(parsed)));
             ThresholdText = string.Empty;
             Error = null;
         }
@@ -185,11 +210,11 @@ public sealed partial class MonitorEditorViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private void RemoveThreshold(string? text)
+    private void RemoveThreshold(ThresholdRow? row)
     {
-        if (text is not null)
+        if (row is not null)
         {
-            Thresholds.Remove(text);
+            Thresholds.Remove(row);
             Refresh();
         }
     }
@@ -242,7 +267,7 @@ public sealed partial class MonitorEditorViewModel : ObservableObject
 
         try
         {
-            limits = [.. Thresholds.Select(t => Threshold.Parse(t))];
+            limits = [.. Thresholds.Select(t => Threshold.Parse(t.Text))];
         }
         catch (FormatException ex)
         {

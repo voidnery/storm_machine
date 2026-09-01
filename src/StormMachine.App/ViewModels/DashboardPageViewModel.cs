@@ -1,4 +1,4 @@
-﻿using System.Collections.ObjectModel;
+using System.Collections.ObjectModel;
 using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -87,7 +87,7 @@ public sealed partial class DashboardPageViewModel(
 
         TimerInfo =
             $"Таймер: разрешение {_clock.ResolutionNanoseconds:0.###} нс, "
-            + $"порог достоверности {_clock.CalibrationBaselineMs.ToString("0.000", CultureInfo.InvariantCulture)} мс";
+            + $"порог часов {_clock.CalibrationBaselineMs.ToString("0.000", CultureInfo.InvariantCulture)} мс";
 
         Adapters.Clear();
         var primary = _environment.GetPrimaryAdapter();
