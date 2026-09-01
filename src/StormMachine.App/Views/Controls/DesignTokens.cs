@@ -1,3 +1,4 @@
+using System.Globalization;
 using Avalonia.Controls;
 using Avalonia.Media;
 
@@ -39,6 +40,9 @@ internal static class DesignTokens
 
     public const string TextSecondary = "TextSecondaryBrush";
 
+    /// <summary>Подложка карточки.</summary>
+    public const string Panel = "PanelBrush";
+
     public const string Accent = "AccentBrush";
 
     public const string Warning = "WarningBrush";
@@ -76,6 +80,28 @@ internal static class DesignTokens
         Cache[key] = found;
 
         return found;
+    }
+
+    /// <summary>
+    /// Цвет токена — тем рисовалкам, которым нужна не кисть, а значение.
+    /// </summary>
+    /// <remarks>
+    /// График строит ScottPlot, а выгрузку карты в SVG — текстовый писатель:
+    /// ни тому, ни другому кисть Avalonia не подходит. Значение всё равно берётся
+    /// из общего словаря — иначе график и выгруженный файл разъедутся с экраном,
+    /// оставаясь при этом «правильными» каждый по-своему.
+    /// </remarks>
+    public static Color ColorOf(string key) =>
+        Brush(key) is ISolidColorBrush solid ? solid.Color : Colors.Gray;
+
+    /// <summary>Цвет токена строкой <c>#RRGGBB</c> — для SVG.</summary>
+    public static string HexOf(string key)
+    {
+        var colour = ColorOf(key);
+
+        return string.Create(
+            CultureInfo.InvariantCulture,
+            $"#{colour.R:X2}{colour.G:X2}{colour.B:X2}");
     }
 
     /// <summary>Есть ли такой токен в словаре приложения.</summary>

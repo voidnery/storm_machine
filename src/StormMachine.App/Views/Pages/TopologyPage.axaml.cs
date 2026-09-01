@@ -98,7 +98,7 @@ public partial class TopologyPage : UserControl
         svg.Append(CultureInfo.InvariantCulture, $"""
             <svg xmlns="http://www.w3.org/2000/svg" width="{N(width)}" height="{N(height)}"
                  viewBox="0 0 {N(width)} {N(height)}">
-              <rect width="100%" height="100%" fill="#151922"/>
+              <rect width="100%" height="100%" fill="{DesignTokens.HexOf(DesignTokens.Surface)}"/>
               <g transform="translate(40,40)" font-family="Segoe UI, sans-serif">
 
             """);
@@ -121,9 +121,9 @@ public partial class TopologyPage : UserControl
             svg.Append(CultureInfo.InvariantCulture, $"""
                     <g>
                       <rect x="{N(node.Left)}" y="{N(node.Top)}" width="{N(node.Width)}" height="{N(node.Height)}"
-                            rx="4" fill="#1E2635" stroke="{Border(node.Node.Kind)}" stroke-width="1"/>
-                      <text x="{N(node.Left + 8)}" y="{N(node.Top + 17)}" font-size="12" fill="#DCE3EF">{Escape(node.Node.Label)}</text>
-                      <text x="{N(node.Left + 8)}" y="{N(node.Top + 31)}" font-size="9.5" fill="#8894A8">{Escape(node.Node.Address ?? string.Empty)}</text>
+                            rx="4" fill="{DesignTokens.HexOf(DesignTokens.Node)}" stroke="{Border(node.Node.Kind)}" stroke-width="1"/>
+                      <text x="{N(node.Left + 8)}" y="{N(node.Top + 17)}" font-size="12" fill="{DesignTokens.HexOf(DesignTokens.Text)}">{Escape(node.Node.Label)}</text>
+                      <text x="{N(node.Left + 8)}" y="{N(node.Top + 31)}" font-size="9.5" fill="{DesignTokens.HexOf(DesignTokens.TextSecondary)}">{Escape(node.Node.Address ?? string.Empty)}</text>
                     </g>
 
                 """);
@@ -136,17 +136,17 @@ public partial class TopologyPage : UserControl
 
     private static (string Stroke, string Dash) Stroke(LinkConfidence confidence) => confidence switch
     {
-        LinkConfidence.Confirmed => ("#4B7FD1", string.Empty),
-        LinkConfidence.Inferred => ("#7A8AA5", " stroke-dasharray=\"5,4\""),
-        _ => ("#5D6B82", " stroke-dasharray=\"1.5,4\""),
+        LinkConfidence.Confirmed => (DesignTokens.HexOf(DesignTokens.LinkConfirmed), string.Empty),
+        LinkConfidence.Inferred => (DesignTokens.HexOf(DesignTokens.LinkInferred), " stroke-dasharray=\"5,4\""),
+        _ => (DesignTokens.HexOf(DesignTokens.LinkAssumed), " stroke-dasharray=\"1.5,4\""),
     };
 
     private static string Border(TopologyNodeKind kind) => kind switch
     {
-        TopologyNodeKind.ThisMachine or TopologyNodeKind.Router => "#3B82F6",
-        TopologyNodeKind.Internet => "#D97706",
-        TopologyNodeKind.Subnet or TopologyNodeKind.HostGroup => "#4B5A72",
-        _ => "#333D4E",
+        TopologyNodeKind.ThisMachine or TopologyNodeKind.Router => DesignTokens.HexOf(DesignTokens.Accent),
+        TopologyNodeKind.Internet => DesignTokens.HexOf(DesignTokens.Warning),
+        TopologyNodeKind.Subnet or TopologyNodeKind.HostGroup => DesignTokens.HexOf(DesignTokens.NodeOutline),
+        _ => DesignTokens.HexOf(DesignTokens.Divider),
     };
 
     private static string N(double value) => value.ToString("0.##", CultureInfo.InvariantCulture);

@@ -3,6 +3,7 @@ using Avalonia.Markup.Xaml;
 using ScottPlot;
 using ScottPlot.Avalonia;
 using StormMachine.App.ViewModels;
+using StormMachine.App.Views.Controls;
 
 namespace StormMachine.App.Views.Pages;
 
@@ -54,6 +55,21 @@ public partial class LatencyPage : UserControl
 
     private void OnChartUpdated(object? sender, EventArgs e) => Redraw();
 
+    /// <summary>
+    /// Цвет токена в цвет ScottPlot.
+    /// </summary>
+    /// <remarks>
+    /// У рисовалки графиков свой тип цвета, и кисть Avalonia ей не подходит.
+    /// Значение всё равно берётся из общего словаря: график, разъехавшийся
+    /// с окном по палитре, выглядит вставленным из другой программы.
+    /// </remarks>
+    private static Color Token(string key)
+    {
+        var colour = DesignTokens.ColorOf(key);
+
+        return Color.FromARGB(colour.ToUInt32());
+    }
+
     private void ConfigurePlot()
     {
         if (_chart is null)
@@ -63,10 +79,10 @@ public partial class LatencyPage : UserControl
 
         var plot = _chart.Plot;
 
-        plot.FigureBackground.Color = Color.FromHex("#151922");
-        plot.DataBackground.Color = Color.FromHex("#151922");
-        plot.Axes.Color(Color.FromHex("#8A93A6"));
-        plot.Grid.MajorLineColor = Color.FromHex("#232A38");
+        plot.FigureBackground.Color = Token(DesignTokens.Surface);
+        plot.DataBackground.Color = Token(DesignTokens.Surface);
+        plot.Axes.Color(Token(DesignTokens.TextSecondary));
+        plot.Grid.MajorLineColor = Token(DesignTokens.Panel);
 
         plot.XLabel("проба");
         plot.YLabel("RTT, мс");
@@ -80,9 +96,9 @@ public partial class LatencyPage : UserControl
         // плашку, и на тёмном графике она выглядит наклейкой поверх чужого окна.
         // Настройки берутся у самой легенды, а не у панели, которую вернул ShowLegend:
         // панель отвечает за размещение, легенда — за вид.
-        plot.Legend.BackgroundColor = Color.FromHex("#232A38");
-        plot.Legend.OutlineColor = Color.FromHex("#2E3648");
-        plot.Legend.FontColor = Color.FromHex("#C8D0DE");
+        plot.Legend.BackgroundColor = Token(DesignTokens.Panel);
+        plot.Legend.OutlineColor = Token(DesignTokens.Divider);
+        plot.Legend.FontColor = Token(DesignTokens.Text);
         plot.Legend.ShadowColor = Colors.Transparent;
     }
 
@@ -105,7 +121,7 @@ public partial class LatencyPage : UserControl
             var ys = values.ToArray();
 
             var signal = plot.Add.Signal(ys);
-            signal.Color = Color.FromHex("#3B82F6");
+            signal.Color = Token(DesignTokens.Accent);
             signal.LineWidth = 1.5f;
             signal.LegendText = "RTT";
 
@@ -115,7 +131,7 @@ public partial class LatencyPage : UserControl
             if (_viewModel.FloorMs > 0)
             {
                 var floor = plot.Add.HorizontalLine(_viewModel.FloorMs);
-                floor.Color = Color.FromHex("#F59E0B");
+                floor.Color = Token(DesignTokens.Warning);
                 floor.LineWidth = 1;
                 floor.LinePattern = LinePattern.Dashed;
 
