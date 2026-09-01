@@ -56,16 +56,19 @@ public sealed partial class MonitorsPageViewModel : PageViewModel
         NavigationSection section,
         IMonitorStore store,
         MonitorScheduler scheduler,
-        IProbeRegistry probes)
+        IProbeRegistry probes,
+        IEnumerable<IAlertChannel> channels)
         : base(section)
     {
         _store = store ?? throw new ArgumentNullException(nameof(store));
         _scheduler = scheduler ?? throw new ArgumentNullException(nameof(scheduler));
-        Editor = new MonitorEditorViewModel(probes ?? throw new ArgumentNullException(nameof(probes)));
 
-        // Список обновляется по факту проверки, а не по таймеру: иначе состояние
-        // на экране отставало бы от того, что уже записано в базу.
-        _scheduler.Checked += OnChecked;
+        // Каналы доставки отдаются форме: монитор с включённым оповещением и пустым
+        // списком каналов не оповещает никого, и узнать об этом можно было только
+        // по строке в ленте алертов «оповещать было некуда».
+        Editor = new MonitorEditorViewModel(
+            probes ?? throw new ArgumentNullException(nameof(probes)),
+            channels ?? throw new ArgumentNullException(nameof(channels)));
     }
 
     /// <summary>
@@ -112,8 +115,22 @@ public sealed partial class MonitorsPageViewModel : PageViewModel
         ? $"Планировщик работает. Проверок сейчас: {_scheduler.ActiveCount}."
         : "Планировщик остановлен — проверки по расписанию не идут.";
 
-    public override Task ActivateAsync(CancellationToken cancellationToken = default) =>
-        RefreshAsync(cancellationToken);
+    /// <summary>
+    /// Подписка на факт проверки заводится при каждом заходе.
+    /// </summary>
+    /// <remarks>
+    /// Раньше она делалась один раз в конструкторе, а снималась при каждом уходе:
+    /// после первого же перехода на другой раздел список переставал обновляться сам
+    /// и замирал до нажатия «Обновить». Двойной подписки не будет: снятие идёт
+    /// перед постановкой.
+    /// </remarks>
+    public override Task ActivateAsync(CancellationToken cancellationToken = default)
+    {
+        _scheduler.Checked -= OnChecked;
+        _scheduler.Checked += OnChecked;
+
+        return RefreshAsync(cancellationToken);
+    }
 
     public override void Deactivate() => _scheduler.Checked -= OnChecked;
 
@@ -146,12 +163,21 @@ public sealed partial class MonitorsPageViewModel : PageViewModel
         }
     }
 
+    /// <summary>Есть ли выбранный монитор: действия над ним включаются по этому.</summary>
+    public bool HasSelection => Selected is not null;
+
     partial void OnSelectedChanged(MonitorRow? value)
     {
+        OnPropertyChanged(nameof(HasSelection));
+
         if (value is null)
         {
             Details = "Выбери монитор в списке слева.";
             AvailabilityText = null;
+
+            // Оговорка о покрытии тоже снимается: она осталась бы висеть
+            // над числами, которых на экране больше нет.
+            CoverageNotice = null;
             Checks.Clear();
             OnPropertyChanged(nameof(HasChecks));
 

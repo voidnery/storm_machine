@@ -59,6 +59,15 @@ public sealed partial class UpdateService : ObservableObject
     {
         _runner = runner ?? throw new ArgumentNullException(nameof(runner));
 
+        // Оговорка про идущие измерения зависит от списка операций, а не от состояния
+        // обновления: без этой подписки она застывала — измерение закончилось,
+        // а «дождитесь окончания» продолжало висеть, и наоборот.
+        _runner.ActiveChanged += (_, _) =>
+        {
+            OnPropertyChanged(nameof(Hold));
+            OnPropertyChanged(nameof(CanApply));
+        };
+
         try
         {
             _manager = new UpdateManager(new GithubSource(ReleasesUrl, accessToken: null, prerelease: false));
@@ -98,7 +107,15 @@ public sealed partial class UpdateService : ObservableObject
 
     public bool CanDownload => State == UpdateState.Available;
 
-    public bool CanApply => State == UpdateState.Ready;
+    /// <summary>
+    /// Установка предлагается, только когда она возможна.
+    /// </summary>
+    /// <remarks>
+    /// Раньше кнопка оставалась включённой во время измерений, а сама установка
+    /// молча выходила по <see cref="Hold"/>: нажатие не давало ни результата,
+    /// ни объяснения. Кнопка обязана быть выключенной там, где действие не сработает.
+    /// </remarks>
+    public bool CanApply => State == UpdateState.Ready && Hold is null;
 
     public string StateText => State switch
     {

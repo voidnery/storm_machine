@@ -7,7 +7,7 @@ namespace StormMachine.Cli.Rendering;
 /// <summary>Показ журнала прогонов.</summary>
 internal static class RunRenderer
 {
-    private static string F(double value) => value.ToString("0.000", CultureInfo.InvariantCulture);
+    private static string F(double value) => Units.Number(value, MeasurementUnit.Milliseconds);
 
     public static void WriteList(IReadOnlyList<RunSummary> runs)
     {

@@ -85,9 +85,14 @@ public sealed partial class DashboardPageViewModel(
             ? "Права администратора: есть"
             : "Права администратора: нет — уровню 0 они и не требуются";
 
+        // «Порог часов 0.000 мс» читается как измеренный ноль, хотя означает, что
+        // калибровки ещё не было: она идёт перед первым измерением. Строка состояния
+        // об этом говорила прямо, дашборд — врал числом.
         TimerInfo =
             $"Таймер: разрешение {_clock.ResolutionNanoseconds:0.###} нс, "
-            + $"порог часов {_clock.CalibrationBaselineMs.ToString("0.000", CultureInfo.InvariantCulture)} мс";
+            + (_clock.CalibrationBaselineMs > 0
+                ? $"порог часов {_clock.CalibrationBaselineMs.ToString("0.000", CultureInfo.InvariantCulture)} мс"
+                : "порог часов ещё не измерен — калибровка идёт перед первым измерением");
 
         Adapters.Clear();
         var primary = _environment.GetPrimaryAdapter();

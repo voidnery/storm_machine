@@ -14,10 +14,10 @@
         <Button Grid.Column="1" Content="Завести" Command="{Binding ToggleEditorCommand}"
                 Padding="14,5" Margin="0,0,8,0"
                 Background="{StaticResource AccentBrush}" Foreground="White" />
-        <Button Grid.Column="2" Content="Проверить сейчас" Command="{Binding RunNowCommand}" Padding="12,5" Margin="0,0,8,0" />
-        <Button Grid.Column="3" Content="Вкл / выкл" Command="{Binding ToggleCommand}" Padding="12,5" Margin="0,0,8,0" />
+        <Button Grid.Column="2" Content="Проверить сейчас" Command="{Binding RunNowCommand}" Padding="12,5" Margin="0,0,8,0" IsEnabled="{Binding HasSelection}" />
+        <Button Grid.Column="3" Content="Вкл / выкл" Command="{Binding ToggleCommand}" Padding="12,5" Margin="0,0,8,0" IsEnabled="{Binding HasSelection}" />
         <Button Grid.Column="4" Content="Обновить" Command="{Binding RefreshCommand}" Padding="12,5" Margin="0,0,8,0" />
-        <Button Grid.Column="5" Content="Удалить" Command="{Binding DeleteCommand}" Padding="12,5" />
+        <Button Grid.Column="5" Content="Удалить" Command="{Binding DeleteCommand}" Padding="12,5" IsEnabled="{Binding HasSelection}" />
       </Grid>
 
       <TextBlock Text="{Binding SchedulerState}" FontSize="11" Foreground="{StaticResource TextMutedBrush}" TextWrapping="Wrap" />
@@ -159,6 +159,21 @@
               <CheckBox Content="Оповещать" IsChecked="{Binding Alert}" />
 
               <StackPanel Spacing="6" IsVisible="{Binding Alert}" Margin="18,0,0,0">
+
+                <!-- Каналы доставки: без единой отметки монитор молчит, как бы
+                     ни был настроен гистерезис. -->
+                <StackPanel Spacing="3">
+                  <TextBlock Text="Куда оповещать" Classes="caption" />
+                  <ItemsControl ItemsSource="{Binding Channels}">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate x:DataType="vm:ChannelChoice">
+                        <CheckBox Content="{Binding Title}" IsChecked="{Binding IsChosen}" FontSize="11" />
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                  <forms:Caveat Text="{Binding ChannelWarning}" />
+                </StackPanel>
+
                 <Grid ColumnDefinitions="*,10,*">
                   <StackPanel Grid.Column="0" Spacing="2">
                     <TextBlock Text="Поднять алерт после, проверок" Classes="caption" ToolTip.Tip="Столько неудачных проверок подряд нужно, чтобы поднять алерт" />

@@ -95,7 +95,10 @@ public sealed partial class SettingsPageViewModel : PageViewModel
         Agents = new AgentsSectionViewModel(agents ?? throw new ArgumentNullException(nameof(agents)));
         Transfer = new TransferSectionViewModel(
             transfer ?? throw new ArgumentNullException(nameof(transfer)),
-            picker ?? throw new ArgumentNullException(nameof(picker)));
+            picker ?? throw new ArgumentNullException(nameof(picker)))
+        {
+            Reload = RefreshAsync,
+        };
         Retention = new RetentionSectionViewModel(
             retention ?? throw new ArgumentNullException(nameof(retention)),
             runs ?? throw new ArgumentNullException(nameof(runs)));

@@ -316,8 +316,13 @@ public sealed partial class InspectPageViewModel : PageViewModel, ITargetAware, 
     private async Task LookOutsideAsync()
     {
         IsOutsideRunning = true;
+        Error = null;
         Mappings.Clear();
         Notes.Clear();
+
+        // Панель прячется сразу: иначе на экране оставались адрес и вывод о NAT
+        // от прошлого запуска, пока идёт новый или пока он не удался.
+        OnPropertyChanged(nameof(HasOutside));
 
         try
         {
@@ -355,6 +360,13 @@ public sealed partial class InspectPageViewModel : PageViewModel, ITargetAware, 
             }
 
             OnPropertyChanged(nameof(HasOutside));
+        }
+        catch (Exception ex)
+        {
+            // Единственное место продукта, которое обязательно ходит к чужим серверам,
+            // — и самое вероятное место сетевого отказа. Без этой ветки исключение
+            // уходило в поток интерфейса и роняло клиент.
+            Error = "Взгляд снаружи не удался: " + ex.Message;
         }
         finally
         {

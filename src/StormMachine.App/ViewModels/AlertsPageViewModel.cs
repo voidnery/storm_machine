@@ -75,8 +75,6 @@ public sealed partial class AlertsPageViewModel : PageViewModel
         _store = store ?? throw new ArgumentNullException(nameof(store));
         _scheduler = scheduler ?? throw new ArgumentNullException(nameof(scheduler));
         _channels = [.. channels ?? []];
-
-        _scheduler.Alerted += OnAlerted;
     }
 
     public ObservableCollection<AlertRow> Alerts { get; } = [];
@@ -89,8 +87,20 @@ public sealed partial class AlertsPageViewModel : PageViewModel
     [ObservableProperty]
     private string _summary = string.Empty;
 
-    public override Task ActivateAsync(CancellationToken cancellationToken = default) =>
-        RefreshAsync(cancellationToken);
+    /// <summary>
+    /// Подписка на алерт заводится при каждом заходе.
+    /// </summary>
+    /// <remarks>
+    /// Раньше она делалась один раз в конструкторе, а снималась при каждом уходе:
+    /// после первого перехода на другой раздел лента переставала пополняться сама.
+    /// </remarks>
+    public override Task ActivateAsync(CancellationToken cancellationToken = default)
+    {
+        _scheduler.Alerted -= OnAlerted;
+        _scheduler.Alerted += OnAlerted;
+
+        return RefreshAsync(cancellationToken);
+    }
 
     public override void Deactivate() => _scheduler.Alerted -= OnAlerted;
 

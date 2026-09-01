@@ -224,10 +224,22 @@ public sealed partial class ProbeRunnerViewModel : ObservableObject
         OnPropertyChanged(nameof(ProbeAbout));
 
         // Имя агента из цели ping не сделать, и наоборот: смена пробы очищает цель,
-        // если её вид больше не подходит.
-        if (value?.Descriptor.RequiresAgent == true && AgentNames.Count > 0)
+        // если её вид больше не подходит. Обратная половина правила отсутствовала —
+        // после «Пропускной способности» в поле оставалось имя агента, и ping уходил
+        // разрешать его как имя узла: отказ выглядел проблемой сети.
+        if (value?.Descriptor.RequiresAgent == true)
         {
-            Target = AgentNames[0];
+            if (AgentNames.Count > 0 && !AgentNames.Contains(Target, StringComparer.OrdinalIgnoreCase))
+            {
+                Target = AgentNames[0];
+            }
+
+            return;
+        }
+
+        if (AgentNames.Contains(Target, StringComparer.OrdinalIgnoreCase))
+        {
+            Target = string.Empty;
         }
     }
 
@@ -445,6 +457,5 @@ public sealed partial class ProbeRunnerViewModel : ObservableObject
     /// В колонке с семью числами единица у каждого превращает таблицу в частокол
     /// букв; в подписи она читается один раз и относится ко всем.
     /// </remarks>
-    private static string Measured(double value, MeasurementUnit unit) =>
-        value.ToString(unit == MeasurementUnit.MegabitsPerSecond ? "0.#" : "0.###", CultureInfo.InvariantCulture);
+    private static string Measured(double value, MeasurementUnit unit) => Units.Number(value, unit);
 }

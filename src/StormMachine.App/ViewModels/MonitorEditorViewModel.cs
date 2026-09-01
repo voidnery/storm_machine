@@ -36,6 +36,25 @@ public sealed record ScheduleOption(string Title, TimeSpan? Interval, string? Cr
 public sealed record ThresholdRow(string Text, string Explanation);
 
 /// <summary>
+/// Канал доставки, отмечаемый галочкой.
+/// </summary>
+/// <remarks>
+/// До И-24+ формы каналов не было вовсе: монитор, заведённый мышью, получал пустой
+/// список и не оповещал никого — при включённой галочке «Оповещать» и настроенном
+/// гистерезисе. Узнать об этом можно было только по строке в ленте алертов
+/// «оповещать было некуда».
+/// </remarks>
+public sealed partial class ChannelChoice(string Name, string Title) : ObservableObject
+{
+    public string Name { get; } = Name;
+
+    public string Title { get; } = Title;
+
+    [ObservableProperty]
+    private bool _isChosen;
+}
+
+/// <summary>
 /// Форма заведения монитора.
 /// </summary>
 /// <remarks>
@@ -53,9 +72,23 @@ public sealed partial class MonitorEditorViewModel : ObservableObject
 {
     private readonly IProbeRegistry _probes;
 
-    public MonitorEditorViewModel(IProbeRegistry probes)
+    public MonitorEditorViewModel(IProbeRegistry probes, IEnumerable<IAlertChannel> channels)
     {
         _probes = probes ?? throw new ArgumentNullException(nameof(probes));
+        ArgumentNullException.ThrowIfNull(channels);
+
+        // Каналы доставки: без них монитор с включённым оповещением молчит.
+        // Отмечены по умолчанию те, что настроены, — не настроенный канал
+        // отметить можно, но он честно скажет о себе в ленте алертов.
+        Channels =
+        [
+            .. channels.Select(c => new ChannelChoice(c.Name, c.Title) { IsChosen = c.IsConfigured }),
+        ];
+
+        foreach (var channel in Channels)
+        {
+            channel.PropertyChanged += (_, _) => Refresh();
+        }
 
         Subjects =
         [
@@ -104,7 +137,20 @@ public sealed partial class MonitorEditorViewModel : ObservableObject
         + "у времён миллисекунды, у потерь проценты. Нарушенный порог даёт монитору "
         + "отказ, а при включённом оповещении — алерт.";
 
-    public ObservableCollection<string> Channels { get; } = [];
+    /// <summary>Каналы доставки: какие отмечены, туда алерт и уйдёт.</summary>
+    public IReadOnlyList<ChannelChoice> Channels { get; }
+
+    /// <summary>
+    /// Оговорка о молчащем оповещении.
+    /// </summary>
+    /// <remarks>
+    /// Включённое оповещение без единого канала — самая тихая из поломок: монитор
+    /// считает отказ, пишет его в базу и никому не говорит. Форма обязана сказать
+    /// об этом до сохранения, а не лента алертов после.
+    /// </remarks>
+    public string? ChannelWarning => Alert && Channels.All(c => !c.IsChosen)
+        ? "Ни один канал не отмечен — оповещать будет некуда."
+        : null;
 
     [ObservableProperty]
     private string _name = string.Empty;
@@ -293,7 +339,7 @@ public sealed partial class MonitorEditorViewModel : ObservableObject
                     Cooldown = Domain.Monitors.Schedule.TryParseInterval(Cooldown, out var pause)
                         ? pause
                         : TimeSpan.FromMinutes(15),
-                    Channels = [.. Channels],
+                    Channels = [.. Channels.Where(c => c.IsChosen).Select(c => c.Name)],
                 }
                 : null,
             Objective = ObjectivePercent is { } percent
@@ -319,6 +365,7 @@ public sealed partial class MonitorEditorViewModel : ObservableObject
 
         Error = problem;
         OnPropertyChanged(nameof(Preview));
+        OnPropertyChanged(nameof(ChannelWarning));
     }
 
     /// <summary>Подсказка про цель для выбранного предмета измерения.</summary>

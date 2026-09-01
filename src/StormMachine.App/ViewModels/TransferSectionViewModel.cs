@@ -20,6 +20,16 @@ public sealed partial class TransferSectionViewModel(SettingsTransfer transfer, 
     private readonly SettingsTransfer _transfer = transfer ?? throw new ArgumentNullException(nameof(transfer));
     private readonly IFilePicker _picker = picker ?? throw new ArgumentNullException(nameof(picker));
 
+    /// <summary>
+    /// Чем перечитать страницу после загрузки из файла.
+    /// </summary>
+    /// <remarks>
+    /// Сообщение звало «активируйте нужный профиль в списке выше», а список оставался
+    /// прежним: приехавшие профили появлялись в нём только после ручного «Обновить».
+    /// Совет, который не работает без ещё одного действия, — хуже отсутствия совета.
+    /// </remarks>
+    public Func<CancellationToken, Task>? Reload { get; set; }
+
     [ObservableProperty]
     private string? _message;
 
@@ -130,6 +140,13 @@ public sealed partial class TransferSectionViewModel(SettingsTransfer transfer, 
             if (report.Problems.Count > 0)
             {
                 Error = "Не перенеслось: " + string.Join("; ", report.Problems);
+            }
+
+            // Страница перечитывается сразу: совет «активируйте нужный в списке выше»
+            // должен указывать на список, в котором приехавшее уже видно.
+            if (Reload is { } reload)
+            {
+                await reload(cancellationToken).ConfigureAwait(true);
             }
         }
         catch (Exception ex)

@@ -23,22 +23,51 @@ public partial class TopologyPage : UserControl
     /// <summary>Разрешение снимка. Больше экранного: карту вставляют в отчёты и печатают.</summary>
     private const double ExportScale = 2.0;
 
+    private TopologyPageViewModel? _model;
+
     public TopologyPage()
     {
         AvaloniaXamlLoader.Load(this);
+
         DataContextChanged += OnDataContextChanged;
+        DetachedFromVisualTree += (_, _) => Unsubscribe();
     }
 
+    /// <summary>
+    /// Подписка на замену графа — с отпиской.
+    /// </summary>
+    /// <remarks>
+    /// Модель представления живёт всё время работы клиента, а страница создаётся
+    /// заново на каждый переход в раздел. Без отписки каждый заход добавлял ещё один
+    /// обработчик к тому же событию: после десятого захода одна перестройка карты
+    /// дёргала подгонку десять раз, в том числе на давно закрытых полотнах.
+    /// Так же устроена страница задержки — там это уже было сделано.
+    /// </remarks>
     private void OnDataContextChanged(object? sender, EventArgs e)
     {
+        Unsubscribe();
+
         if (DataContext is not TopologyPageViewModel model)
         {
             return;
         }
 
+        _model = model;
         model.ExportImage = SaveAsync;
-        model.GraphReplaced += (_, _) => this.FindControl<TopologyCanvas>("Canvas")?.FitToView();
+        model.GraphReplaced += OnGraphReplaced;
     }
+
+    private void Unsubscribe()
+    {
+        if (_model is not null)
+        {
+            _model.GraphReplaced -= OnGraphReplaced;
+            _model = null;
+        }
+    }
+
+    private void OnGraphReplaced(object? sender, EventArgs e) =>
+        this.FindControl<TopologyCanvas>("Canvas")?.FitToView();
 
     private Task<bool> SaveAsync(string path)
     {

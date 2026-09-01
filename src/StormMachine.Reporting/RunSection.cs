@@ -538,7 +538,7 @@ internal static class RunSection
     public static IContainer BodyCell(IContainer container) =>
         container.BorderBottom(0.5f).BorderColor(Colors.Grey.Lighten2).PaddingVertical(3);
 
-    private static string F(double value) => value.ToString("0.000", CultureInfo.InvariantCulture);
+    private static string F(double value) => Units.Number(value, MeasurementUnit.Milliseconds);
 
     public static string DescribeState(RunState state, int lost) => state switch
     {

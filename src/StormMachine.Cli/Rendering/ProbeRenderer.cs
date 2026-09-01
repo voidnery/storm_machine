@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using System.Globalization;
 using StormMachine.Application.Abstractions;
 using StormMachine.Application.Probes;
@@ -26,7 +26,7 @@ internal static class ProbeRenderer
 {
     private const int WaterfallWidth = 40;
 
-    private static string F(double value) => value.ToString("0.000", CultureInfo.InvariantCulture);
+    private static string F(double value) => Units.Number(value, MeasurementUnit.Milliseconds);
 
     public static void WriteHeader(
         ProbeDescriptor descriptor,

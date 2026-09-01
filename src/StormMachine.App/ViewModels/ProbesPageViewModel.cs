@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.Globalization;
+using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using StormMachine.App.Services;
@@ -327,14 +328,24 @@ public sealed partial class ProbesPageViewModel : PageViewModel, ITargetAware, I
         return run;
     }
 
-    private void OnProgress(ScenarioProgress progress)
-    {
-        Progress = progress.Finished is null
-            ? $"{progress.StepIndex + 1}/{progress.StepCount} {progress.StepName}…"
-            : string.Empty;
+    /// <summary>
+    /// Ход сценария приходит с потока, на котором идёт прогон.
+    /// </summary>
+    /// <remarks>
+    /// Оркестратор зовёт этот обработчик после <c>ConfigureAwait(false)</c>, то есть
+    /// со второго шага — уже из пула потоков. Присвоение свойства оттуда уводит
+    /// уведомление об изменении прямо в привязку, минуя поток разметки. Для проб
+    /// это сделано правильно в <c>RunnerService</c>; у сценариев обёртки не было.
+    /// </remarks>
+    private void OnProgress(ScenarioProgress progress) =>
+        Dispatcher.UIThread.Post(() =>
+        {
+            Progress = progress.Finished is null
+                ? $"{progress.StepIndex + 1}/{progress.StepCount} {progress.StepName}…"
+                : string.Empty;
 
-        _operation?.Report(progress);
-    }
+            _operation?.Report(progress);
+        });
 
     private string Describe(TargetSet set)
     {
@@ -370,7 +381,18 @@ public sealed partial class ProbesPageViewModel : PageViewModel, ITargetAware, I
     [RelayCommand(CanExecute = nameof(IsRunning))]
     private void Stop() => _cts?.Cancel();
 
-    public override void Deactivate() => _cts?.Cancel();
+    /// <summary>
+    /// Уход с экрана сценарий не останавливает.
+    /// </summary>
+    /// <remarks>
+    /// Раньше здесь стояло <c>_cts?.Cancel()</c>, и переход на любой другой раздел
+    /// обрывал идущий сценарий — ровно то, ради чего он и кладётся в панель операций:
+    /// прогон по восьми целям идёт минутами, и оператор не обязан сидеть на экране,
+    /// с которого его запустил. Остановка осталась кнопкой «Стоп» и закрытием клиента.
+    /// </remarks>
+    public override void Deactivate()
+    {
+    }
 
     public void Dispose()
     {

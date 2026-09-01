@@ -1,5 +1,6 @@
-﻿using System.Collections.ObjectModel;
+using System.Collections.ObjectModel;
 using System.Globalization;
+using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using StormMachine.App.Services;
@@ -50,6 +51,9 @@ public sealed partial class TopologyPageViewModel(
     public ITopologyLayout Layout { get; } = layout ?? throw new ArgumentNullException(nameof(layout));
 
     private readonly List<string> _expanded = [];
+
+    /// <summary>Переключатель нажали, пока строилась карта: пересчитать после.</summary>
+    private bool _reloadAgain;
 
     [ObservableProperty]
     private TopologyGraph? _graph;
@@ -390,8 +394,13 @@ public sealed partial class TopologyPageViewModel(
 
     private async Task ReloadAsync(CancellationToken cancellationToken = default)
     {
+        // Переключатель, нажатый во время построения, не теряется: раньше карта
+        // просто не пересчитывалась, и состояние формы расходилось с показанным
+        // молча. Теперь просьба запоминается и выполняется, как только освободимся.
         if (IsBusy)
         {
+            _reloadAgain = true;
+
             return;
         }
 
@@ -409,7 +418,9 @@ public sealed partial class TopologyPageViewModel(
                     ExpandedSubnets = [.. _expanded],
                     UseSnmp = UseSnmp,
                 },
-                note => Note = note,
+                // Ход опроса приходит с потока опроса, а не с потока разметки:
+                // сборщик карты зовёт этот обработчик после ConfigureAwait(false).
+                note => Dispatcher.UIThread.Post(() => Note = note),
                 cancellationToken).ConfigureAwait(true);
 
             Graph = graph;
@@ -439,6 +450,13 @@ public sealed partial class TopologyPageViewModel(
         finally
         {
             IsBusy = false;
+        }
+
+        if (_reloadAgain)
+        {
+            _reloadAgain = false;
+
+            await ReloadAsync(cancellationToken).ConfigureAwait(true);
         }
     }
 

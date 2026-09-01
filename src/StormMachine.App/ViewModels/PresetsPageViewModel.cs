@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using System.Globalization;
@@ -28,9 +29,12 @@ public sealed partial class PresetsPageViewModel(
     IRunStore store,
     IFilePicker filePicker,
     ScenarioRunner scenarios,
+    ScenarioLibrary library,
     IHighResolutionClock clock,
     INetworkEnvironment environment) : PageViewModel(section)
 {
+    private readonly ScenarioLibrary _library = library ?? throw new ArgumentNullException(nameof(library));
+
     private readonly PresetService _presets = presets ?? throw new ArgumentNullException(nameof(presets));
     private readonly RunnerService _operations = runner ?? throw new ArgumentNullException(nameof(runner));
     private readonly IRunStore _store = store ?? throw new ArgumentNullException(nameof(store));
@@ -239,9 +243,19 @@ public sealed partial class PresetsPageViewModel(
             {
                 operation.SetTarget(set.Targets.Count > 1 ? target : null);
 
-                var scenario = ScenarioTemplates.Create(preset.Subject, target);
+                // Свой сценарий тоже должен запускаться: ScenarioTemplates.Create
+                // знает только три шаблона и на собранный оператором бросал
+                // «шаблон не найден», хотя с экрана «Внешние пробы» он работает.
+                var scenario = await _library.CreateAsync(preset.Subject, target, cts.Token).ConfigureAwait(true);
+
                 var run = await _scenarios
-                    .RunAsync(scenario, save: true, operation.Report, cts.Token)
+                    .RunAsync(
+                        scenario,
+                        save: true,
+                        // Ход приходит с потока прогона — в интерфейс он попадает
+                        // через диспетчер, как и у остальных длительных операций.
+                        progress => Dispatcher.UIThread.Post(() => operation.Report(progress)),
+                        cts.Token)
                     .ConfigureAwait(true);
 
                 if (run.Level == VerdictLevel.Fail)

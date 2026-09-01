@@ -22,7 +22,12 @@
       <!-- Лента -->
       <Border Grid.Column="0" Background="{StaticResource PanelBrush}" CornerRadius="6" Padding="12">
         <ScrollViewer>
-          <ItemsControl ItemsSource="{Binding Alerts}">
+          <Panel>
+            <TextBlock Text="Событий нет. Алерт поднимается, когда монитор нарушает свои пороги нужное число проверок подряд."
+                       Classes="label" TextWrapping="Wrap" VerticalAlignment="Top"
+                       IsVisible="{Binding !Alerts.Count}" />
+          <ItemsControl ItemsSource="{Binding Alerts}"
+                        IsVisible="{Binding Alerts.Count}">
             <ItemsControl.ItemTemplate>
               <DataTemplate x:DataType="vm:AlertRow">
                 <Border Margin="0,0,0,8" Padding="12,9" CornerRadius="4" Background="{StaticResource TileBrush}">
@@ -56,6 +61,7 @@
               </DataTemplate>
             </ItemsControl.ItemTemplate>
           </ItemsControl>
+          </Panel>
         </ScrollViewer>
       </Border>
 

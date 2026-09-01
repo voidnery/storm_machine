@@ -84,6 +84,17 @@ public sealed partial class RetentionSectionViewModel(RetentionSettings settings
     {
         Message = Error = null;
 
+        // Уборка шла мимо проверки горизонтов, которая есть у сохранения политики:
+        // очищенное поле давало ноль дней, а нулевой горизонт означает «удалить всё».
+        // Необратимое действие обязано отказываться от бессмысленного ввода.
+        if (Days(RawDays) < 1 || Days(RunDays) < Days(RawDays))
+        {
+            Error = "Горизонты не годятся: сырые измерения — не меньше суток, "
+                    + "а прогоны должны храниться не меньше сырых измерений.";
+
+            return;
+        }
+
         try
         {
             var policy = new RetentionPolicy

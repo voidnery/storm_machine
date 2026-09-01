@@ -105,12 +105,27 @@ public sealed partial class RunsPageViewModel(
         await RefreshAsync(cancellationToken).ConfigureAwait(true);
     }
 
+    /// <summary>Есть ли выбранный прогон: кнопки над ним включаются по этому.</summary>
+    public bool HasSelection => SelectedRun is not null;
+
     partial void OnSelectedRunChanged(RunSummary? value)
     {
-        if (value is not null)
+        OnPropertyChanged(nameof(HasSelection));
+
+        if (value is null)
         {
-            _ = LoadDetailsAsync(value.Id);
+            // Подробности снятого выбора не остаются на экране: после «Обновить»
+            // справа висели ряды и факты прогона, который уже не выбран.
+            Details = "Выбери прогон в списке слева.";
+            RetentionNotice = null;
+            SeriesUnit = string.Empty;
+            Series.Clear();
+            Facts.Clear();
+
+            return;
         }
+
+        _ = LoadDetailsAsync(value.Id);
     }
 
     [RelayCommand]
@@ -422,6 +437,5 @@ public sealed partial class RunsPageViewModel(
     }
 
     /// <summary>Значение ряда без единицы: единица названа подписью таблицы.</summary>
-    private static string F(double value, MeasurementUnit unit) =>
-        value.ToString(unit == MeasurementUnit.MegabitsPerSecond ? "0.#" : "0.000", CultureInfo.InvariantCulture);
+    private static string F(double value, MeasurementUnit unit) => Units.Number(value, unit);
 }

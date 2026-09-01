@@ -81,6 +81,9 @@ public sealed partial class DiscoveryPageViewModel : PageViewModel, IDisposable
     private DiscoveryProgress? _pending;
     private AddressRange? _range;
 
+    /// <summary>Красная строка сейчас жалуется на диапазон, а не на упавший скан.</summary>
+    private bool _rangeIsWrong;
+
     public DiscoveryPageViewModel(
         NavigationSection section,
         IDiscoveryService discovery,
@@ -187,6 +190,15 @@ public sealed partial class DiscoveryPageViewModel : PageViewModel, IDisposable
         CatalogInfo = _oui.Count > 0
             ? $"производители: {_oui.Count.ToString(CultureInfo.InvariantCulture)} записей реестра IEEE"
             : "производители: база не загрузилась";
+
+        // Скан идёт и без экрана, а таймер хода останавливается при уходе. Без этой
+        // строки вернувшийся оператор видел полосу застывшей на том месте, где ушёл,
+        // до самого конца сканирования — как зависшую.
+        if (IsRunning)
+        {
+            PumpProgress();
+            _timer.Start();
+        }
 
         return Task.CompletedTask;
     }
@@ -327,11 +339,16 @@ public sealed partial class DiscoveryPageViewModel : PageViewModel, IDisposable
             Devices.Add(DeviceRow.From(device));
         }
 
-        ProgressPercent = 100;
-        ProgressText = $"опрошено {scan.Probed} из {scan.Probed}";
+        // Прерванный скан не доводится до ста процентов: полоса на всю ширину
+        // и «опрошено 40 из 40» читались как «сеть просмотрена целиком», хотя
+        // остановились на сороковом адресе из двухсот пятидесяти четырёх.
+        var total = _range?.Count ?? scan.Probed;
+
+        ProgressPercent = total > 0 ? Math.Min(100, scan.Probed * 100.0 / total) : 100;
+        ProgressText = $"опрошено {scan.Probed} из {total}";
 
         StatusLine = scan.WasCancelled
-            ? "Сканирование прервано. Ниже — то, что успели найти."
+            ? $"Сканирование прервано на {scan.Probed} адресе из {total}. Ниже — то, что успели найти."
             : $"Готово за {scan.Duration?.TotalSeconds.ToString("0.0", CultureInfo.InvariantCulture) ?? "?"} с.";
 
         var arpOnly = scan.Devices.Count(d => d.Evidence.Any(e =>
@@ -387,13 +404,20 @@ public sealed partial class DiscoveryPageViewModel : PageViewModel, IDisposable
             RangeSummary = $"{_range.Count.ToString(CultureInfo.InvariantCulture)} адресов: "
                            + $"{_range.First} … {_range.Last}";
 
-            ErrorMessage = null;
+            // Снимается только жалоба на сам диапазон. Раньше правка поля стирала
+            // и объяснение упавшего скана — до того, как его успевали дочитать.
+            if (_rangeIsWrong)
+            {
+                ErrorMessage = null;
+                _rangeIsWrong = false;
+            }
         }
         catch (Exception ex) when (ex is FormatException or ArgumentException)
         {
             _range = null;
             RangeSummary = string.Empty;
             ErrorMessage = ex.Message;
+            _rangeIsWrong = true;
         }
     }
 

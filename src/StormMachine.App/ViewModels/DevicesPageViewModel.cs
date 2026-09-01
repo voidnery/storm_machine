@@ -260,11 +260,21 @@ public sealed partial class DevicesPageViewModel(
 
             _devices = await _store.ListDevicesAsync(cancellationToken).ConfigureAwait(true);
 
+            // Выбор переживает перечитывание: назвал устройство — и тут же хочешь
+            // присвоить ему роль, а список сбрасывал выделение, и ту же строку
+            // приходилось искать заново.
+            var previous = Selected?.Address;
+
             Rows.Clear();
 
             foreach (var device in _devices.OrderBy(d => IpAddressOrder.Of(d.Address)))
             {
                 Rows.Add(InventoryRow.From(device));
+            }
+
+            if (previous is { } address)
+            {
+                Selected = Rows.FirstOrDefault(r => string.Equals(r.Address, address, StringComparison.Ordinal));
             }
 
             var scans = await _store.ListScansAsync(20, cancellationToken).ConfigureAwait(true);

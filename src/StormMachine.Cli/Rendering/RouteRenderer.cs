@@ -18,7 +18,7 @@ internal static class RouteRenderer
 {
     private const int MaxChangesShown = 10;
 
-    private static string F(double value) => value.ToString("0.000", CultureInfo.InvariantCulture);
+    private static string F(double value) => Units.Number(value, MeasurementUnit.Milliseconds);
 
     /// <summary>
     /// Восстанавливает разбор маршрута: по сырым сэмплам, а после их удаления — по агрегатам.

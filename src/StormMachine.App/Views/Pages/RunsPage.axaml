@@ -11,12 +11,12 @@
     <StackPanel Grid.Row="0" Spacing="4" Margin="0,0,0,12">
       <Grid ColumnDefinitions="*,Auto,Auto,Auto,Auto,Auto">
         <TextBlock Grid.Column="0" Text="{Binding Title}" FontSize="24" FontWeight="SemiBold" />
-        <Button Grid.Column="1" Content="Отчёт PDF" Command="{Binding SaveReportCommand}"
+        <Button Grid.Column="1" Content="Отчёт PDF" Command="{Binding SaveReportCommand}" IsEnabled="{Binding HasSelection}"
                 Padding="14,5" Margin="0,0,8,0"
                 Background="{StaticResource AccentBrush}" Foreground="White" />
 
         <!-- Выгрузка отдельно от отчёта: отчёт объясняет, выгрузка отдаёт -->
-        <Button Grid.Column="2" Content="Выгрузить" Padding="12,5" Margin="0,0,8,0">
+        <Button Grid.Column="2" Content="Выгрузить" Padding="12,5" Margin="0,0,8,0" IsEnabled="{Binding HasSelection}">
           <Button.Flyout>
             <MenuFlyout>
               <MenuItem Header="CSV — таблица" Command="{Binding ExportCommand}" CommandParameter="csv" />
@@ -26,12 +26,12 @@
           </Button.Flyout>
         </Button>
 
-        <Button Grid.Column="3" Content="В эталон" Command="{Binding CaptureBaselineCommand}"
+        <Button Grid.Column="3" Content="В эталон" Command="{Binding CaptureBaselineCommand}" IsEnabled="{Binding HasSelection}"
                 Padding="12,5" Margin="0,0,8,0"
                 ToolTip.Tip="Зафиксировать это измерение нормой вместе с условиями, в которых оно сделано" />
 
         <Button Grid.Column="4" Content="Обновить" Command="{Binding RefreshCommand}" Padding="12,5" Margin="0,0,8,0" />
-        <Button Grid.Column="5" Content="Удалить" Command="{Binding DeleteSelectedCommand}" Padding="12,5" />
+        <Button Grid.Column="5" Content="Удалить" Command="{Binding DeleteSelectedCommand}" Padding="12,5" IsEnabled="{Binding HasSelection}" />
       </Grid>
       <!-- Сводка плитками, путь — копируемым чипом: раньше четыре числа и путь шли
            одной серой строкой, и путь в ней обрезался. -->
@@ -58,6 +58,12 @@
 
       <!-- Список прогонов -->
       <Border Grid.Column="0" Background="{StaticResource PanelBrush}" CornerRadius="6" Padding="8">
+        <Panel>
+        <!-- Пустой список молчал: экран без данных обязан говорить, что сделать. -->
+        <TextBlock Text="Журнал пуст. Запустите измерение — прогоны сохраняются сюда сами, если у пробы отмечено «В журнал»."
+                   Classes="label" TextWrapping="Wrap" Margin="8" VerticalAlignment="Top"
+                   IsVisible="{Binding !Runs.Count}" />
+
         <ListBox ItemsSource="{Binding Runs}"
                  SelectedItem="{Binding SelectedRun}"
                  Background="Transparent" BorderThickness="0">
@@ -79,6 +85,7 @@
             </DataTemplate>
           </ListBox.ItemTemplate>
         </ListBox>
+        </Panel>
       </Border>
 
       <!-- Подробности -->

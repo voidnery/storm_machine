@@ -23,6 +23,9 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private readonly IHighResolutionClock _clock;
     private readonly Dictionary<string, PageViewModel> _pages = new(StringComparer.Ordinal);
 
+    /// <summary>Идёт переход — повторный вход через выбор в меню не нужен.</summary>
+    private bool _navigating;
+
     public MainWindowViewModel(
         RunnerService runner,
         INetworkEnvironment environment,
@@ -220,7 +223,35 @@ public sealed partial class MainWindowViewModel : ObservableObject
         }
     }
 
+    /// <summary>
+    /// Переход в раздел.
+    /// </summary>
+    /// <remarks>
+    /// Защита от повторного входа обязательна: присвоение <see cref="SelectedSection"/>
+    /// ниже само зовёт этот же метод через уведомление об изменении, и на старте
+    /// первая страница активировалась дважды — две копии загрузки данных наперегонки
+    /// чистили и наполняли одни и те же коллекции.
+    /// </remarks>
     private void Navigate(NavigationSection section)
+    {
+        if (_navigating)
+        {
+            return;
+        }
+
+        _navigating = true;
+
+        try
+        {
+            NavigateCore(section);
+        }
+        finally
+        {
+            _navigating = false;
+        }
+    }
+
+    private void NavigateCore(NavigationSection section)
     {
         CurrentPage?.Deactivate();
 

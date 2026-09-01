@@ -252,7 +252,11 @@ public sealed class ProbeRendererTests
 
         Assert.Contains("Больше всего времени занимает фаза «TLS»", text, StringComparison.Ordinal);
         Assert.Contains("ИТОГО", text, StringComparison.Ordinal);
-        Assert.Contains("235.000", text, StringComparison.Ordinal);
+
+        // 235, а не 235.000: точность падает с ростом значения — три знака на двухстах
+        // миллисекундах сообщают точность, которой у сетевого измерения нет. Правило
+        // одно на консоль и окно и живёт в Units; до И-24+ у консоли было своё.
+        Assert.Contains("235 мс", text, StringComparison.Ordinal);
     }
 
     /// <summary>Провалившаяся попытка называет фазу, на которой встала.</summary>

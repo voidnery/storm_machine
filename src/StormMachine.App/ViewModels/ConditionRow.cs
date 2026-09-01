@@ -27,7 +27,9 @@ public static class ConditionRows
         // рядом с медианой в 0.2 мс говорит, доверять ей или нет.
         yield return new ConditionRow(
             "порог часов",
-            context.CalibrationBaselineMs.ToString("0.000", CultureInfo.InvariantCulture) + " мс");
+            context.CalibrationBaselineMs > 0
+                ? context.CalibrationBaselineMs.ToString("0.000", CultureInfo.InvariantCulture) + " мс"
+                : "не измерен");
 
         yield return new ConditionRow("методика", context.Methodology.ToString());
 
