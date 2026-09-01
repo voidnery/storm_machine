@@ -125,11 +125,14 @@
             <DataTemplate x:DataType="vm:ParameterFieldViewModel">
               <StackPanel Spacing="2" Margin="0,0,12,8" Width="180"
                           ToolTip.Tip="{Binding Description}">
-                <TextBlock Text="{Binding Label}" FontSize="10" Foreground="{StaticResource TextSecondaryBrush}" />
+                <!-- У переключателя подпись стоит на нём самом: отдельной строкой
+                     она не нажималась, а сам квадратик был мельче нормы мишени. -->
+                <TextBlock Text="{Binding Label}" Classes="caption" IsVisible="{Binding !IsBoolean}" />
                 <NumericUpDown Value="{Binding Number}" Minimum="{Binding Minimum}"
                                Maximum="{Binding Maximum}" Increment="1" FormatString="0.###"
                                IsVisible="{Binding IsNumber}" />
-                <CheckBox IsChecked="{Binding Flag}" IsVisible="{Binding IsBoolean}" />
+                <CheckBox IsChecked="{Binding Flag}" Content="{Binding Label}"
+                          FontSize="11" IsVisible="{Binding IsBoolean}" />
                 <TextBox Text="{Binding Text}" IsVisible="{Binding IsText}" FontSize="12" />
                 <ComboBox ItemsSource="{Binding Choices}" SelectedItem="{Binding Text}"
                           IsVisible="{Binding IsChoice}" HorizontalAlignment="Stretch" />

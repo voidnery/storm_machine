@@ -63,7 +63,7 @@ public sealed class HttpProbe(IHighResolutionClock clock) : IProbe
             },
             new ProbeParameter
             {
-                Name = "timeout", Label = "Таймаут, мс", Type = ProbeParameterType.Duration,
+                Name = "timeout", Label = "Ждать ответа, мс", Type = ProbeParameterType.Duration,
                 DefaultValue = 15_000, Minimum = 1, Maximum = 120_000,
                 Description = "Общий предел на запрос.",
             },

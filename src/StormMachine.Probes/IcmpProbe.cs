@@ -70,7 +70,7 @@ public sealed class IcmpProbe(IHighResolutionClock clock, TargetResolver resolve
             },
             new ProbeParameter
             {
-                Name = ParameterTimeoutMs, Label = "Таймаут, мс", Type = ProbeParameterType.Duration,
+                Name = ParameterTimeoutMs, Label = "Ждать ответа, мс", Type = ProbeParameterType.Duration,
                 DefaultValue = 2000, Minimum = 1, Maximum = 60_000,
                 Description = "Сколько ждать ответа.",
             },

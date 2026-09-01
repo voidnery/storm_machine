@@ -71,7 +71,7 @@ public sealed class DnsProbe(IHighResolutionClock clock, INetworkEnvironment env
             },
             new ProbeParameter
             {
-                Name = "timeout", Label = "Таймаут, мс", Type = ProbeParameterType.Duration,
+                Name = "timeout", Label = "Ждать ответа, мс", Type = ProbeParameterType.Duration,
                 DefaultValue = 3000, Minimum = 1, Maximum = 60_000,
                 Description = "Сколько ждать ответа.",
             },
