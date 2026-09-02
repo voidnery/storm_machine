@@ -339,11 +339,11 @@ internal static class MonitorRenderer
         }
 
         // Цель за месяц, посчитанная по трём дням наблюдений, — не выполненная цель,
-        // а обещание, которое ещё нечем подтвердить.
-        if (availability.Coverage < 0.9)
+        // а обещание, которое ещё нечем подтвердить. Слова и порог — из домена:
+        // консоль, окно и отчёт обязаны оговариваться одинаково.
+        if (availability.CoverageNotice is { } notice)
         {
-            Console.WriteLine("  оговорка      : окно наблюдалось не полностью, "
-                              + "и вывод по цели предварителен");
+            Console.WriteLine("  оговорка      : " + notice);
         }
     }
 
@@ -372,10 +372,11 @@ internal static class MonitorRenderer
             : "оповещать было некуда — каналы в правиле не заданы";
     }
 
+    /// <summary>Короткая пометка у самого числа; порог доверия — общий, из домена.</summary>
     private static string Coverage(Availability availability) => availability.Coverage switch
     {
-        >= 0.95 => string.Empty,
-        >= 0.5 => "  — часть окна не наблюдалась",
+        >= Availability.TrustedCoverage => string.Empty,
+        >= Availability.UsableCoverage => "  — часть окна не наблюдалась",
         _ => "  — данных мало, доверять числу выше нельзя",
     };
 

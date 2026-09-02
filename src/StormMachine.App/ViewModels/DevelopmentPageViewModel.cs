@@ -1,4 +1,4 @@
-using System.Collections.ObjectModel;
+﻿using System.Collections.ObjectModel;
 using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -144,17 +144,7 @@ public sealed partial class DevelopmentPageViewModel(
              + "лицензия NPSL это запрещает. Ставится вручную с npcap.com.",
     };
 
-    internal static string Describe(CapabilityState state) => state switch
-    {
-        CapabilityState.Available => "работает",
-        CapabilityState.Limited => "работает не в полную силу",
-        CapabilityState.NeedsElevation => "нужны права администратора",
-        CapabilityState.NeedsCredentials => "нужны учётные данные",
-        CapabilityState.NeedsDriver => "нужен драйвер захвата",
-        CapabilityState.NeedsData => "нужен файл базы",
-        CapabilityState.NeedsAgent => "нужна вторая точка измерения",
-        _ => "запланировано",
-    };
+    internal static string Describe(CapabilityState state) => CapabilityWording.State(state);
 
     /// <summary>
     /// Цвет состояния.

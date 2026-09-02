@@ -263,6 +263,40 @@ public sealed class PickerTests(HeadlessSessionFixture fixture)
             CancellationToken.None);
     }
 
+    /// <summary>
+    /// Закрытый экран не слушает свой список.
+    /// </summary>
+    /// <remarks>
+    /// Список живёт в модели страницы, а модель — всё время работы клиента; сам элемент
+    /// создаётся заново при каждом заходе. Ровно эта утечка уже была у страницы карты:
+    /// после десятого захода одно обновление перестраивало десять закрытых экранов.
+    /// </remarks>
+    [Fact]
+    public async Task DetachedPicker_StopsListeningToItsSource()
+    {
+        await _session.Dispatch(
+            async () =>
+            {
+                var source = new System.Collections.ObjectModel.ObservableCollection<string>(Three);
+                var picker = new Picker { ItemsSource = source };
+
+                var window = Open(picker);
+
+                Assert.Equal(3, picker.Options.Count);
+
+                window.Content = null;
+                window.UpdateLayout();
+
+                source.Add("четвёртый");
+                window.UpdateLayout();
+
+                Assert.Equal(3, picker.Options.Count);
+
+                await Task.CompletedTask;
+            },
+            CancellationToken.None);
+    }
+
     private static void Press(Picker picker, Key key) =>
         picker.RaiseEvent(new KeyEventArgs
         {

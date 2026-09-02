@@ -1,4 +1,4 @@
-<UserControl xmlns="https://github.com/avaloniaui"
+﻿<UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:StormMachine.App.ViewModels"
              xmlns:forms="using:StormMachine.App.Controls"
@@ -12,8 +12,10 @@
     <Border Padding="14" CornerRadius="6" Background="{StaticResource PanelBrush}">
       <StackPanel Spacing="10">
 
-        <Grid ColumnDefinitions="2*,2*,Auto,Auto,Auto">
-          <StackPanel Grid.Column="0" Spacing="4" Margin="0,0,12,0">
+        <!-- Панель переносится, а не сжимается: в окне уже стенда звёздные колонки
+             съёживались, и поле цели уезжало за край панели полоской. -->
+        <WrapPanel Orientation="Horizontal">
+          <StackPanel Spacing="4" Margin="0,0,12,8" Width="320">
             <TextBlock Text="Проба" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" />
             <!-- Состав пункта — дело самого пункта (ProbeOption : IOption): в списке
                  название и описание, в закрытом поле одно название. Полная строка
@@ -22,9 +24,10 @@
                           IsEnabled="{Binding CanStart}" />
           </StackPanel>
 
-          <StackPanel Grid.Column="1" Spacing="4" Margin="0,0,12,0" MinWidth="320"
+          <StackPanel Spacing="4" Margin="0,0,12,8" Width="320"
                       IsVisible="{Binding NeedsTarget}">
-            <TextBlock Text="{Binding TargetHint}" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" />
+            <TextBlock Text="{Binding TargetHint}" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}"
+                       TextTrimming="CharacterEllipsis" />
             <!-- Цель набирается или подставляется из инвентаря — это один элемент
                  продукта, а не поле с самодельным списком рядом (И-24+). -->
             <forms:Picker AcceptsText="True" Text="{Binding Target, Mode=TwoWay}"
@@ -32,17 +35,17 @@
                           Empty="Инвентарь пуст — просканируйте сеть в «Обнаружении»." />
           </StackPanel>
 
-          <StackPanel Grid.Column="2" Spacing="4" Margin="0,0,12,0" VerticalAlignment="Bottom">
+          <StackPanel Spacing="4" Margin="0,0,12,8" VerticalAlignment="Bottom">
             <CheckBox IsChecked="{Binding Save}" Content="В журнал" IsEnabled="{Binding CanStart}" />
           </StackPanel>
 
-          <Button Grid.Column="3" Content="Запустить" Margin="0,0,8,0" VerticalAlignment="Bottom"
-                  Command="{Binding StartCommand}" Padding="18,7"
-                  Background="{StaticResource AccentBrush}" Foreground="White" />
-
-          <Button Grid.Column="4" Content="Стоп" VerticalAlignment="Bottom"
-                  Command="{Binding StopCommand}" />
-        </Grid>
+          <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,0,0,8" VerticalAlignment="Bottom">
+            <Button Content="Запустить"
+                    Command="{Binding StartCommand}" Padding="18,7"
+                    Background="{StaticResource AccentBrush}" Foreground="White" />
+            <Button Content="Стоп" Command="{Binding StopCommand}" />
+          </StackPanel>
+        </WrapPanel>
 
         <TextBlock Text="{Binding ProbeAbout}" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap" />
 

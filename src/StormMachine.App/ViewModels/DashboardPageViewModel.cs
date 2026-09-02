@@ -1,4 +1,4 @@
-using System.Collections.ObjectModel;
+﻿using System.Collections.ObjectModel;
 using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -99,11 +99,11 @@ public sealed partial class DashboardPageViewModel(
 
         foreach (var adapter in _environment.GetAdapters().Where(a => a.IsUp && a.IPv4Address is not null))
         {
-            var suspect = adapter.Kind is AdapterKind.Virtual or AdapterKind.Vpn or AdapterKind.Tunnel;
+            var suspect = AdapterWording.IsUntrustworthy(adapter.Kind);
 
             Adapters.Add(new AdapterRow(
                 adapter.Name,
-                DescribeKind(adapter.Kind),
+                AdapterWording.Kind(adapter.Kind),
                 adapter.SubnetCidr ?? adapter.IPv4Address ?? "—",
                 primary is not null && primary.Id == adapter.Id,
                 suspect));
@@ -111,7 +111,7 @@ public sealed partial class DashboardPageViewModel(
 
         Warning = primary is null
             ? "Активный адаптер не определён — измерения будут без указания интерфейса."
-            : primary.Kind is AdapterKind.Virtual or AdapterKind.Vpn or AdapterKind.Tunnel
+            : AdapterWording.IsUntrustworthy(primary.Kind)
                 ? "Измерение пойдёт через виртуальный коммутатор или VPN. Он вносит собственную задержку и джиттер — выбросы могут не иметь отношения к тестируемой сети."
                 : null;
 
@@ -198,15 +198,4 @@ public sealed partial class DashboardPageViewModel(
             JournalInfo = "Сводка журнала не посчиталась: " + (StorageProblem.ExplainCorruption(ex) ?? ex.Message);
         }
     }
-
-    private static string DescribeKind(AdapterKind kind) => kind switch
-    {
-        AdapterKind.Physical => "физический",
-        AdapterKind.Wireless => "беспроводной",
-        AdapterKind.Virtual => "виртуальный коммутатор",
-        AdapterKind.Vpn => "VPN",
-        AdapterKind.Tunnel => "туннель",
-        AdapterKind.Loopback => "loopback",
-        _ => "не определён",
-    };
 }

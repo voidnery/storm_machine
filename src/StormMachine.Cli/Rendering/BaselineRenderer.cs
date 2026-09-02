@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using StormMachine.Domain.Measurements;
 using StormMachine.Domain.Reports;
 using StormMachine.Domain.Results;
@@ -188,16 +188,7 @@ internal static class BaselineRenderer
         _ => change.Insignificance ?? "без изменений",
     };
 
-    private static string Describe(AdapterKind kind) => kind switch
-    {
-        AdapterKind.Physical => "физический",
-        AdapterKind.Wireless => "беспроводной",
-        AdapterKind.Virtual => "виртуальный коммутатор",
-        AdapterKind.Vpn => "VPN",
-        AdapterKind.Tunnel => "туннель",
-        AdapterKind.Loopback => "loopback",
-        _ => "тип не определён",
-    };
+    private static string Describe(AdapterKind kind) => AdapterWording.Kind(kind);
 
     private static string Local(DateTimeOffset moment) =>
         moment.ToLocalTime().ToString("dd.MM.yyyy HH:mm", CultureInfo.InvariantCulture);

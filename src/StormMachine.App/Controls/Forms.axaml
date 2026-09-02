@@ -408,16 +408,23 @@
       </ControlTemplate>
     </Setter>
   </Style>
+  <!-- Знака нет, пока нет и вердикта: «·» перед «Маршрут ещё не построен»
+       ничего не сообщал (замечание оператора). Словарь VerdictWording при этом
+       не трогаем — в консоли эта же точка держит колонку. -->
   <Style Selector="controls|VerdictLine /template/ TextBlock#PART_Mark">
+    <Setter Property="IsVisible" Value="False" />
     <Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}" />
   </Style>
   <Style Selector="controls|VerdictLine:pass /template/ TextBlock#PART_Mark">
+    <Setter Property="IsVisible" Value="True" />
     <Setter Property="Foreground" Value="{DynamicResource SuccessBrush}" />
   </Style>
   <Style Selector="controls|VerdictLine:warn /template/ TextBlock#PART_Mark">
+    <Setter Property="IsVisible" Value="True" />
     <Setter Property="Foreground" Value="{DynamicResource WarningBrush}" />
   </Style>
   <Style Selector="controls|VerdictLine:fail /template/ TextBlock#PART_Mark">
+    <Setter Property="IsVisible" Value="True" />
     <Setter Property="Foreground" Value="{DynamicResource DangerBrush}" />
   </Style>
 

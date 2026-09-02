@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using QuestPDF.Fluent;
 using QuestPDF.Helpers;
 using QuestPDF.Infrastructure;
@@ -315,12 +315,9 @@ internal static class ServiceLevelSectionRenderer
                         + $"{Schedule.Elapsed(availability.ErrorBudgetLeft ?? TimeSpan.Zero)}");
                 }
 
-                if (availability.Coverage < 0.9)
+                if (availability.CoverageNotice is { } notice)
                 {
-                    column.Item().PaddingTop(3).Text(
-                            "Окно наблюдалось не полностью, и вывод по цели предварителен: "
-                            + "часть периода продукт не работал и о сети в это время данных нет.")
-                        .FontSize(8).Italic();
+                    column.Item().PaddingTop(3).Text(notice).FontSize(8).Italic();
                 }
             });
     }

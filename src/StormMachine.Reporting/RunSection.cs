@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using QuestPDF.Fluent;
 using QuestPDF.Helpers;
 using QuestPDF.Infrastructure;
@@ -549,14 +549,5 @@ internal static class RunSection
         _ => "выполняется",
     };
 
-    public static string DescribeAdapter(AdapterKind kind) => kind switch
-    {
-        AdapterKind.Physical => "физический",
-        AdapterKind.Wireless => "беспроводной",
-        AdapterKind.Virtual => "виртуальный коммутатор",
-        AdapterKind.Vpn => "VPN",
-        AdapterKind.Tunnel => "туннель",
-        AdapterKind.Loopback => "loopback",
-        _ => "тип не определён",
-    };
+    public static string DescribeAdapter(AdapterKind kind) => AdapterWording.Kind(kind);
 }

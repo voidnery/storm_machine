@@ -1,4 +1,4 @@
-using Avalonia;
+﻿using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Platform;
@@ -32,6 +32,8 @@ public sealed class TrayIndicator : IDisposable
     private readonly IMonitorStore _store;
     private readonly MonitorScheduler _scheduler;
 
+    private int _refreshing;
+    private int _repeat;
     private TrayIcon? _icon;
     private WindowIcon? _calm;
     private WindowIcon? _alarmed;
@@ -96,8 +98,40 @@ public sealed class TrayIndicator : IDisposable
 
     private void OnChecked(object? sender, MonitorCheck check) => _ = RefreshAsync();
 
-    /// <summary>Пересчитывает состояние по всем мониторам.</summary>
+    /// <summary>
+    /// Пересчитывает состояние по всем мониторам.
+    /// </summary>
+    /// <remarks>
+    /// Обновления схлопываются. Обработчик зовётся на каждую проверку каждого монитора,
+    /// а обход опрашивает хранилище по разу на монитор: двадцать мониторов, идущих
+    /// раз в минуту, давали двадцать полных обходов подряд ради одного значка.
+    /// Пришедшее во время обхода запоминается и выполняется один раз после него.
+    /// </remarks>
     private async Task RefreshAsync()
+    {
+        if (Interlocked.CompareExchange(ref _refreshing, 1, 0) == 1)
+        {
+            Volatile.Write(ref _repeat, 1);
+            return;
+        }
+
+        try
+        {
+            do
+            {
+                Volatile.Write(ref _repeat, 0);
+
+                await RefreshOnceAsync().ConfigureAwait(false);
+            }
+            while (Volatile.Read(ref _repeat) == 1);
+        }
+        finally
+        {
+            Volatile.Write(ref _refreshing, 0);
+        }
+    }
+
+    private async Task RefreshOnceAsync()
     {
         try
         {

@@ -1,4 +1,4 @@
-using StormMachine.Domain.Capabilities;
+﻿using StormMachine.Domain.Capabilities;
 
 namespace StormMachine.Cli.Rendering;
 
@@ -87,13 +87,7 @@ internal static class CapabilityRenderer
         Console.WriteLine();
     }
 
-    private static string Mark(CapabilityState state) => state switch
-    {
-        CapabilityState.Available => "+",
-        CapabilityState.Limited => "~",
-        CapabilityState.Planned => "·",
-        _ => "!",
-    };
+    private static string Mark(CapabilityState state) => CapabilityWording.Mark(state);
 
     private static string Title(CapabilityLevel level) => level switch
     {
@@ -102,15 +96,5 @@ internal static class CapabilityRenderer
         _ => "Уровень 2 — захват пакетов. Нужен Npcap",
     };
 
-    private static string Describe(CapabilityState state) => state switch
-    {
-        CapabilityState.Available => "доступно",
-        CapabilityState.Limited => "доступно частично",
-        CapabilityState.NeedsElevation => "нужны права администратора",
-        CapabilityState.NeedsCredentials => "нужны учётные данные",
-        CapabilityState.NeedsDriver => "нужен драйвер",
-        CapabilityState.NeedsData => "нужен файл базы",
-        CapabilityState.NeedsAgent => "нужен агент на второй точке",
-        _ => "ещё не сделано",
-    };
+    private static string Describe(CapabilityState state) => CapabilityWording.State(state);
 }

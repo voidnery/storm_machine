@@ -377,7 +377,7 @@ public sealed class TopologyService(
 
         foreach (var adapter in _environment.GetAdapters())
         {
-            var virtualAdapter = adapter.Kind is AdapterKind.Virtual or AdapterKind.Vpn or AdapterKind.Tunnel;
+            var virtualAdapter = AdapterWording.IsUntrustworthy(adapter.Kind);
 
             if (!adapter.IsUp
                 || adapter.SubnetCidr is not { } cidr

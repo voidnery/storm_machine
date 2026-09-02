@@ -81,14 +81,6 @@ internal static class EnvCommand
     private static MeasurementContext ContextFor(NetworkAdapter adapter, IHighResolutionClock clock) =>
         MeasurementConditions.Build(adapter, clock, Methodology.Unspecified);
 
-    public static string Describe(AdapterKind kind) => kind switch
-    {
-        AdapterKind.Physical => "физический",
-        AdapterKind.Wireless => "беспроводной",
-        AdapterKind.Virtual => "виртуальный коммутатор",
-        AdapterKind.Vpn => "VPN",
-        AdapterKind.Tunnel => "туннель",
-        AdapterKind.Loopback => "loopback",
-        _ => "не определён",
-    };
+    /// <summary>Тип адаптера словами продукта — словарь один на консоль, окно и отчёт.</summary>
+    public static string Describe(AdapterKind kind) => AdapterWording.Kind(kind);
 }

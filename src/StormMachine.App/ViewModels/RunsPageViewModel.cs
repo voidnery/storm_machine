@@ -1,4 +1,4 @@
-using System.Collections.ObjectModel;
+﻿using System.Collections.ObjectModel;
 using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -56,7 +56,7 @@ public sealed partial class RunsPageViewModel(
     private RunSummary? _selectedRun;
 
     [ObservableProperty]
-    private string _details = "Выбери прогон в списке слева.";
+    private string _details = "Здесь будут ряды, факты и условия выбранного прогона.";
 
     [ObservableProperty]
     private string? _retentionNotice;
@@ -108,6 +108,18 @@ public sealed partial class RunsPageViewModel(
     /// <summary>Есть ли выбранный прогон: кнопки над ним включаются по этому.</summary>
     public bool HasSelection => SelectedRun is not null;
 
+    /// <summary>
+    /// Что стоит вместо подробностей, пока прогон не выбран.
+    /// </summary>
+    /// <remarks>
+    /// «Выбери прогон в списке слева» на пустом журнале — совет, которому нельзя
+    /// последовать: слева ничего нет. Что делать, там уже написано, и повторять
+    /// это второй раз незачем — панель говорит о себе.
+    /// </remarks>
+    private string NothingChosen => Runs.Count == 0
+        ? "Здесь будут ряды, факты и условия выбранного прогона."
+        : "Выбери прогон в списке слева.";
+
     partial void OnSelectedRunChanged(RunSummary? value)
     {
         OnPropertyChanged(nameof(HasSelection));
@@ -116,7 +128,7 @@ public sealed partial class RunsPageViewModel(
         {
             // Подробности снятого выбора не остаются на экране: после «Обновить»
             // справа висели ряды и факты прогона, который уже не выбран.
-            Details = "Выбери прогон в списке слева.";
+            Details = NothingChosen;
             RetentionNotice = null;
             SeriesUnit = string.Empty;
             Series.Clear();
@@ -143,6 +155,12 @@ public sealed partial class RunsPageViewModel(
             foreach (var run in runs)
             {
                 Runs.Add(run);
+            }
+
+            if (SelectedRun is null)
+            {
+                // Список мог опустеть, а присвоение null поверх null уведомления не даёт.
+                Details = NothingChosen;
             }
 
             ErrorMessage = null;

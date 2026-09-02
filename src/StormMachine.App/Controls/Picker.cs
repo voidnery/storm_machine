@@ -308,6 +308,30 @@ public class Picker : TemplatedControl
         Rebuild();
     }
 
+    /// <summary>
+    /// Подписка на список снимается вместе с уходом с экрана.
+    /// </summary>
+    /// <remarks>
+    /// Список живёт в модели страницы, а модель — всё время работы клиента; сам элемент
+    /// создаётся заново при каждом заходе. Без снятия подписки после десятого захода
+    /// одно обновление инвентаря перестраивало десять давно закрытых списков. Ровно эта
+    /// утечка уже была у страницы карты (И-24+).
+    /// </remarks>
+    protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        base.OnDetachedFromVisualTree(e);
+
+        Watch(null);
+    }
+
+    protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        base.OnAttachedToVisualTree(e);
+
+        Watch(ItemsSource);
+        Rebuild();
+    }
+
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
     {
         ArgumentNullException.ThrowIfNull(change);
@@ -572,14 +596,22 @@ public class Picker : TemplatedControl
         IsBlank = AcceptsText ? string.IsNullOrEmpty(Text) : SelectedItem is null;
     }
 
+    /// <summary>Слушает ровно один список: старая подписка снимается перед новой.</summary>
     private void Watch(IEnumerable? source)
     {
+        var next = source as INotifyCollectionChanged;
+
+        if (ReferenceEquals(_watched, next))
+        {
+            return;
+        }
+
         if (_watched is not null)
         {
             _watched.CollectionChanged -= OnSourceChanged;
         }
 
-        _watched = source as INotifyCollectionChanged;
+        _watched = next;
 
         if (_watched is not null)
         {

@@ -1,4 +1,4 @@
-using StormMachine.Domain.Measurements;
+﻿using StormMachine.Domain.Measurements;
 
 namespace StormMachine.Cli.Rendering;
 
@@ -13,16 +13,7 @@ namespace StormMachine.Cli.Rendering;
 /// </remarks>
 internal static class Describe
 {
-    public static string AdapterKind(AdapterKind kind) => kind switch
-    {
-        Domain.Measurements.AdapterKind.Physical => "физический",
-        Domain.Measurements.AdapterKind.Wireless => "беспроводной",
-        Domain.Measurements.AdapterKind.Virtual => "виртуальный коммутатор",
-        Domain.Measurements.AdapterKind.Vpn => "VPN",
-        Domain.Measurements.AdapterKind.Tunnel => "туннель",
-        Domain.Measurements.AdapterKind.Loopback => "loopback",
-        _ => "не определён",
-    };
+    public static string AdapterKind(AdapterKind kind) => AdapterWording.Kind(kind);
 
     public static string SampleStatus(SampleStatus status) => status switch
     {

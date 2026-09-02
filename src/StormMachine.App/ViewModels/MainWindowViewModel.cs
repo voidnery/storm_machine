@@ -1,4 +1,4 @@
-using System.Collections.ObjectModel;
+﻿using System.Collections.ObjectModel;
 using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -286,7 +286,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         }
         else
         {
-            AdapterLine = $"{adapter.Name} · {DescribeKind(adapter.Kind)}"
+            AdapterLine = $"{adapter.Name} · {AdapterWording.Kind(adapter.Kind)}"
                           + (adapter.IPv4Address is { } ip ? $" · {ip}" : string.Empty);
 
             // Предупреждение живёт в строке состояния намеренно: оператор должен
@@ -303,15 +303,4 @@ public sealed partial class MainWindowViewModel : ObservableObject
             ? $"порог часов {_clock.CalibrationBaselineMs.ToString("0.000", CultureInfo.InvariantCulture)} мс"
             : "порог не измерен";
     }
-
-    private static string DescribeKind(AdapterKind kind) => kind switch
-    {
-        AdapterKind.Physical => "физический",
-        AdapterKind.Wireless => "беспроводной",
-        AdapterKind.Virtual => "виртуальный коммутатор",
-        AdapterKind.Vpn => "VPN",
-        AdapterKind.Tunnel => "туннель",
-        AdapterKind.Loopback => "loopback",
-        _ => "тип не определён",
-    };
 }

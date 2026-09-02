@@ -1,4 +1,4 @@
-<UserControl xmlns="https://github.com/avaloniaui"
+﻿<UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:StormMachine.App.ViewModels"
              xmlns:forms="using:StormMachine.App.Controls"
@@ -101,7 +101,9 @@
             <!-- Ряды: фазы, резолверы, хопы или весь прогон — зависит от формы результата.
                  Таблица собрана из ItemsControl намеренно: DataGrid потянул бы отдельный
                  пакет с собственной темой ради семи колонок только для чтения. -->
-            <StackPanel Spacing="4">
+            <!-- Заголовки и шапка таблицы прячутся вместе с содержимым: без выбора
+                 справа висели «Ряды», «Факты» и пустая строка колонок. -->
+            <StackPanel Spacing="4" IsVisible="{Binding HasSelection}">
               <TextBlock Text="Ряды" FontWeight="SemiBold" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" />
 
               <Grid ColumnDefinitions="*,60,70,90,90,90,90" Margin="0,2">
@@ -134,7 +136,7 @@
             </StackPanel>
 
             <!-- Факты: то, что не является числом во временном ряду -->
-            <StackPanel Spacing="6">
+            <StackPanel Spacing="6" IsVisible="{Binding HasSelection}">
               <TextBlock Text="Факты" FontWeight="SemiBold" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" />
               <ItemsControl ItemsSource="{Binding Facts}">
                 <ItemsControl.ItemTemplate>

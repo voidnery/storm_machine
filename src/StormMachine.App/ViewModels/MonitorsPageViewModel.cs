@@ -94,7 +94,7 @@ public sealed partial class MonitorsPageViewModel : PageViewModel
     private MonitorRow? _selected;
 
     [ObservableProperty]
-    private string _details = "Мониторов ещё нет. Нажмите «Завести» — форма откроется справа.";
+    private string _details = "Здесь будут состояние, история проверок и доступность выбранного монитора.";
 
     [ObservableProperty]
     private string? _availabilityText;
@@ -110,6 +110,9 @@ public sealed partial class MonitorsPageViewModel : PageViewModel
 
     [ObservableProperty]
     private bool _isBusy;
+
+    /// <summary>Чью историю проверок сейчас показывает правая панель.</summary>
+    private Guid? _historyFor;
 
     public string SchedulerState => _scheduler.IsRunning
         ? $"Планировщик работает. Проверок сейчас: {_scheduler.ActiveCount}."
@@ -128,6 +131,10 @@ public sealed partial class MonitorsPageViewModel : PageViewModel
     {
         _scheduler.Checked -= OnChecked;
         _scheduler.Checked += OnChecked;
+
+        // Заход на страницу перечитывает и историю: пока её не было видно,
+        // проверки шли, и показанное успело устареть.
+        _historyFor = null;
 
         return RefreshAsync(cancellationToken);
     }
@@ -178,10 +185,11 @@ public sealed partial class MonitorsPageViewModel : PageViewModel
     /// </summary>
     /// <remarks>
     /// «Выбери монитор в списке слева» на пустом списке — совет, которому нельзя
-    /// последовать: слева ничего нет. Пустому продукту полагается называть первый шаг.
+    /// последовать: слева ничего нет. Первый шаг назван там же, слева, и повторять
+    /// его второй раз незачем — панель говорит о себе.
     /// </remarks>
     private string NothingChosen => Monitors.Count == 0
-        ? "Мониторов ещё нет. Нажмите «Завести» — форма откроется справа."
+        ? "Здесь будут состояние, история проверок и доступность выбранного монитора."
         : "Выбери монитор в списке слева.";
 
     partial void OnSelectedChanged(MonitorRow? value)
@@ -198,11 +206,19 @@ public sealed partial class MonitorsPageViewModel : PageViewModel
             CoverageNotice = null;
             Checks.Clear();
             OnPropertyChanged(nameof(HasChecks));
+            _historyFor = null;
 
             return;
         }
 
         Details = Describe(value);
+
+        if (_historyFor == value.Monitor.Id)
+        {
+            return;
+        }
+
+        _historyFor = value.Monitor.Id;
 
         _ = LoadHistoryAsync(value.Monitor);
     }
@@ -336,8 +352,29 @@ public sealed partial class MonitorsPageViewModel : PageViewModel
         }
     }
 
-    private void OnChecked(object? sender, MonitorCheck check) =>
-        Dispatcher.UIThread.Post(() => _ = RefreshAsync());
+    /// <summary>
+    /// Пришла проверка — список перечитывается.
+    /// </summary>
+    /// <remarks>
+    /// История и доступность выбранного монитора при этом не перечитываются, если
+    /// проверка была не о нём: список пересобирается целиком, строка выбранного —
+    /// новая запись, и без этой отметки каждая чужая проверка тянула пять тысяч
+    /// проверок из хранилища ради тех же пятидесяти строк на экране.
+    /// </remarks>
+    private void OnChecked(object? sender, MonitorCheck check)
+    {
+        ArgumentNullException.ThrowIfNull(check);
+
+        Dispatcher.UIThread.Post(() =>
+        {
+            if (Selected?.Monitor.Id == check.MonitorId)
+            {
+                _historyFor = null;
+            }
+
+            _ = RefreshAsync();
+        });
+    }
 
     private async Task LoadHistoryAsync(Monitor monitor)
     {
@@ -376,12 +413,11 @@ public sealed partial class MonitorsPageViewModel : PageViewModel
 
             // Оговорка про покрытие идёт отдельной строкой и остаётся видимой:
             // доступность 100% при покрытии 4% — это отсутствие данных, а не отличная сеть.
-            CoverageNotice = availability.Total == 0
-                ? "За период нет ни одного наблюдения — считать не из чего."
-                : availability.Coverage < 0.9
-                    ? $"Окно наблюдалось на {Percent(availability.Coverage * 100)} — "
-                      + "числа выше предварительны."
-                    : null;
+            // Слова общие с консолью и отчётом, а доля наблюдавшегося названа числом:
+            // на экране она рядом, и «на 62%» точнее, чем «не полностью».
+            CoverageNotice = availability.CoverageNotice is { } notice && availability.Total > 0
+                ? $"Окно наблюдалось на {Percent(availability.Coverage * 100)}. {notice}"
+                : availability.CoverageNotice;
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {

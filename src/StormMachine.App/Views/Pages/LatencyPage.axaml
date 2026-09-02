@@ -1,4 +1,4 @@
-<UserControl xmlns="https://github.com/avaloniaui"
+﻿<UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:StormMachine.App.ViewModels"
              xmlns:forms="using:StormMachine.App.Controls"
@@ -39,8 +39,10 @@
     <Border Grid.Row="2" Margin="0,12,0,0" Padding="14" CornerRadius="6"
             Background="{StaticResource PanelBrush}">
       <StackPanel Spacing="10">
-        <Grid ColumnDefinitions="2*,Auto,Auto,Auto,Auto" >
-          <StackPanel Grid.Column="0" Spacing="4" Margin="0,0,12,0" MinWidth="320">
+        <!-- Панель переносится, а не сжимается: в окне уже стенда звёздная колонка
+             цели съёживалась в ноль, и поле уезжало за край панели полоской. -->
+        <WrapPanel Orientation="Horizontal">
+          <StackPanel Spacing="4" Margin="0,0,12,8" Width="320">
             <TextBlock Text="Цель" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" />
             <!-- Набранное фильтрует подсказки инвентаря, стрелка показывает их целиком.
                  До И-24+ это было поле, кнопка и собранный руками список: список
@@ -53,33 +55,33 @@
 
           <!-- Ширина 140: у NumericUpDown стрелки съедают место, и «100» в 110 px
                обрезалось (замечание оператора, И-24). -->
-          <StackPanel Grid.Column="1" Spacing="4" Margin="0,0,12,0" Width="140">
+          <StackPanel Spacing="4" Margin="0,0,12,8" Width="140">
             <TextBlock Text="Интервал, мс" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" />
             <NumericUpDown Value="{Binding IntervalMs}" Minimum="10" Maximum="600000" Increment="100"
                            FormatString="0" IsEnabled="{Binding CanStart}" />
           </StackPanel>
 
-          <StackPanel Grid.Column="2" Spacing="4" Margin="0,0,12,0" Width="140">
+          <StackPanel Spacing="4" Margin="0,0,12,8" Width="140">
             <TextBlock Text="Число проб" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" />
             <NumericUpDown Value="{Binding Count}" Minimum="1" Maximum="1000000" Increment="10"
                            FormatString="0"
                            IsEnabled="{Binding !Continuous}" />
           </StackPanel>
 
-          <StackPanel Grid.Column="3" Spacing="8" Margin="0,0,14,0" VerticalAlignment="Bottom">
+          <StackPanel Spacing="8" Margin="0,0,14,8" VerticalAlignment="Bottom">
             <CheckBox IsChecked="{Binding Continuous}" Content="Непрерывно" FontSize="12"
                       IsEnabled="{Binding CanStart}" />
             <CheckBox IsChecked="{Binding SaveToJournal}" Content="Писать в журнал" FontSize="12"
                       IsEnabled="{Binding CanStart}" />
           </StackPanel>
 
-          <StackPanel Grid.Column="4" Orientation="Horizontal" Spacing="8" VerticalAlignment="Bottom">
+          <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,0,0,8" VerticalAlignment="Bottom">
             <Button Content="Запустить" Command="{Binding StartCommand}" IsEnabled="{Binding CanStart}"
                     Padding="18,7" Background="{StaticResource AccentBrush}" Foreground="White" />
             <Button Content="Остановить" Command="{Binding StopCommand}" IsEnabled="{Binding CanStop}"
                     Padding="14,7" />
           </StackPanel>
-        </Grid>
+        </WrapPanel>
 
         <!-- Сквозной принцип: пресет рождается не из формы, а из измерения,
              которое только что оказалось полезным. -->

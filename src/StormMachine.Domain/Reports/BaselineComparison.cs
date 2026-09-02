@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using StormMachine.Domain.Measurements;
 
 namespace StormMachine.Domain.Reports;
@@ -313,14 +313,5 @@ public static class BaselineComparer
         return found;
     }
 
-    private static string Describe(AdapterKind kind) => kind switch
-    {
-        AdapterKind.Physical => "физический",
-        AdapterKind.Wireless => "беспроводной",
-        AdapterKind.Virtual => "виртуальный коммутатор",
-        AdapterKind.Vpn => "VPN",
-        AdapterKind.Tunnel => "туннель",
-        AdapterKind.Loopback => "loopback",
-        _ => "не определён",
-    };
+    private static string Describe(AdapterKind kind) => AdapterWording.Kind(kind);
 }

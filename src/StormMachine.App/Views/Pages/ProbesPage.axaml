@@ -1,4 +1,4 @@
-<UserControl xmlns="https://github.com/avaloniaui"
+﻿<UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:StormMachine.App.ViewModels"
              xmlns:forms="using:StormMachine.App.Controls"
@@ -35,8 +35,10 @@
     <Border Grid.Row="1" Margin="0,12,0,0" Padding="14" CornerRadius="6"
             Background="{StaticResource PanelBrush}">
       <StackPanel Spacing="10">
-        <Grid ColumnDefinitions="2*,2*,Auto,Auto,Auto">
-          <StackPanel Grid.Column="0" Spacing="4" Margin="0,0,12,0">
+        <!-- Панель переносится, а не сжимается: в окне уже стенда звёздные колонки
+             съёживались, и поле цели уезжало за край панели полоской. -->
+        <WrapPanel Orientation="Horizontal">
+          <StackPanel Spacing="4" Margin="0,0,12,8" Width="380">
             <TextBlock Text="Сценарий" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" />
             <Grid ColumnDefinitions="*,Auto">
               <!-- Пометка «свой» приходит от самого пункта: собранный оператором
@@ -49,8 +51,9 @@
             </Grid>
           </StackPanel>
 
-          <StackPanel Grid.Column="1" Spacing="4" Margin="0,0,12,0" MinWidth="320">
-            <TextBlock Text="Цель, список через запятую или имя набора" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" />
+          <StackPanel Spacing="4" Margin="0,0,12,8" Width="320">
+            <TextBlock Text="Цель, список через запятую или имя набора" FontSize="11"
+                       Foreground="{StaticResource TextSecondaryBrush}" TextTrimming="CharacterEllipsis" />
             <!-- Цель: набор фильтрует подсказки инвентаря, стрелка показывает их целиком -->
             <forms:Picker AcceptsText="True" Text="{Binding Target, Mode=TwoWay}"
                           ItemsSource="{Binding Suggestions}" IsEnabled="{Binding CanStart}"
@@ -58,17 +61,17 @@
                           Empty="Инвентарь пуст — просканируйте сеть в «Обнаружении»." />
           </StackPanel>
 
-          <StackPanel Grid.Column="2" Spacing="4" Margin="0,0,12,0" VerticalAlignment="Bottom">
+          <StackPanel Spacing="4" Margin="0,0,12,8" VerticalAlignment="Bottom">
             <CheckBox IsChecked="{Binding Save}" Content="В журнал" IsEnabled="{Binding CanStart}" />
           </StackPanel>
 
-          <Button Grid.Column="3" Content="Запустить" Margin="0,0,8,0" VerticalAlignment="Bottom"
-                  Command="{Binding RunCommand}" Padding="18,7"
-                  Background="{StaticResource AccentBrush}" Foreground="White" />
-
-          <Button Grid.Column="4" Content="Стоп" VerticalAlignment="Bottom"
-                  Command="{Binding StopCommand}" />
-        </Grid>
+          <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,0,0,8" VerticalAlignment="Bottom">
+            <Button Content="Запустить"
+                    Command="{Binding RunCommand}" Padding="18,7"
+                    Background="{StaticResource AccentBrush}" Foreground="White" />
+            <Button Content="Стоп" Command="{Binding StopCommand}" />
+          </StackPanel>
+        </WrapPanel>
 
         <!-- Наборы целей подставляются нажатием: помнить их наизусть незачем. -->
         <StackPanel Orientation="Horizontal" Spacing="6">
