@@ -1,4 +1,4 @@
-<UserControl xmlns="https://github.com/avaloniaui"
+﻿<UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:StormMachine.App.ViewModels"
              xmlns:results="using:StormMachine.Domain.Results"
@@ -45,16 +45,23 @@
           <ItemsControl ItemsSource="{Binding Adapters}" Margin="0,4,0,0">
             <ItemsControl.ItemTemplate>
               <DataTemplate x:DataType="vm:AdapterRow">
-                <Grid ColumnDefinitions="Auto,*,Auto,Auto" Margin="0,3">
-                  <TextBlock Grid.Column="0" Text="→" Margin="0,0,8,0"
-                             IsVisible="{Binding IsPrimary}" />
-                  <TextBlock Grid.Column="1" Text="{Binding Name}" FontSize="13" />
-                  <TextBlock Grid.Column="2" Text="{Binding Kind}" FontSize="12" Margin="12,0"
+                <!-- Действующий интерфейс помечен словом, а не стрелкой: знак без
+                     легенды нечитаем, а колонка под него ещё и сдвигала имена
+                     остальных строк относительно помеченной. -->
+                <Grid ColumnDefinitions="*,Auto,Auto" Margin="0,3">
+                  <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8">
+                    <TextBlock Text="{Binding Name}" FontSize="13" VerticalAlignment="Center" />
+                    <Border Classes="chip" VerticalAlignment="Center" IsVisible="{Binding IsPrimary}">
+                      <TextBlock Text="меряем отсюда" FontSize="10"
+                                 Foreground="{StaticResource InfoBrush}" />
+                    </Border>
+                  </StackPanel>
+                  <TextBlock Grid.Column="1" Text="{Binding Kind}" FontSize="12" Margin="12,0"
                              Foreground="{StaticResource WarningBrush}"
                              IsVisible="{Binding IsSuspect}" />
-                  <TextBlock Grid.Column="2" Text="{Binding Kind}" FontSize="12" Margin="12,0" Foreground="{StaticResource TextSecondaryBrush}"
+                  <TextBlock Grid.Column="1" Text="{Binding Kind}" FontSize="12" Margin="12,0" Foreground="{StaticResource TextSecondaryBrush}"
                              IsVisible="{Binding !IsSuspect}" />
-                  <TextBlock Grid.Column="3" Text="{Binding Address}" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" />
+                  <TextBlock Grid.Column="2" Text="{Binding Address}" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" />
                 </Grid>
               </DataTemplate>
             </ItemsControl.ItemTemplate>
@@ -98,7 +105,7 @@
                              TextTrimming="CharacterEllipsis" Margin="8,0" />
                   <TextBlock Grid.Column="3" Text="{Binding SentCount, StringFormat='{}{0} проб'}"
                              FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" Margin="8,0" />
-                  <TextBlock Grid.Column="4" Text="{Binding MedianMs, StringFormat='{}{0:0.000} мс'}"
+                  <TextBlock Grid.Column="4" Text="{Binding MedianText}"
                              FontSize="12" Margin="8,0" />
                 </Grid>
               </DataTemplate>

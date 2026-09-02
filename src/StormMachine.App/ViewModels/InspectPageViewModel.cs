@@ -1,3 +1,4 @@
+﻿using StormMachine.App.Controls;
 using System.Collections.ObjectModel;
 using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -24,9 +25,13 @@ public sealed record InspectSeriesRow(string Label, string Median, string Loss, 
 public sealed record OutsideMappingRow(string Server, string Seen);
 
 /// <summary>Один инспектор в переключателе.</summary>
-public sealed record InspectorOption(string ProbeName, string Title, string About)
+public sealed record InspectorOption(string ProbeName, string Title, string About) : IOption
 {
     public override string ToString() => Title;
+
+    string IOption.Caption => Title;
+
+    string IOption.About => About;
 }
 
 /// <summary>

@@ -106,6 +106,72 @@ public sealed class DesignTokenTests
             + Environment.NewLine + string.Join(Environment.NewLine, violations));
     }
 
+    /// <summary>
+    /// Выпадающий список в продукте один — <c>forms:Picker</c>.
+    /// </summary>
+    /// <remarks>
+    /// До И-24+ их было девятнадцать трёх пород: <c>ComboBox</c> со своим шаблоном пункта
+    /// на каждой странице, голый <c>ComboBox</c> и поле цели с самодельным списком
+    /// из кнопок в <c>Popup</c> — четыре копии по тридцать строк. Оператор увидел то же,
+    /// что видно в разметке: «одинаковые по сути списки выглядят по-разному».
+    /// Штатные контролы запрещены здесь по той же причине, по какой запрещены
+    /// литеральные цвета: следующий экран иначе заведёт двадцатый список.
+    /// </remarks>
+    [Fact]
+    public void Dropdowns_AreTheProductsOwn()
+    {
+        var violations = new List<string>();
+
+        foreach (var file in MarkupFiles())
+        {
+            var source = File.ReadAllText(file);
+
+            foreach (Match match in Regex.Matches(source, "<(ComboBox|AutoCompleteBox)\\b"))
+            {
+                var line = source[..match.Index].Count(c => c == '\n') + 1;
+                violations.Add($"{RepositoryLayout.Relative(file)}:{line} — {match.Groups[1].Value}");
+            }
+        }
+
+        Assert.True(
+            violations.Count == 0,
+            "Штатный выпадающий список в разметке. Выбор в продукте один — forms:Picker "
+            + "(Controls/Picker.cs): у него одна форма пункта, поиск по длинному списку "
+            + "и внятная фраза на пустом:"
+            + Environment.NewLine + string.Join(Environment.NewLine, violations));
+    }
+
+    /// <summary>
+    /// Разметка не решает сама, как показать измеренное число.
+    /// </summary>
+    /// <remarks>
+    /// Точность и единица — правило продукта, оно живёт в <c>Units</c>. Формат «0.000»
+    /// в привязке давал «244.160 мс»: три знака на двухстах миллисекундах сообщают
+    /// точность, которой у сетевого измерения нет.
+    /// </remarks>
+    [Fact]
+    public void Markup_DoesNotFormatMeasuredNumbersItself()
+    {
+        var violations = new List<string>();
+
+        foreach (var file in MarkupFiles())
+        {
+            var source = File.ReadAllText(file);
+
+            foreach (Match match in Regex.Matches(source, "StringFormat='[^']*(мс|Мбит)"))
+            {
+                var line = source[..match.Index].Count(c => c == '\n') + 1;
+                violations.Add($"{RepositoryLayout.Relative(file)}:{line}");
+            }
+        }
+
+        Assert.True(
+            violations.Count == 0,
+            "Единица измерения приписана числу в разметке. Как показать измеренное — "
+            + "решает Units (домен), а модель отдаёт готовую строку:"
+            + Environment.NewLine + string.Join(Environment.NewLine, violations));
+    }
+
     private static IEnumerable<string> MarkupFiles()
     {
         var path = Path.Combine(RepositoryLayout.Root, "src");

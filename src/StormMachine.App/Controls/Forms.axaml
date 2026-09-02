@@ -1,4 +1,4 @@
-<Styles xmlns="https://github.com/avaloniaui"
+﻿<Styles xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:controls="using:StormMachine.App.Controls">
 
@@ -7,6 +7,47 @@
        До волны 2 все семь выглядели одинаково — серой строкой мелким кеглем.
        Кисти берутся через DynamicResource: набор стилей загружается раньше
        словаря ресурсов приложения, и StaticResource здесь ничего не найдёт. -->
+
+  <!-- ============================== Поля ввода ================================
+       Рамка у всего, что заполняют, одна: тёмная подложка, тонкий контур, радиус 4,
+       при наборе контур подсвечен. Тема рисует поле, счётчик и список по-своему,
+       и рядом они читались как элементы из разных наборов.
+
+       Кисти задаются самому полю, а не его рамке в шаблоне: тема привязывает рамку
+       к свойствам контрола, а привязка в шаблоне — локальное значение, и стиль,
+       нацеленный на неё, молча проигрывает. Правило стоит выше словаря выпадающего
+       списка: у того поле своё, и его настройки обязаны перебивать общие, —
+       а перебивает в Avalonia объявленное позже. -->
+  <Style Selector="TextBox">
+    <Setter Property="Background" Value="{DynamicResource InsetBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource OutlineBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="4" />
+    <Setter Property="MinHeight" Value="32" />
+  </Style>
+  <Style Selector="TextBox:pointerover">
+    <Setter Property="Background" Value="{DynamicResource InsetBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+  </Style>
+  <Style Selector="TextBox:focus">
+    <Setter Property="Background" Value="{DynamicResource InsetBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+    <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
+  </Style>
+
+  <Style Selector="NumericUpDown">
+    <Setter Property="Background" Value="{DynamicResource InsetBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource OutlineBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="4" />
+    <Setter Property="MinHeight" Value="32" />
+  </Style>
+  <Style Selector="ButtonSpinner">
+    <Setter Property="Background" Value="{DynamicResource InsetBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource OutlineBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="4" />
+  </Style>
 
   <!-- Методика: тезис виден всегда, обоснование — по кнопке -->
   <Style Selector="controls|MethodCard">
@@ -159,21 +200,198 @@
       </ControlTemplate>
     </Setter>
   </Style>
+  <!-- В покое знака нет вовсе. Точка на его месте ничего не сообщала: три знака
+       из четырёх означают состояние («идёт», «готово», «отказ»), а четвёртый
+       означал, что состояния нет, — и читался как мусор в начале строки. -->
   <Style Selector="controls|StatusLine /template/ TextBlock#PART_Mark">
-    <Setter Property="Text" Value="·" />
+    <Setter Property="IsVisible" Value="False" />
     <Setter Property="Foreground" Value="{DynamicResource TextMutedBrush}" />
   </Style>
   <Style Selector="controls|StatusLine:running /template/ TextBlock#PART_Mark">
+    <Setter Property="IsVisible" Value="True" />
     <Setter Property="Text" Value="●" />
     <Setter Property="Foreground" Value="{DynamicResource AccentBrush}" />
   </Style>
   <Style Selector="controls|StatusLine:done /template/ TextBlock#PART_Mark">
+    <Setter Property="IsVisible" Value="True" />
     <Setter Property="Text" Value="✓" />
     <Setter Property="Foreground" Value="{DynamicResource SuccessBrush}" />
   </Style>
   <Style Selector="controls|StatusLine:failed /template/ TextBlock#PART_Mark">
+    <Setter Property="IsVisible" Value="True" />
     <Setter Property="Text" Value="✗" />
     <Setter Property="Foreground" Value="{DynamicResource DangerBrush}" />
+  </Style>
+
+  <!-- ============================ Выпадающий список ============================
+       Один элемент на все выборы продукта: закрытое поле с подписью выбранного,
+       карточка списка под ним, строка поиска на длинном списке и внятная фраза,
+       когда показывать нечего. Свободный ввод (поле цели) — тот же элемент
+       с AcceptsText: тогда поле набирается, а стрелка показывает список целиком.
+
+       Умолчания задаются стилем, а не атрибутом в шаблоне: значение, написанное
+       в самом шаблоне, — локальное, и селектор с псевдоклассом его уже не перебьёт. -->
+  <Style Selector="controls|Picker">
+    <Setter Property="MinHeight" Value="32" />
+    <Setter Property="Focusable" Value="True" />
+    <Setter Property="HorizontalAlignment" Value="Stretch" />
+    <Setter Property="Template">
+      <ControlTemplate TargetType="controls:Picker">
+        <Panel>
+
+          <!-- Выбор из списка: нажимается всё поле -->
+          <Button x:Name="PART_Field" Classes="picker"
+                  IsVisible="{Binding !AcceptsText, RelativeSource={RelativeSource TemplatedParent}}">
+            <Grid ColumnDefinitions="*,Auto">
+              <TextBlock x:Name="PART_Chosen" Grid.Column="0" Text="{TemplateBinding Chosen}"
+                         FontSize="12" VerticalAlignment="Center"
+                         TextTrimming="CharacterEllipsis"
+                         IsVisible="{Binding !IsBlank, RelativeSource={RelativeSource TemplatedParent}}" />
+              <TextBlock x:Name="PART_Placeholder" Grid.Column="0" Text="{TemplateBinding Placeholder}"
+                         FontSize="12" VerticalAlignment="Center"
+                         Foreground="{DynamicResource TextMutedBrush}"
+                         TextTrimming="CharacterEllipsis"
+                         IsVisible="{TemplateBinding IsBlank}" />
+              <Path Grid.Column="1" Width="10" Height="6" Stretch="Uniform" Margin="10,0,0,0"
+                    VerticalAlignment="Center" Data="M 0,0 L 5,5 L 10,0"
+                    Stroke="{DynamicResource TextMutedBrush}" StrokeThickness="1.4" />
+            </Grid>
+          </Button>
+
+          <!-- Свободный ввод: набранное фильтрует список, стрелка открывает его целиком -->
+          <Border x:Name="PART_Frame" Background="{DynamicResource InsetBrush}"
+                  BorderBrush="{DynamicResource OutlineBrush}" BorderThickness="1"
+                  CornerRadius="4" MinHeight="32"
+                  IsVisible="{TemplateBinding AcceptsText}">
+            <Grid ColumnDefinitions="*,Auto">
+              <TextBox x:Name="PART_Text" Grid.Column="0" Classes="picker"
+                       Text="{Binding Text, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}"
+                       PlaceholderText="{TemplateBinding Placeholder}" />
+              <Button x:Name="PART_Arrow" Grid.Column="1" Classes="arrow" Padding="9,6"
+                      ToolTip.Tip="Показать список целиком">
+                <Path Width="10" Height="6" Stretch="Uniform" VerticalAlignment="Center"
+                      Data="M 0,0 L 5,5 L 10,0"
+                      Stroke="{DynamicResource TextMutedBrush}" StrokeThickness="1.4" />
+              </Button>
+            </Grid>
+          </Border>
+
+          <Popup x:Name="PART_Popup" Placement="BottomEdgeAlignedLeft"
+                 PlacementTarget="{Binding RelativeSource={RelativeSource TemplatedParent}}"
+                 MinWidth="{Binding Bounds.Width, RelativeSource={RelativeSource TemplatedParent}}"
+                 IsOpen="{Binding IsOpen, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}"
+                 IsLightDismissEnabled="True" InheritsTransform="True">
+            <Border Background="{DynamicResource ChromeBrush}" BorderBrush="{DynamicResource OutlineBrush}"
+                    BorderThickness="1" CornerRadius="4" Padding="4" MaxHeight="360">
+              <DockPanel LastChildFill="True">
+
+                <TextBox x:Name="PART_Search" DockPanel.Dock="Top" FontSize="12" Margin="0,0,0,4"
+                         PlaceholderText="поиск по списку"
+                         IsVisible="{TemplateBinding HasSearch}" />
+
+                <TextBlock x:Name="PART_Hint" DockPanel.Dock="Top" Text="{TemplateBinding Hint}"
+                           FontSize="11" TextWrapping="Wrap" Margin="8,6"
+                           Foreground="{DynamicResource TextSecondaryBrush}"
+                           IsVisible="{TemplateBinding Hint, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+
+                <ListBox x:Name="PART_List" ItemsSource="{TemplateBinding Options}"
+                         Background="Transparent" BorderThickness="0" Padding="0">
+                  <ListBox.Styles>
+                    <Style Selector="ListBoxItem">
+                      <Setter Property="Padding" Value="8,5" />
+                      <Setter Property="MinHeight" Value="28" />
+                    </Style>
+                    <Style Selector="ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+                      <Setter Property="Background" Value="{DynamicResource TileBrush}" />
+                    </Style>
+                    <Style Selector="ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
+                      <Setter Property="Background" Value="{DynamicResource ChipBrush}" />
+                    </Style>
+                    <Style Selector="ListBoxItem:selected:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+                      <Setter Property="Background" Value="{DynamicResource ChipBrush}" />
+                    </Style>
+                  </ListBox.Styles>
+                  <ListBox.ItemTemplate>
+                    <DataTemplate x:DataType="controls:PickerRow">
+                      <StackPanel Spacing="1">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                          <TextBlock Text="{Binding Caption}" FontSize="12" VerticalAlignment="Center" />
+                          <Border Classes="chip" VerticalAlignment="Center" IsVisible="{Binding HasNote}">
+                            <TextBlock Text="{Binding Note}" FontSize="10"
+                                       Foreground="{DynamicResource InfoBrush}" />
+                          </Border>
+                        </StackPanel>
+                        <TextBlock Text="{Binding About}" FontSize="10" TextWrapping="Wrap"
+                                   Foreground="{DynamicResource TextMutedBrush}"
+                                   IsVisible="{Binding HasAbout}" />
+                      </StackPanel>
+                    </DataTemplate>
+                  </ListBox.ItemTemplate>
+                </ListBox>
+
+              </DockPanel>
+            </Border>
+          </Popup>
+
+        </Panel>
+      </ControlTemplate>
+    </Setter>
+  </Style>
+
+  <!-- Поле выбора: вид входного поля, а не кнопки. Фон гасится и в шаблоне темы —
+       Fluent красит подложку у своего ContentPresenter, а не у самой кнопки. -->
+  <Style Selector="Button.picker">
+    <Setter Property="Padding" Value="10,6" />
+    <Setter Property="MinHeight" Value="32" />
+    <Setter Property="CornerRadius" Value="4" />
+    <Setter Property="HorizontalAlignment" Value="Stretch" />
+    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+    <Setter Property="Cursor" Value="Hand" />
+  </Style>
+  <Style Selector="Button.picker /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource InsetBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource OutlineBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="4" />
+  </Style>
+  <Style Selector="Button.picker:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource InsetBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+  </Style>
+  <Style Selector="Button.picker:pressed /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource TileBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+  </Style>
+
+  <!-- Стрелка внутри поля ввода: рамка у неё своя не нужна — её держит обёртка -->
+  <Style Selector="Button.arrow">
+    <Setter Property="CornerRadius" Value="4" />
+    <Setter Property="Cursor" Value="Hand" />
+  </Style>
+  <Style Selector="Button.arrow /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+  </Style>
+  <Style Selector="Button.arrow:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource TileBrush}" />
+  </Style>
+
+  <!-- Поле со свободным вводом: рамку держит обёртка, чтобы стрелка стояла внутри поля -->
+  <Style Selector="TextBox.picker">
+    <Setter Property="FontSize" Value="12" />
+    <Setter Property="Padding" Value="10,6" />
+    <Setter Property="MinHeight" Value="30" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+  </Style>
+  <Style Selector="TextBox.picker:pointerover">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+  </Style>
+  <Style Selector="TextBox.picker:focus">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
   </Style>
 
   <!-- Вердикт: знак из словаря продукта плюс цвет уровня -->

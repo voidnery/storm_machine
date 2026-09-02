@@ -1,11 +1,26 @@
-using System.Collections.ObjectModel;
+﻿using System.Collections.ObjectModel;
 using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using StormMachine.App.Controls;
 using StormMachine.Application.Abstractions;
 using StormMachine.Domain.Discovery;
 
 namespace StormMachine.App.ViewModels;
+
+/// <summary>Сканирование в выпадающем списке сравнения.</summary>
+/// <remarks>
+/// Обёртка называет сканирование сама: до И-24+ подпись собиралась в разметке
+/// многосоставной привязкой с форматом даты по месту — ещё одна копия формата
+/// в списке из тридцати.
+/// </remarks>
+public sealed record ScanOption(DiscoveryScan Scan) : IOption
+{
+    public string Caption =>
+        $"{Scan.StartedUtc.ToLocalTime().ToString("dd.MM HH:mm", CultureInfo.InvariantCulture)} · {Scan.Range}";
+
+    public string About => $"опрошено {Scan.Probed}, откликнулось {Scan.Responded}";
+}
 
 /// <summary>Строка инвентаря.</summary>
 public sealed record InventoryRow(
@@ -72,7 +87,7 @@ public sealed partial class DevicesPageViewModel(
 
     public ObservableCollection<InventoryRow> Rows { get; } = [];
 
-    public ObservableCollection<DiscoveryScan> Scans { get; } = [];
+    public ObservableCollection<ScanOption> Scans { get; } = [];
 
     public ObservableCollection<string> Differences { get; } = [];
 
@@ -100,7 +115,7 @@ public sealed partial class DevicesPageViewModel(
     private InventoryRow? _selected;
 
     [ObservableProperty]
-    private DiscoveryScan? _compareFrom;
+    private ScanOption? _compareFrom;
 
     public override async Task ActivateAsync(CancellationToken cancellationToken = default)
     {
@@ -211,8 +226,8 @@ public sealed partial class DevicesPageViewModel(
 
         try
         {
-            var before = await _store.GetScanAsync(from.Id).ConfigureAwait(true);
-            var latest = Scans.Count > 0 ? await _store.GetScanAsync(Scans[0].Id).ConfigureAwait(true) : null;
+            var before = await _store.GetScanAsync(from.Scan.Id).ConfigureAwait(true);
+            var latest = Scans.Count > 0 ? await _store.GetScanAsync(Scans[0].Scan.Id).ConfigureAwait(true) : null;
 
             if (before is null || latest is null)
             {
@@ -283,7 +298,7 @@ public sealed partial class DevicesPageViewModel(
 
             foreach (var scan in scans)
             {
-                Scans.Add(scan);
+                Scans.Add(new ScanOption(scan));
             }
 
             var addresses = _devices.Sum(d => Math.Max(1, d.Addresses.Count));

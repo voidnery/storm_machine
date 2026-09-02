@@ -1,3 +1,4 @@
+﻿using StormMachine.App.Controls;
 using System.Collections.ObjectModel;
 using System.Globalization;
 using Avalonia.Threading;
@@ -16,10 +17,17 @@ namespace StormMachine.App.ViewModels;
 public sealed record ScenarioTargetRow(string Target, string Mark, string Verdict, string Where);
 
 /// <summary>Сценарий в выпадающем списке: шаблон или собранный оператором.</summary>
-public sealed record ScenarioTemplateOption(string Key, string Title, string About, bool IsTemplate, Scenario? Custom = null)
+public sealed record ScenarioTemplateOption(string Key, string Title, string About, bool IsTemplate, Scenario? Custom = null) : IOption
 {
     public override string ToString() =>
         IsTemplate ? $"{Title} — {About}" : $"{Title} · свой — {About}";
+
+    string IOption.Caption => Title;
+
+    string IOption.About => About;
+
+    /// <summary>Собранный оператором сценарий помечен: он отличается от шаблона продукта.</summary>
+    string? IOption.Note => IsTemplate ? null : "свой";
 }
 
 /// <summary>
@@ -404,21 +412,6 @@ public sealed partial class ProbesPageViewModel : PageViewModel, ITargetAware, I
     /// <summary>Подпись набора целей для поля ввода.</summary>
     [RelayCommand]
     private void UseSet(string key) => Target = key;
-
-    /// <summary>Открыт ли список инвентаря под полем цели.</summary>
-    [ObservableProperty]
-    private bool _isPickerOpen;
-
-    // Кнопка только открывает: закрытие — выбором или щелчком мимо (light dismiss).
-    [RelayCommand]
-    private void OpenPicker() => IsPickerOpen = true;
-
-    [RelayCommand]
-    private void UseSuggestion(TargetSuggestion suggestion)
-    {
-        Target = suggestion.Address;
-        IsPickerOpen = false;
-    }
 
     public string BaselineCaption =>
         $"Порог часов {_clock.CalibrationBaselineMs.ToString("0.000", CultureInfo.InvariantCulture)} мс";

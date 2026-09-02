@@ -1,4 +1,4 @@
-<UserControl xmlns="https://github.com/avaloniaui"
+﻿<UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:StormMachine.App.ViewModels"
              xmlns:presets="using:StormMachine.Domain.Presets"
@@ -109,7 +109,7 @@
                         <TextBlock Grid.Column="2" FontSize="12"
                                    Text="{Binding LossPercent, StringFormat='{}{0:0.0}% потерь'}" />
                         <TextBlock Grid.Column="3" FontSize="12"
-                                   Text="{Binding MedianMs, StringFormat='{}медиана {0:0.000} мс'}" />
+                                   Text="{Binding MedianText, StringFormat='{}медиана {0}'}" />
                       </Grid>
                     </DataTemplate>
                   </ItemsControl.ItemTemplate>

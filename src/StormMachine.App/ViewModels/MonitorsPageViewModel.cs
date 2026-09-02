@@ -94,7 +94,7 @@ public sealed partial class MonitorsPageViewModel : PageViewModel
     private MonitorRow? _selected;
 
     [ObservableProperty]
-    private string _details = "Выбери монитор в списке слева.";
+    private string _details = "Мониторов ещё нет. Нажмите «Завести» — форма откроется справа.";
 
     [ObservableProperty]
     private string? _availabilityText;
@@ -155,6 +155,13 @@ public sealed partial class MonitorsPageViewModel : PageViewModel
 
             Selected = Monitors.FirstOrDefault(m => m.Monitor.Id == previous) ?? Monitors.FirstOrDefault();
 
+            if (Selected is null)
+            {
+                // Присвоение null поверх null уведомления не даёт, а список за это
+                // время мог стать пустым — фразу надо пересчитать самим.
+                Details = NothingChosen;
+            }
+
             OnPropertyChanged(nameof(SchedulerState));
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
@@ -166,13 +173,24 @@ public sealed partial class MonitorsPageViewModel : PageViewModel
     /// <summary>Есть ли выбранный монитор: действия над ним включаются по этому.</summary>
     public bool HasSelection => Selected is not null;
 
+    /// <summary>
+    /// Что стоит вместо подробностей, пока монитор не выбран.
+    /// </summary>
+    /// <remarks>
+    /// «Выбери монитор в списке слева» на пустом списке — совет, которому нельзя
+    /// последовать: слева ничего нет. Пустому продукту полагается называть первый шаг.
+    /// </remarks>
+    private string NothingChosen => Monitors.Count == 0
+        ? "Мониторов ещё нет. Нажмите «Завести» — форма откроется справа."
+        : "Выбери монитор в списке слева.";
+
     partial void OnSelectedChanged(MonitorRow? value)
     {
         OnPropertyChanged(nameof(HasSelection));
 
         if (value is null)
         {
-            Details = "Выбери монитор в списке слева.";
+            Details = NothingChosen;
             AvailabilityText = null;
 
             // Оговорка о покрытии тоже снимается: она осталась бы висеть

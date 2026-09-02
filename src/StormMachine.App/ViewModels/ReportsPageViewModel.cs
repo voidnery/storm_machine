@@ -1,7 +1,8 @@
-using System.Collections.ObjectModel;
+﻿using System.Collections.ObjectModel;
 using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using StormMachine.App.Controls;
 using StormMachine.App.Services;
 using StormMachine.Application.Abstractions;
 using StormMachine.Application.Topology;
@@ -15,15 +16,41 @@ using Monitor = StormMachine.Domain.Monitors.Monitor;
 namespace StormMachine.App.ViewModels;
 
 /// <summary>Шаблон в выпадающем списке.</summary>
-public sealed record TemplateOption(ReportTemplate Template, string Title, string About)
+public sealed record TemplateOption(ReportTemplate Template, string Title, string About) : IOption
 {
     public override string ToString() => Title;
+
+    string IOption.Caption => Title;
+
+    string IOption.About => About;
 }
 
 /// <summary>Срок в выпадающем списке.</summary>
-public sealed record PeriodOption(string Title, TimeSpan? Span)
+public sealed record PeriodOption(string Title, TimeSpan? Span) : IOption
 {
     public override string ToString() => Title;
+
+    string IOption.Caption => Title;
+}
+
+/// <summary>Монитор в выпадающем списке.</summary>
+/// <remarks>
+/// Обёртка, а не сам монитор: список показывает имя и предмет проверки, а поиск
+/// идёт по обоим. Домену знать, как он выглядит в списке, незачем.
+/// </remarks>
+public sealed record MonitorOption(Monitor Monitor) : IOption
+{
+    public string Caption => Monitor.Name;
+
+    public string About => $"{Monitor.Subject} → {Monitor.Target.DisplayName}";
+}
+
+/// <summary>Эталон в выпадающем списке.</summary>
+public sealed record BaselineOption(Baseline Baseline) : IOption
+{
+    public string Caption => Baseline.Name;
+
+    public string About => $"{Baseline.Subject} → {Baseline.Target.DisplayName}";
 }
 
 /// <summary>Прогон, выбираемый галочкой.</summary>
@@ -105,9 +132,9 @@ public sealed partial class ReportsPageViewModel : PageViewModel
 
     public ObservableCollection<RunChoice> Runs { get; } = [];
 
-    public ObservableCollection<Monitor> Monitors { get; } = [];
+    public ObservableCollection<MonitorOption> Monitors { get; } = [];
 
-    public ObservableCollection<Baseline> Baselines { get; } = [];
+    public ObservableCollection<BaselineOption> Baselines { get; } = [];
 
     [ObservableProperty]
     private TemplateOption _template;
@@ -116,10 +143,10 @@ public sealed partial class ReportsPageViewModel : PageViewModel
     private PeriodOption _period;
 
     [ObservableProperty]
-    private Monitor? _monitor;
+    private MonitorOption? _monitor;
 
     [ObservableProperty]
-    private Baseline? _baseline;
+    private BaselineOption? _baseline;
 
     [ObservableProperty]
     private bool _includeTopology;
@@ -217,7 +244,7 @@ public sealed partial class ReportsPageViewModel : PageViewModel
 
             foreach (var monitor in await _monitors.ListAsync(cancellationToken).ConfigureAwait(true))
             {
-                Monitors.Add(monitor);
+                Monitors.Add(new MonitorOption(monitor));
             }
 
             Monitor ??= Monitors.FirstOrDefault();
@@ -228,7 +255,7 @@ public sealed partial class ReportsPageViewModel : PageViewModel
                          .ListAsync(new BaselineQuery(), cancellationToken)
                          .ConfigureAwait(true))
             {
-                Baselines.Add(baseline);
+                Baselines.Add(new BaselineOption(baseline));
             }
 
             OnPropertyChanged(nameof(SizeNotice));
@@ -309,7 +336,7 @@ public sealed partial class ReportsPageViewModel : PageViewModel
 
     private async Task<ServiceLevelSection?> LevelAsync(CancellationToken cancellationToken)
     {
-        if (Monitor is not { } monitor || Template.Template != ReportTemplate.ServiceLevel)
+        if (Monitor?.Monitor is not { } monitor || Template.Template != ReportTemplate.ServiceLevel)
         {
             return null;
         }
@@ -340,7 +367,7 @@ public sealed partial class ReportsPageViewModel : PageViewModel
     /// </remarks>
     private List<BaselineComparison> Compare(List<StoredRun> chosen)
     {
-        if (Baseline is not { } baseline || chosen.Count == 0)
+        if (Baseline?.Baseline is not { } baseline || chosen.Count == 0)
         {
             return [];
         }

@@ -1,7 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:StormMachine.App.ViewModels"
-             xmlns:controls="using:StormMachine.App.Controls"
+             xmlns:forms="using:StormMachine.App.Controls"
              x:Class="StormMachine.App.Views.Pages.InspectPage"
              x:DataType="vm:InspectPageViewModel">
 
@@ -18,8 +18,8 @@
         <Grid ColumnDefinitions="Auto,2*,Auto,Auto">
           <StackPanel Grid.Column="0" Spacing="4" Margin="0,0,12,0" Width="150">
             <TextBlock Text="Инспектор" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" />
-            <ComboBox ItemsSource="{Binding Inspectors}" SelectedItem="{Binding Inspector}"
-                      HorizontalAlignment="Stretch" IsEnabled="{Binding CanStart}" />
+            <forms:Picker ItemsSource="{Binding Inspectors}" SelectedItem="{Binding Inspector, Mode=TwoWay}"
+                          IsEnabled="{Binding CanStart}" />
           </StackPanel>
 
           <StackPanel Grid.Column="1" Spacing="4" Margin="0,0,12,0">
@@ -59,7 +59,7 @@
           <TextBlock Text="Разложение" Classes="h2" />
           <!-- Складываются ряды или нет — методика, а не подпись: от ответа зависит,
                законно ли складывать числа под ней. -->
-          <controls:MethodCard Thesis="{Binding SeriesCaption}"
+          <forms:MethodCard Thesis="{Binding SeriesCaption}"
                                IsVisible="{Binding SeriesCaption, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
 
           <!-- Заголовки колонок: до И-24+ таблица шла вовсе без них, и «2 из 6»
@@ -130,7 +130,7 @@
             <Grid ColumnDefinitions="*,Auto">
               <StackPanel Grid.Column="0" Spacing="6" Margin="0,0,12,0">
                 <TextBlock Text="Как сеть видна снаружи" Classes="h2" />
-                <controls:MethodCard Thesis="Внешний адрес и поведение NAT изнутри сети неизвестны в принципе."
+                <forms:MethodCard Thesis="Внешний адрес и поведение NAT изнутри сети неизвестны в принципе."
                                      Detail="NAT — трансляция адресов: домашний или офисный маршрутизатор подменяет ваш адрес своим. Каким его видят снаружи, знает только собеседник за пределами трансляции — поэтому проверка спрашивает у публичных серверов STUN, созданных ровно для этого вопроса." />
               </StackPanel>
               <Button Grid.Column="1" Content="Посмотреть" VerticalAlignment="Center"

@@ -35,9 +35,8 @@
                оператора весит больше и переживает пересканирование (И-24). -->
           <TextBlock Grid.Column="3" Text="Роль:" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}"
                      VerticalAlignment="Center" Margin="16,0,8,0" />
-          <AutoCompleteBox Grid.Column="4" Text="{Binding NewRole}" ItemsSource="{Binding RoleOptions}"
-                           FilterMode="Contains" MinimumPrefixLength="0" FontSize="12"
-                           PlaceholderText="из списка или своя" />
+          <forms:Picker Grid.Column="4" AcceptsText="True" Text="{Binding NewRole, Mode=TwoWay}"
+                        ItemsSource="{Binding RoleOptions}" Placeholder="из списка или своя" />
           <Button Grid.Column="5" Content="Присвоить" Command="{Binding AssignRoleCommand}"
                   FontSize="12" Padding="12,5" Margin="8,0,0,0" />
 
@@ -123,21 +122,10 @@
                        FontSize="11" Foreground="{StaticResource TextMutedBrush}" TextWrapping="Wrap" />
           </StackPanel>
 
-          <ComboBox Grid.Row="1" ItemsSource="{Binding Scans}" SelectedItem="{Binding CompareFrom}"
-                    HorizontalAlignment="Stretch" FontSize="12">
-            <ComboBox.ItemTemplate>
-              <DataTemplate x:DataType="discovery:DiscoveryScan">
-                <TextBlock FontSize="12">
-                  <TextBlock.Text>
-                    <MultiBinding StringFormat="{}{0:dd.MM HH:mm} · {1}">
-                      <Binding Path="StartedUtc.LocalDateTime" />
-                      <Binding Path="Range" />
-                    </MultiBinding>
-                  </TextBlock.Text>
-                </TextBlock>
-              </DataTemplate>
-            </ComboBox.ItemTemplate>
-          </ComboBox>
+          <forms:Picker Grid.Row="1" ItemsSource="{Binding Scans}"
+                        SelectedItem="{Binding CompareFrom, Mode=TwoWay}"
+                        Placeholder="выберите сканирование"
+                        Empty="Сканирований ещё не было — начните с «Обнаружения»." />
 
           <Button Grid.Row="2" Content="Сравнить с последним" Command="{Binding CompareCommand}"
                   FontSize="12" Padding="12,5" Margin="0,8,0,8" HorizontalAlignment="Stretch" />

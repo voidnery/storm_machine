@@ -32,6 +32,10 @@
 
       <!-- Список мониторов -->
       <Border Grid.Column="0" Background="{StaticResource PanelBrush}" CornerRadius="6" Padding="8">
+        <Panel>
+        <TextBlock Text="Мониторов ещё нет. «Завести» — и проверка пойдёт по расписанию сама."
+                   Classes="label" TextWrapping="Wrap" Margin="8,10"
+                   VerticalAlignment="Top" IsVisible="{Binding !Monitors.Count}" />
         <ListBox ItemsSource="{Binding Monitors}"
                  SelectedItem="{Binding Selected}"
                  Background="Transparent" BorderThickness="0">
@@ -60,6 +64,7 @@
             </DataTemplate>
           </ListBox.ItemTemplate>
         </ListBox>
+        </Panel>
       </Border>
 
       <!-- Форма заведения. Занимает место подробностей, но не список: выбранный
@@ -80,8 +85,7 @@
 
               <StackPanel Spacing="3">
                 <TextBlock Text="Что проверять" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" />
-                <ComboBox ItemsSource="{Binding Subjects}" SelectedItem="{Binding Subject}"
-                          HorizontalAlignment="Stretch" />
+                <forms:Picker ItemsSource="{Binding Subjects}" SelectedItem="{Binding Subject, Mode=TwoWay}" />
                 <TextBlock Text="{Binding TargetHint}" FontSize="10" Foreground="{StaticResource TextMutedBrush}" TextWrapping="Wrap" />
               </StackPanel>
 
@@ -92,8 +96,7 @@
 
               <StackPanel Spacing="3">
                 <TextBlock Text="Как часто" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" />
-                <ComboBox ItemsSource="{Binding Schedules}" SelectedItem="{Binding Schedule}"
-                          HorizontalAlignment="Stretch" />
+                <forms:Picker ItemsSource="{Binding Schedules}" SelectedItem="{Binding Schedule, Mode=TwoWay}" />
 
                 <!-- Cron вводится текстом: строка «0 3 * * 1-5» короче и точнее
                      любого набора выпадающих списков -->

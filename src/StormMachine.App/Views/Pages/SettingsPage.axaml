@@ -1,7 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:StormMachine.App.ViewModels"
-             xmlns:controls="using:StormMachine.App.Controls"
+             xmlns:forms="using:StormMachine.App.Controls"
              x:Class="StormMachine.App.Views.Pages.SettingsPage"
              x:DataType="vm:SettingsPageViewModel">
 
@@ -35,7 +35,7 @@
 
             <TextBlock Text="Профили окружения" Classes="h2" />
 
-            <controls:MethodCard Thesis="Порог 50 мс, разумный в офисе, бессмыслен для канала до филиала через VPN."
+            <forms:MethodCard Thesis="Порог 50 мс, разумный в офисе, бессмыслен для канала до филиала через VPN."
                                  Detail="Активный профиль пишется в условия каждого измерения — иначе через полгода отличить замер у заказчика от замера в офисе будет нечем." />
 
             <StackPanel Spacing="2">
@@ -84,7 +84,7 @@
                       Padding="12,5" Margin="6,0,0,0" />
             </Grid>
 
-            <controls:MethodCard Thesis="Продукт узнаёт сеть, но не переключает профиль сам."
+            <forms:MethodCard Thesis="Продукт узнаёт сеть, но не переключает профиль сам."
                                  Detail="Смена профиля меняет пороги и состав работающих мониторов, а делать это молча значит поменять смысл измерений за спиной оператора." />
 
           </StackPanel>
@@ -106,14 +106,14 @@
 
                 <TextBlock Text="Агенты" Classes="h2" />
 
-                <controls:MethodCard Thesis="Вторая точка измерения."
+                <forms:MethodCard Thesis="Вторая точка измерения."
                                      Detail="Без неё пропускная способность, качество канала и задержка под нагрузкой измерены быть не могут: скорость между точками требует двух точек." />
 
                 <StackPanel Spacing="3"
                             IsVisible="{Binding OwnThumbprint, Converter={x:Static ObjectConverters.IsNotNull}}">
                   <TextBlock Text="Наш отпечаток сертификата — его называют тому, кто у агента" Classes="caption" />
                   <!-- Отпечаток диктуют по телефону или шлют сообщением: чип копируется -->
-                  <controls:CopyChip Text="{Binding OwnThumbprint}" />
+                  <forms:CopyChip Text="{Binding OwnThumbprint}" />
                 </StackPanel>
 
                 <TextBlock Text="Сопряжённых агентов нет." Classes="label"
@@ -150,7 +150,7 @@
                 <!-- Два способа, потому что соединение устанавливает любая сторона:
                      входящие на Windows заблокированы по умолчанию, а правило требует
                      администратора. Где прав нет — звонит агент. -->
-                <controls:MethodCard Thesis="Звонить самим — когда на машине агента разрешены входящие."
+                <forms:MethodCard Thesis="Звонить самим — когда на машине агента разрешены входящие."
                                      Detail="Ждать звонка — когда прав там нет: исходящие разрешены всегда." />
 
                 <Grid ColumnDefinitions="*,Auto">
@@ -208,7 +208,7 @@
                            TextWrapping="Wrap"
                            IsVisible="{Binding Error, Converter={x:Static ObjectConverters.IsNotNull}}" />
 
-                <controls:Caveat Text="Отпечаток сверяется глазами и всегда: объявление о себе в сети подделать может кто угодно, и поиск избавляет от набора адреса — только от этого." />
+                <forms:Caveat Text="Отпечаток сверяется глазами и всегда: объявление о себе в сети подделать может кто угодно, и поиск избавляет от набора адреса — только от этого." />
 
               </StackPanel>
             </StackPanel>
@@ -229,7 +229,7 @@
                       Command="{Binding ToggleCredentialEditorCommand}" />
             </Grid>
 
-            <controls:MethodCard Thesis="{x:Static vm:SettingsPageViewModel.SnmpNote}"
+            <forms:MethodCard Thesis="{x:Static vm:SettingsPageViewModel.SnmpNote}"
                                  Detail="{x:Static vm:SettingsPageViewModel.SnmpNoteWhy}" />
 
             <TextBlock Text="Наборов нет — опрашивать оборудование нечем." Classes="label"
@@ -265,27 +265,24 @@
 
                   <TextBox PlaceholderText="имя набора: «свитчи», «ядро»" Text="{Binding Name}" />
 
-                  <ComboBox ItemsSource="{Binding Versions}" SelectedItem="{Binding Version}"
-                            HorizontalAlignment="Stretch" />
+                  <forms:Picker ItemsSource="{Binding Versions}" SelectedItem="{Binding Version, Mode=TwoWay}" />
 
                   <StackPanel Spacing="6" IsVisible="{Binding IsCommunity}">
                     <TextBox PlaceholderText="строка сообщества" Text="{Binding Community}"
                              PasswordChar="•" />
                     <!-- Не методика, а оговорка: набор со строкой сообщества ничего
                          не защищает, и сказать об этом надо голосом предупреждения. -->
-                    <controls:Caveat Text="{x:Static vm:SnmpCredentialEditorViewModel.CommunityNote}" />
+                    <forms:Caveat Text="{x:Static vm:SnmpCredentialEditorViewModel.CommunityNote}" />
                   </StackPanel>
 
                   <StackPanel Spacing="6" IsVisible="{Binding IsV3}">
                     <TextBox PlaceholderText="имя пользователя" Text="{Binding UserName}" />
 
-                    <ComboBox ItemsSource="{Binding Auths}" SelectedItem="{Binding Auth}"
-                              HorizontalAlignment="Stretch" />
+                    <forms:Picker ItemsSource="{Binding Auths}" SelectedItem="{Binding Auth, Mode=TwoWay}" />
                     <TextBox PlaceholderText="пароль проверки подлинности" Text="{Binding AuthPassword}"
                              PasswordChar="•" IsVisible="{Binding NeedsAuthPassword}" />
 
-                    <ComboBox ItemsSource="{Binding Privacies}" SelectedItem="{Binding Privacy}"
-                              HorizontalAlignment="Stretch" />
+                    <forms:Picker ItemsSource="{Binding Privacies}" SelectedItem="{Binding Privacy, Mode=TwoWay}" />
                     <TextBox PlaceholderText="пароль шифрования" Text="{Binding PrivacyPassword}"
                              PasswordChar="•" IsVisible="{Binding NeedsPrivacyPassword}" />
                   </StackPanel>
@@ -307,7 +304,7 @@
                     </StackPanel>
                   </Grid>
 
-                  <controls:MethodCard Thesis="{x:Static vm:SnmpCredentialEditorViewModel.PasswordNote}"
+                  <forms:MethodCard Thesis="{x:Static vm:SnmpCredentialEditorViewModel.PasswordNote}"
                                        Detail="{x:Static vm:SnmpCredentialEditorViewModel.PasswordNoteWhy}" />
 
                   <Border Classes="inset" Padding="10,8">
@@ -349,9 +346,9 @@
 
             <TextBlock Text="Хранилище" Classes="h2" />
 
-            <controls:CopyChip Text="{Binding DatabasePath}" />
+            <forms:CopyChip Text="{Binding DatabasePath}" />
 
-            <controls:MethodCard Thesis="{x:Static vm:SettingsPageViewModel.StorageNote}"
+            <forms:MethodCard Thesis="{x:Static vm:SettingsPageViewModel.StorageNote}"
                                  Detail="{x:Static vm:SettingsPageViewModel.StorageNoteWhy}" />
 
             <!-- Два способа назвать другой файл — чипами: их набирают руками
@@ -359,9 +356,9 @@
             <StackPanel Spacing="4">
               <TextBlock Text="Другой файл базы задаётся так" Classes="caption" />
               <WrapPanel>
-                <controls:CopyChip Text="{x:Static vm:SettingsPageViewModel.StoragePathVariable}"
+                <forms:CopyChip Text="{x:Static vm:SettingsPageViewModel.StoragePathVariable}"
                                    Margin="0,0,6,4" />
-                <controls:CopyChip Text="--база" Margin="0,0,6,4" />
+                <forms:CopyChip Text="--база" Margin="0,0,6,4" />
               </WrapPanel>
             </StackPanel>
 
@@ -371,12 +368,12 @@
 
                 <TextBlock Text="Политика хранения" Classes="h2" />
 
-                <controls:MethodCard Thesis="{x:Static vm:RetentionSectionViewModel.Note}"
+                <forms:MethodCard Thesis="{x:Static vm:RetentionSectionViewModel.Note}"
                                      Detail="{x:Static vm:RetentionSectionViewModel.NoteWhy}" />
 
                 <StackPanel Spacing="4">
                   <TextBlock Text="Та же уборка из консоли" Classes="caption" />
-                  <controls:CopyChip Text="{x:Static vm:RetentionSectionViewModel.PurgeCommand}" />
+                  <forms:CopyChip Text="{x:Static vm:RetentionSectionViewModel.PurgeCommand}" />
                 </StackPanel>
 
                 <Grid ColumnDefinitions="*,8,*">
@@ -421,16 +418,16 @@
 
                 <TextBlock Text="Перенос настроек" Classes="h2" />
 
-                <controls:MethodCard Thesis="{x:Static vm:TransferSectionViewModel.Note}"
+                <forms:MethodCard Thesis="{x:Static vm:TransferSectionViewModel.Note}"
                                      Detail="{x:Static vm:TransferSectionViewModel.NoteWhy}" />
 
                 <!-- Чего перенос не делает — голосом предупреждения, а рядом команды,
                      которыми заводят заново то, что не переехало. -->
-                <controls:Caveat Text="{x:Static vm:TransferSectionViewModel.SecretsCaveat}" />
+                <forms:Caveat Text="{x:Static vm:TransferSectionViewModel.SecretsCaveat}" />
                 <WrapPanel>
-                  <controls:CopyChip Text="{x:Static vm:TransferSectionViewModel.SnmpCredsCommand}"
+                  <forms:CopyChip Text="{x:Static vm:TransferSectionViewModel.SnmpCredsCommand}"
                                      Margin="0,0,6,4" />
-                  <controls:CopyChip Text="{x:Static vm:TransferSectionViewModel.AlertsCommand}"
+                  <forms:CopyChip Text="{x:Static vm:TransferSectionViewModel.AlertsCommand}"
                                      Margin="0,0,6,4" />
                 </WrapPanel>
 
@@ -466,14 +463,14 @@
 
             <StackPanel Spacing="3">
               <TextBlock Text="Версия" Classes="caption" />
-              <controls:CopyChip Text="{x:Static vm:SettingsPageViewModel.Version}" />
+              <forms:CopyChip Text="{x:Static vm:SettingsPageViewModel.Version}" />
             </StackPanel>
 
             <StackPanel Spacing="6">
               <TextBlock Text="Обновление" Classes="caption" />
               <TextBlock Text="{Binding Updates.StateText}" Classes="label" TextWrapping="Wrap" LineHeight="16" />
 
-              <controls:Caveat Text="{Binding Updates.Hold}" />
+              <forms:Caveat Text="{Binding Updates.Hold}" />
 
               <Grid ColumnDefinitions="Auto,Auto,Auto">
                 <Button Grid.Column="0" Content="Проверить" Padding="12,5" Margin="0,0,6,0"
@@ -485,11 +482,11 @@
                         Background="{StaticResource AccentBrush}" Foreground="White" />
               </Grid>
 
-              <controls:MethodCard Thesis="{x:Static vm:SettingsPageViewModel.UpdateNote}"
+              <forms:MethodCard Thesis="{x:Static vm:SettingsPageViewModel.UpdateNote}"
                                    Detail="{x:Static vm:SettingsPageViewModel.UpdateNoteWhy}" />
             </StackPanel>
 
-            <controls:MethodCard Thesis="{x:Static vm:SettingsPageViewModel.LicenceNote}"
+            <forms:MethodCard Thesis="{x:Static vm:SettingsPageViewModel.LicenceNote}"
                                  Detail="{x:Static vm:SettingsPageViewModel.LicenceNoteWhy}" />
 
           </StackPanel>

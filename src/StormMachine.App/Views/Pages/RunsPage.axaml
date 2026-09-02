@@ -1,7 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:StormMachine.App.ViewModels"
-             xmlns:controls="using:StormMachine.App.Controls"
+             xmlns:forms="using:StormMachine.App.Controls"
              xmlns:results="using:StormMachine.Domain.Results"
              x:Class="StormMachine.App.Views.Pages.RunsPage"
              x:DataType="vm:RunsPageViewModel">
@@ -36,17 +36,17 @@
       <!-- Сводка плитками, путь — копируемым чипом: раньше четыре числа и путь шли
            одной серой строкой, и путь в ней обрезался. -->
       <Grid ColumnDefinitions="Auto,Auto,Auto,*" Margin="0,6,0,2">
-        <controls:StatTile Grid.Column="0" Width="110" Caption="Прогонов" Value="{Binding RunCountText}" />
-        <controls:StatTile Grid.Column="1" Width="130" Caption="Сырых измерений" Value="{Binding SampleCountText}" />
-        <controls:StatTile Grid.Column="2" Width="130" Caption="Размер файла" Value="{Binding SizeText}" />
+        <forms:StatTile Grid.Column="0" Width="110" Caption="Прогонов" Value="{Binding RunCountText}" />
+        <forms:StatTile Grid.Column="1" Width="130" Caption="Сырых измерений" Value="{Binding SampleCountText}" />
+        <forms:StatTile Grid.Column="2" Width="130" Caption="Размер файла" Value="{Binding SizeText}" />
         <StackPanel Grid.Column="3" Spacing="2" VerticalAlignment="Center">
           <TextBlock Text="Файл журнала" Classes="caption" />
-          <controls:CopyChip Text="{Binding StorePath}" />
+          <forms:CopyChip Text="{Binding StorePath}" />
         </StackPanel>
       </Grid>
 
-      <controls:Caveat Text="{Binding FreeSpaceNotice}" />
-      <controls:Caveat Text="{Binding UsageError}" />
+      <forms:Caveat Text="{Binding FreeSpaceNotice}" />
+      <forms:Caveat Text="{Binding UsageError}" />
 
       <TextBlock Text="{Binding Message}" FontSize="12" Foreground="{StaticResource SuccessBrush}" TextWrapping="Wrap"
                  IsVisible="{Binding Message, Converter={x:Static ObjectConverters.IsNotNull}}" />
@@ -96,7 +96,7 @@
 
             <!-- Оговорка честности: сырья у этого прогона больше нет, и графика по нему
                  не будет. В ряду с остальными строками она терялась. -->
-            <controls:Caveat Text="{Binding RetentionNotice}" />
+            <forms:Caveat Text="{Binding RetentionNotice}" />
 
             <!-- Ряды: фазы, резолверы, хопы или весь прогон — зависит от формы результата.
                  Таблица собрана из ItemsControl намеренно: DataGrid потянул бы отдельный

@@ -1,4 +1,5 @@
-using Avalonia.Controls;
+﻿using Avalonia.Controls;
+using StormMachine.App.Controls;
 using StormMachine.Application.Abstractions;
 using StormMachine.Domain.Discovery;
 
@@ -16,9 +17,12 @@ namespace StormMachine.App.ViewModels;
 /// строка с именем и ролью — только в выпадающем списке.
 /// </para>
 /// </remarks>
-public sealed record TargetSuggestion(string Address, string Description)
+public sealed record TargetSuggestion(string Address, string Description) : IOption
 {
     public override string ToString() => Address;
+
+    /// <summary>В списке видно и адрес, и имя с ролью: устройство помнят по имени.</summary>
+    string IOption.Caption => Description;
 }
 
 /// <summary>Загрузка и фильтрация подсказок — одна на все страницы с полем цели.</summary>

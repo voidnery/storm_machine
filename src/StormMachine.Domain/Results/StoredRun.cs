@@ -52,6 +52,17 @@ public sealed record RunSummary
     /// <summary>Медиана по всему прогону — одна цифра для строки списка.</summary>
     public double? MedianMs { get; init; }
 
+    /// <summary>
+    /// Медиана словами продукта: «244 мс», «0.317 мс», «—», если считать было нечего.
+    /// </summary>
+    /// <remarks>
+    /// Строкой, а не числом с форматом по месту: как показывать измеренное — правило
+    /// продукта, и живёт оно в <see cref="Units"/>. Две страницы клиента печатали эту же
+    /// медиану форматом «0.000» прямо в привязке, и «244.160 мс» сообщал точность,
+    /// которой у сетевого измерения нет.
+    /// </remarks>
+    public string MedianText => MedianMs is { } median ? Units.Milliseconds(median) : "—";
+
     public required bool HasRawSamples { get; init; }
 
     /// <summary>Пресет, из которого запущен прогон.</summary>

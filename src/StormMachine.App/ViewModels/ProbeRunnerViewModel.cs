@@ -1,4 +1,4 @@
-using System.Collections.ObjectModel;
+﻿using System.Collections.ObjectModel;
 using System.Globalization;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -13,11 +13,15 @@ using StormMachine.Domain.Results;
 namespace StormMachine.App.ViewModels;
 
 /// <summary>Одна проба в выпадающем списке прогонщика.</summary>
-public sealed record ProbeOption(IProbe Probe)
+public sealed record ProbeOption(IProbe Probe) : IOption
 {
     public ProbeDescriptor Descriptor => Probe.Descriptor;
 
     public override string ToString() => $"{Descriptor.Title} — {Descriptor.Description}";
+
+    string IOption.Caption => Descriptor.Title;
+
+    string IOption.About => Descriptor.Description;
 }
 
 /// <summary>Поле формы, построенное из объявления параметра пробы.</summary>
@@ -282,21 +286,6 @@ public sealed partial class ProbeRunnerViewModel : ObservableObject
 
     [RelayCommand]
     private void UseAgent(string name) => Target = name;
-
-    /// <summary>Открыт ли список инвентаря под полем цели.</summary>
-    [ObservableProperty]
-    private bool _isPickerOpen;
-
-    // Кнопка только открывает: закрытие — выбором или щелчком мимо (light dismiss).
-    [RelayCommand]
-    private void OpenPicker() => IsPickerOpen = true;
-
-    [RelayCommand]
-    private void UseSuggestion(TargetSuggestion suggestion)
-    {
-        Target = suggestion.Address;
-        IsPickerOpen = false;
-    }
 
     [RelayCommand(CanExecute = nameof(CanStart))]
     private async Task StartAsync()

@@ -1,4 +1,4 @@
-using System.Collections.ObjectModel;
+﻿using System.Collections.ObjectModel;
 using System.Globalization;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -177,23 +177,6 @@ public sealed partial class LatencyPageViewModel : PageViewModel, ITargetAware
 
     /// <summary>Подсказки цели из инвентаря (И-24): сеть просканирована — подставляем.</summary>
     public System.Collections.ObjectModel.ObservableCollection<TargetSuggestion> Suggestions { get; } = [];
-
-    /// <summary>Открыт ли список инвентаря под полем цели.</summary>
-    [ObservableProperty]
-    private bool _isPickerOpen;
-
-    // Кнопка только открывает: закрытие — выбором или щелчком мимо. Переключатель
-    // здесь не работает: щелчок по кнопке при открытом списке сперва закрыл бы его
-    // самим щелчком (light dismiss), а затем команда открыла бы заново.
-    [RelayCommand]
-    private void OpenPicker() => IsPickerOpen = true;
-
-    [RelayCommand]
-    private void UseSuggestion(TargetSuggestion suggestion)
-    {
-        TargetText = suggestion.Address;
-        IsPickerOpen = false;
-    }
 
     private async Task LoadSuggestionsAsync(CancellationToken cancellationToken)
     {
