@@ -1,4 +1,4 @@
-name: Release
+﻿name: Release
 
 # Срабатывает на подписанный тег vX.Y.Z, который создаёт локальный хук
 # .githooks/pre-push при переливке beta -> master.
@@ -108,14 +108,24 @@ jobs:
           Copy-Item artifacts/StormMachine.Cli/* artifacts/StormMachine.App/ -Force -ErrorAction SilentlyContinue
           Copy-Item artifacts/StormMachine.Agent/* artifacts/StormMachine.App/ -Force -ErrorAction SilentlyContinue
 
+          # Отладочные символы в установщик не идут: одни только libSkiaSharp.pdb
+          # и libHarfBuzzSharp.pdb весят 105 МБ и человеку, который ставит продукт,
+          # не нужны. Символы восстанавливаются из той же сборки, когда понадобятся.
+          Remove-Item artifacts/StormMachine.App/*.pdb -Force -ErrorAction SilentlyContinue
+
           # Лента прошлых выпусков нужна для разностных пакетов: без неё каждое
           # обновление весило бы как полная установка.
           New-Item -ItemType Directory -Force -Path releases | Out-Null
           dotnet vpk download github --repoUrl "https://github.com/${{ github.repository }}" --outputDir releases 2>&1 | Out-Host
           if ($LASTEXITCODE -ne 0) { Write-Host "::notice::Прошлых выпусков нет — собираю первый" }
 
+          # packId — это и каталог установки (%LocalAppData%\<packId>), и опознание
+          # продукта в ленте обновлений. Он намеренно не совпадает с каталогом данных
+          # (%LocalAppData%\StormMachine): там лежит storm.db с историей измерений,
+          # и ставить продукт поверх неё значит сложить свои файлы в чужой каталог,
+          # а при удалении унести историю с собой.
           dotnet vpk pack `
-            --packId StormMachine `
+            --packId StormMachine.App `
             --packVersion $version `
             --packTitle "Storm Machine" `
             --packAuthors "Storm Machine contributors" `
@@ -131,7 +141,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: unsigned-installer
-          path: releases/StormMachine-win-Setup.exe
+          path: releases/StormMachine.App-win-Setup.exe
 
       - name: Подпись установщика
         if: steps.probe.outputs.found == 'true' && env.HAS_SIGNING == 'true'

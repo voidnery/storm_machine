@@ -1,4 +1,4 @@
-# Заявка в SignPath Foundation — пошагово
+﻿# Заявка в SignPath Foundation — пошагово
 
 > Этот документ — для оператора. Всё, что можно было сделать со стороны кода, сделано:
 > конвейер выпуска подпишет установщик сам, как только в репозитории появятся токен
@@ -150,7 +150,7 @@
 | Контакт | почта сопровождающего, читаемая и отвечающая |
 
 Про артефакты скажите точно: подписываются **установщик Windows
-(`StormMachine-win-Setup.exe`) и исполняемые файлы внутри него** — клиент
+(`StormMachine.App-win-Setup.exe`) и исполняемые файлы внутри него** — клиент
 (`StormMachine.exe`), консоль (`storm.exe`) и агент (`storm-agent.exe`),
 все self-contained single-file, платформа win-x64.
 
@@ -189,7 +189,7 @@
 | Слаг | Что подписывает |
 |------|-----------------|
 | `app-files` | zip с каталогом публикации: `StormMachine.exe`, `storm.exe`, `storm-agent.exe` |
-| `installer` | одиночный файл `StormMachine-win-Setup.exe` |
+| `installer` | одиночный файл `StormMachine.App-win-Setup.exe` |
 
 Оба слага прописаны в конвейере; менять имена — только вместе с ним.
 
@@ -237,12 +237,14 @@ HAS_SIGNING: ${{ secrets.SIGNPATH_API_TOKEN != '' }}
 После первого подписанного выпуска скачайте установщик и проверьте:
 
 ```powershell
-Get-AuthenticodeSignature .\StormMachine-win-Setup.exe | Format-List Status, SignerCertificate
+Get-AuthenticodeSignature .\StormMachine.App-win-Setup.exe | Format-List Status, SignerCertificate
 ```
 
 Ожидается `Status: Valid` и субъект сертификата, содержащий `SignPath Foundation`.
 Внутренние бинарники проверяются так же — после установки, в каталоге
-`%LocalAppData%\StormMachine\current`.
+`%LocalAppData%\StormMachine.App\current`. Каталог установки не совпадает
+с каталогом данных (`%LocalAppData%\StormMachine`) намеренно: там лежит история
+измерений, и продукт не кладёт свои файлы поверх неё.
 
 Если `Status: NotSigned` — подпись не сработала: смотрите журнал шага
 «Подпись установщика» в Actions и запрос на подпись в портале SignPath (он мог
