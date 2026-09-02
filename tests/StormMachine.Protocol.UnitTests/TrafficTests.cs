@@ -373,12 +373,27 @@ public sealed class TrafficTests
         var port = ((IPEndPoint)socket.LocalEndPoint!).Port;
 
         var receiving = UdpQuality.ReceiveAsync(socket, request);
-        await UdpQuality.SendAsync("127.0.0.1", port, request);
+        var sent = await UdpQuality.SendAsync("127.0.0.1", port, request);
         var received = await receiving;
 
-        // Петля отдаёт заказанное почти точно. Границы широкие: тест идёт вместе
-        // с остальными и на занятой машине.
-        Assert.InRange(received.Mbps, 7.0, 9.0);
+        Assert.True(received.Packets > 0, "Ни один пакет не дошёл по петле.");
+
+        // Мерка относительная, а не абсолютная. Раньше проверялось «7…9 Мбит/с»
+        // от заказанных восьми — и на двухъядерной машине под нагрузкой темповка
+        // не выдавала заказанного, а тест объявлял поломкой продукта медленный
+        // раннер. Найдено воспроизведением условий CI: прогон Protocol на двух
+        // ядрах рядом с нагрузочными даёт ровно ту же единственную ошибку.
+        //
+        // Существо проверки — знаменатель. Полсекунды ожидания опоздавших не входят
+        // в длительность: попади они туда, окно выросло бы с двух секунд до двух
+        // с половиной, а скорость просела бы на пятую часть при том же отправленном.
+        // Оба утверждения ниже не зависят от того, сколько успела отправить машина.
+        Assert.True(
+            received.ElapsedSeconds < sent.ElapsedSeconds + 0.25,
+            $"Окно получателя {received.ElapsedSeconds:0.000} с при {sent.ElapsedSeconds:0.000} с "
+            + "у отправителя — в знаменатель попало ожидание опоздавших.");
+
+        Assert.InRange(received.Mbps, sent.Mbps * 0.85, sent.Mbps * 1.30);
     }
 
     [Fact]

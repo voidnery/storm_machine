@@ -1,4 +1,4 @@
-name: CI
+﻿name: CI
 
 on:
   push:
@@ -12,7 +12,14 @@ on:
 jobs:
   build:
     runs-on: windows-latest
-    timeout-minutes: 20
+
+    # Сорок минут вместо двадцати. Раннер примерно вдевятеро медленнее машины
+    # разработки: те же проверки хранилища идут 4 секунды здесь и 35 там. Прогон
+    # упёрся в двадцатиминутный потолок на восемнадцатой минуте и был снят на
+    # полуслове — приговор при этом получила лишь часть сборок, а остальные
+    # не успели даже начаться. Потолок нужен как страховка от зависания,
+    # а не как мерка скорости раннера.
+    timeout-minutes: 40
 
     steps:
       - name: Checkout
@@ -46,9 +53,15 @@ jobs:
         if: steps.probe.outputs.found == 'true'
         run: dotnet build --configuration Release --no-restore
 
+      # Нагрузочные проверки здесь не идут — тем же правилом, что в приёмке
+      # (tools/acceptance.sh, шаг 1). Причина не в экономии времени, хотя они и
+      # съедали половину прогона: карта на 4096 узлов и год работы монитора
+      # занимают все ядра и диск сразу, а на двухъядерном общем раннере рядом
+      # с ними меряется не продукт, а планировщик Windows. Их место — стенд
+      # оператора, где машина тихая; в приёмке они идут отдельным шагом.
       - name: Test
         if: steps.probe.outputs.found == 'true'
-        run: dotnet test --configuration Release --no-build --logger "trx;LogFileName=results.trx" --results-directory TestResults
+        run: dotnet test --configuration Release --no-build --filter "Категория!=Нагрузка" --logger "trx;LogFileName=results.trx" --results-directory TestResults
 
       # Публикация с обрезкой проверяется на каждом изменении, а не только при релизе.
       # Причина конкретная: сборка клиентов была сломана с И-3 по И-9 и никто этого
