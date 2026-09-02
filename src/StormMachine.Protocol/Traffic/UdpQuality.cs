@@ -1,4 +1,4 @@
-using System.Buffers.Binary;
+﻿using System.Buffers.Binary;
 using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
@@ -164,7 +164,8 @@ public static class UdpQuality
         var counters = new ArrivalCounters();
 
         var warmup = TimeSpan.FromSeconds(Math.Max(0, request.WarmupSeconds));
-        var duration = warmup + TimeSpan.FromSeconds(Math.Max(1, request.DurationSeconds)) + DrainWindow;
+        var measuring = TimeSpan.FromSeconds(Math.Max(1, request.DurationSeconds));
+        var duration = warmup + measuring + DrainWindow;
 
         var watch = new Stopwatch();
         using var stop = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
@@ -232,7 +233,11 @@ public static class UdpQuality
             }
         }
 
-        return counters.Finish(request.Id, watch.Elapsed - warmup);
+        // Окно измерения — заказанное, а не время работы приёмника: ожидание опоздавших
+        // в него не входит. Короче заказанного оно бывает только при отмене оператором.
+        var elapsed = watch.Elapsed - warmup;
+
+        return counters.Finish(request.Id, elapsed < measuring ? elapsed : measuring);
     }
 
     private static async Task ReportAsync(
@@ -308,9 +313,6 @@ public static class UdpQuality
         private long _firstSequence = -1;
         private long _highestSequence = -1;
 
-        private long _firstTicks;
-        private long _lastTicks;
-
         private double _jitterTicks;
         private long _previousTransit;
         private bool _hasPrevious;
@@ -331,7 +333,6 @@ public static class UdpQuality
                 if (_firstSequence < 0)
                 {
                     _firstSequence = sequence;
-                    _firstTicks = receivedAt;
                 }
 
                 if (sequence < _highestSequence)
@@ -345,7 +346,6 @@ public static class UdpQuality
 
                 _packets++;
                 _bytes += bytes;
-                _lastTicks = receivedAt;
 
                 var transit = receivedAt - sentAt;
 
@@ -360,16 +360,27 @@ public static class UdpQuality
             }
         }
 
-        public TestSnapshot Snapshot(Guid id, TimeSpan fallback)
+        /// <summary>
+        /// Снимок за окно измерения.
+        /// </summary>
+        /// <remarks>
+        /// Знаменатель приходит снаружи — это заказанное окно, а не время между первым
+        /// и последним прочитанным пакетом. Времена чтения для этого не годятся: когда
+        /// приёмник не успевает читать, пакеты лежат в буфере сокета и вычитываются
+        /// пачкой. Окно по ним выходит во столько же раз короче, во сколько приёмник
+        /// опоздал, а скорость — во столько же раз выше. На общем раннере продукт
+        /// объявил 96 Мбит/с у потока в восемь: байты пришли все, но прочитаны были
+        /// за одну шестую секунды вместо двух.
+        /// <para>
+        /// Времена отправителя для этого тоже не годятся, и по той же причине, по какой
+        /// не сообщается односторонняя задержка: часы двух машин не синхронизированы.
+        /// </para>
+        /// </remarks>
+        public TestSnapshot Snapshot(Guid id, TimeSpan window)
         {
             lock (_gate)
             {
-                // Длительность — от первого принятого пакета до последнего, а не до конца
-                // ожидания. Окно ожидания опоздавших добавляло полсекунды к знаменателю
-                // и занижало скорость тем сильнее, чем короче измерение.
-                var seconds = _packets > 1 && _lastTicks > _firstTicks
-                    ? (_lastTicks - _firstTicks) / (double)Stopwatch.Frequency
-                    : Math.Max(0, fallback.TotalSeconds);
+                var seconds = Math.Max(0, window.TotalSeconds);
 
                 var expected = _firstSequence < 0 ? 0 : _highestSequence - _firstSequence + 1;
 
