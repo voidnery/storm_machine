@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using Microsoft.Extensions.DependencyInjection;
 using StormMachine.Application.Abstractions;
 using StormMachine.Application.Probes;
@@ -81,6 +81,7 @@ public sealed class PrecisionTests(ITestOutputHelper output)
     /// </para>
     /// </remarks>
     [Fact]
+    [Trait("Категория", "Точность")]
     public async Task StackNoise_StaysWithinBudget()
     {
         await using var services = MeasurementHarness.BuildServices();
