@@ -6,7 +6,7 @@
   <PropertyGroup>
     <!-- 0.0.0 = предрелизное состояние, тег не создаётся.
          Первый релиз: поднять до 0.1.0 перед переливкой beta -> master. -->
-    <Version>0.2.0-alpha.1</Version>
+    <Version>0.2.0-alpha.2</Version>
   </PropertyGroup>
 
   <PropertyGroup>
