@@ -55,20 +55,8 @@ public partial class LatencyPage : UserControl
 
     private void OnChartUpdated(object? sender, EventArgs e) => Redraw();
 
-    /// <summary>
-    /// Цвет токена в цвет ScottPlot.
-    /// </summary>
-    /// <remarks>
-    /// У рисовалки графиков свой тип цвета, и кисть Avalonia ей не подходит.
-    /// Значение всё равно берётся из общего словаря: график, разъехавшийся
-    /// с окном по палитре, выглядит вставленным из другой программы.
-    /// </remarks>
-    private static Color Token(string key)
-    {
-        var colour = DesignTokens.ColorOf(key);
-
-        return Color.FromARGB(colour.ToUInt32());
-    }
+    /// <summary>Цвет токена в цвет ScottPlot — общий с остальными графиками.</summary>
+    private static Color Token(string key) => PlotLook.Token(key);
 
     private void ConfigurePlot()
     {
@@ -79,27 +67,12 @@ public partial class LatencyPage : UserControl
 
         var plot = _chart.Plot;
 
-        plot.FigureBackground.Color = Token(DesignTokens.Surface);
-        plot.DataBackground.Color = Token(DesignTokens.Surface);
-        plot.Axes.Color(Token(DesignTokens.TextSecondary));
-        plot.Grid.MajorLineColor = Token(DesignTokens.Panel);
+        PlotLook.Apply(plot);
 
         plot.XLabel("проба");
         plot.YLabel("время оборота (RTT), мс");
 
-        // Легенда включается ОДИН раз, при настройке.
-        // ShowLegend() добавляет панель на каждый вызов, а перерисовка идёт десять раз
-        // в секунду — легенды наслаивались друг на друга и съедали половину графика.
-        plot.ShowLegend(Edge.Top);
-
-        // Оформление под тёмную тему приложения: по умолчанию ScottPlot рисует светлую
-        // плашку, и на тёмном графике она выглядит наклейкой поверх чужого окна.
-        // Настройки берутся у самой легенды, а не у панели, которую вернул ShowLegend:
-        // панель отвечает за размещение, легенда — за вид.
-        plot.Legend.BackgroundColor = Token(DesignTokens.Panel);
-        plot.Legend.OutlineColor = Token(DesignTokens.Divider);
-        plot.Legend.FontColor = Token(DesignTokens.Text);
-        plot.Legend.ShadowColor = Colors.Transparent;
+        PlotLook.ShowLegend(plot);
     }
 
     private void Redraw()

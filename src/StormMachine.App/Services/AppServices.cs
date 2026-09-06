@@ -23,6 +23,17 @@ internal static class AppServices
         services.AddLogging(builder => builder.SetMinimumLevel(LogLevel.Warning));
         services.AddStormMachine();
 
+        // Приёмник журнала. Без него уровень задавался, сообщения собирались,
+        // а девать их было некуда: у окна нет консоли, и всё написанное клиентом
+        // о своих сбоях пропадало.
+        //
+        // Путь приёмник спрашивает отложенно. Первая версия спрашивала его при
+        // сборке — и сборка служб зацикливалась: хранилище просит журнал, журнал
+        // просит хранилище. К первой записи хранилище уже собрано.
+        services.AddSingleton(provider => new FileLogProvider(
+            () => provider.GetRequiredService<IStorageLocation>().DatabasePath));
+        services.AddSingleton<ILoggerProvider>(provider => provider.GetRequiredService<FileLogProvider>());
+
         services.AddSingleton<RunnerService>();
 
         // Каналы, у которых есть смысл только при живом окне. Корень композиции

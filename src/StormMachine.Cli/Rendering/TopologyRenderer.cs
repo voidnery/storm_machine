@@ -199,9 +199,8 @@ internal static class TopologyRenderer
             parts.Add(vendor);
         }
 
-        // Тег категории (И-24). Догадка приходит уже с вопросом — «сервер?» и «сервер»
-        // обязаны читаться по-разному.
-        if (node.Role is { Length: > 0 } role)
+        // Тег категории (И-24). Цвета в консоли нет, поэтому догадку отличает слово.
+        if (RoleWording.Tag(node.Role, node.RoleIsGuessed) is { Length: > 0 } role)
         {
             parts.Add(role);
         }

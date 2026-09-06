@@ -61,7 +61,9 @@ public static class TargetSuggestions
                         d.Address,
                         d.Address
                         + (d.HostName is { Length: > 0 } name ? $" · {name}" : string.Empty)
-                        + (d.RoleDisplay is { Length: > 0 } role ? $" · {role}" : string.Empty))),
+                        + (RoleWording.Tag(d.RoleDisplay, d.RoleIsGuessed) is { Length: > 0 } role
+                            ? $" · {role}"
+                            : string.Empty))),
             ];
         }
         catch (Exception ex) when (ex is InvalidOperationException or IOException)

@@ -2,6 +2,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Media;
+using Avalonia.Media.Immutable;
 using StormMachine.Application.Abstractions;
 using StormMachine.Domain.Topology;
 
@@ -291,7 +292,7 @@ public sealed class TopologyCanvas : Control
         // Категория красит рамку (И-24, замечание оператора: тег текстом почти
         // не виден). Цвет — у категоризованных устройств; виды узлов самой карты
         // (эта машина, подсеть, интернет) остаются своими цветами.
-        var role = RoleBrush(node.Node.Role);
+        var role = RoleBrush(node.Node.Role, node.Node.RoleIsGuessed);
         var border = selected
             ? new Pen(Selection, 2)
             : role is not null
@@ -346,22 +347,44 @@ public sealed class TopologyCanvas : Control
     /// Цвет категории устройства.
     /// </summary>
     /// <remarks>
-    /// Догадка («сервер?») красится тем же цветом, что и факт: вопрос остаётся
-    /// в подписи, а цвет отвечает на «что это», не утверждая, откуда известно.
-    /// Неизвестной категории цвета нет — красить всё подряд значило бы обесценить
-    /// подсветку.
+    /// Догадка красится тем же цветом, но вполсилы: до И-24+ её отличал вопрос
+    /// в подписи, и вопрос читался как опечатка. Полоска сплошного цвета — категория
+    /// наблюдена или задана оператором, полупрозрачная — выведена классификатором
+    /// по портам, вендору и имени. Неизвестной категории цвета нет вовсе: красить
+    /// всё подряд значило бы обесценить подсветку.
     /// </remarks>
-    private static IBrush? RoleBrush(string? role)
+    private static IBrush? RoleBrush(string? role, bool guessed)
     {
-        if (string.IsNullOrEmpty(role))
+        if (string.IsNullOrEmpty(role) || !RoleTokens.TryGetValue(role, out var token))
         {
             return null;
         }
 
-        return RoleTokens.TryGetValue(role.TrimEnd('?'), out var token)
-            ? DesignTokens.Brush(token)
-            : null;
+        return guessed ? Faded(token) : DesignTokens.Brush(token);
     }
+
+    /// <summary>
+    /// Тот же цвет вполсилы. Кисти кэшируются: карта перерисовывается на каждом
+    /// движении мыши, и заводить кисть на узел на каждый кадр — расход на ровном месте.
+    /// </summary>
+    private static IBrush Faded(string token)
+    {
+        if (FadedCache.TryGetValue(token, out var cached))
+        {
+            return cached;
+        }
+
+        var made = new ImmutableSolidColorBrush(DesignTokens.ColorOf(token), GuessOpacity);
+
+        FadedCache[token] = made;
+
+        return made;
+    }
+
+    /// <summary>Насколько догадка бледнее факта. Видно, что цвет тот же, и что он неполный.</summary>
+    private const double GuessOpacity = 0.4;
+
+    private static readonly Dictionary<string, IBrush> FadedCache = new(StringComparer.Ordinal);
 
     /// <summary>
     /// Категория устройства — ключ токена. Одна таблица на карту и на легенду.
@@ -402,7 +425,8 @@ public sealed class TopologyCanvas : Control
 
     private static string? Secondary(TopologyNode node)
     {
-        // Тег категории (И-24) идёт первым: «сервер?» говорит о узле больше вендора.
+        // Тег категории (И-24) идёт первым: «сервер» говорит о узле больше вендора.
+        // Откуда категория известна, показывает цвет полоски, а не знак в подписи.
         var role = node.Role is { Length: > 0 } tag ? tag : null;
 
         if (node.Address is { } address && !string.Equals(address, node.Label, StringComparison.Ordinal))

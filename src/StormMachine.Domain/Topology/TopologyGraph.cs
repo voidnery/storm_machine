@@ -90,11 +90,14 @@ public sealed record TopologyNode
     /// Роль устройства из инвентаря — тег категории на карте (И-24).
     /// </summary>
     /// <remarks>
-    /// Догадка классификатора приходит уже с вопросительным знаком
-    /// (<see cref="Discovery.Device.RoleDisplay" />): карта не имеет права
-    /// показать догадку тем же словом, что и правку оператора.
+    /// Слово одно и то же и для догадки, и для наблюдения; отличает их
+    /// <see cref="RoleIsGuessed" />, и карта обязана показать это отличие —
+    /// иначе она выдаёт предположение классификатора за факт.
     /// </remarks>
     public string? Role { get; init; }
+
+    /// <summary>Роль — догадка классификатора, а не наблюдение или правка.</summary>
+    public bool RoleIsGuessed { get; init; }
 
     /// <summary>Сколько устройств свёрнуто в этот узел. 0 — узел не свёрнутый.</summary>
     public int GroupSize { get; init; }
@@ -483,6 +486,7 @@ public sealed record TopologyGraph
                 MacAddress = device?.MacAddress,
                 Vendor = device?.VendorDisplay,
                 Role = device?.RoleDisplay,
+                RoleIsGuessed = device?.RoleIsGuessed ?? false,
                 IsOnline = device?.IsOnline ?? true,
                 Detail = "шлюз по умолчанию",
             });
@@ -755,6 +759,7 @@ public sealed record TopologyGraph
                 MacAddress = device.MacAddress,
                 Vendor = device.VendorDisplay,
                 Role = device.RoleDisplay,
+                RoleIsGuessed = device.RoleIsGuessed,
                 IsOnline = device.IsOnline,
                 Detail = device.ExtraAddresses.Count > 0
                     ? "ещё адреса: " + string.Join(", ", device.ExtraAddresses)

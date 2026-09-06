@@ -78,6 +78,7 @@ public sealed partial class SettingsPageViewModel : PageViewModel
     private readonly IRunStore _runs;
     private readonly ISnmpCredentialStore _credentials;
     private readonly SnmpService _snmp;
+    private readonly FileLogProvider _log;
 
     public SettingsPageViewModel(
         NavigationSection section,
@@ -89,7 +90,8 @@ public sealed partial class SettingsPageViewModel : PageViewModel
         IAgentDirectory agents,
         SettingsTransfer transfer,
         IFilePicker picker,
-        Application.Storage.RetentionSettings retention)
+        Application.Storage.RetentionSettings retention,
+        FileLogProvider log)
         : base(section)
     {
         Agents = new AgentsSectionViewModel(agents ?? throw new ArgumentNullException(nameof(agents)));
@@ -106,6 +108,7 @@ public sealed partial class SettingsPageViewModel : PageViewModel
         _runs = runs ?? throw new ArgumentNullException(nameof(runs));
         _credentials = credentials ?? throw new ArgumentNullException(nameof(credentials));
         _snmp = snmp ?? throw new ArgumentNullException(nameof(snmp));
+        _log = log ?? throw new ArgumentNullException(nameof(log));
         Updates = updates ?? throw new ArgumentNullException(nameof(updates));
     }
 
@@ -176,6 +179,17 @@ public sealed partial class SettingsPageViewModel : PageViewModel
     public static string Version => ProductInfo.Version;
 
     public string DatabasePath => _runs.Location;
+
+    /// <summary>
+    /// Где искать журнал клиента.
+    /// </summary>
+    /// <remarks>
+    /// Путь показан по той же причине, что и путь базы: когда продукт повёл себя
+    /// не так, как ожидалось, первое, что нужно человеку, — это куда посмотреть.
+    /// Сообщения о сбоях ссылаются сюда словами, и ссылка обязана вести
+    /// во что-то, что видно.
+    /// </remarks>
+    public string LogPath => _log.Location;
 
     // Тексты разложены на тезис и обоснование: тезис виден всегда, обоснование —
     // по кнопке карточки. До волны 2 всё это шло сплошными абзацами десятым кеглем,

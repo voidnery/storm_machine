@@ -190,9 +190,11 @@ internal static class DeviceRenderer
             ? " · порт " + string.Join(", ", device.OpenPorts)
             : string.Empty;
 
-        // Тег категории (И-24): догадка классификатора приходит с вопросом,
-        // и «сервер?» с «сервер» читаются по-разному — так и задумано.
-        var role = device.RoleDisplay is { } tag && tag != "шлюз" ? $" · {tag}" : string.Empty;
+        // Тег категории (И-24). Цвета в консоли нет, поэтому догадку отличает слово:
+        // «похоже на сервер» против «сервер» — см. RoleWording.
+        var role = RoleWording.Tag(device.RoleDisplay, device.RoleIsGuessed) is { } tag && tag != "шлюз"
+            ? $" · {tag}"
+            : string.Empty;
 
         return (sources.Count == 0 ? "не отвечает" : string.Join(", ", sources) + ports) + role;
     }
@@ -228,7 +230,9 @@ internal static class DeviceRenderer
 
             // Тег категории после времени: колонка с фиксированной шириной резала бы
             // «маршрутизатор» ровно на том, что несёт сведения.
-            var role = device.RoleDisplay is { } tag && tag != "шлюз" ? $"  {tag}" : string.Empty;
+            var role = RoleWording.Tag(device.RoleDisplay, device.RoleIsGuessed) is { } tag && tag != "шлюз"
+                ? $"  {tag}"
+                : string.Empty;
 
             Console.WriteLine($" {marker}{device.Address,-15} {device.MacAddress ?? "—",-17} "
                               + $"{Shorten(device.HostName, NameWidth),-NameWidth} "

@@ -3,6 +3,7 @@
              xmlns:vm="using:StormMachine.App.ViewModels"
              xmlns:results="using:StormMachine.Domain.Results"
              xmlns:forms="using:StormMachine.App.Controls"
+             xmlns:sp="using:ScottPlot.Avalonia"
              x:Class="StormMachine.App.Views.Pages.DashboardPage"
              x:DataType="vm:DashboardPageViewModel">
 
@@ -42,6 +43,28 @@
           <TextBlock Text="{Binding Privileges}" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" />
           <TextBlock Text="{Binding TimerInfo}" FontSize="12" Foreground="{StaticResource TextSecondaryBrush}" />
 
+          <!-- Выбор адаптера. До этого продукт предупреждал «измерение идёт через
+               виртуальный коммутатор» и на этом останавливался: предупредить о том,
+               что нельзя изменить, — половина дела. -->
+          <StackPanel Spacing="4" Margin="0,6,0,0">
+            <TextBlock Text="Меряем от адаптера" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" />
+            <forms:Picker ItemsSource="{Binding AdapterChoices}"
+                          SelectedItem="{Binding MeasureFrom, Mode=TwoWay}"
+                          HorizontalAlignment="Left" Width="420" />
+
+            <!-- Оговорка обязательна: выбор меняет точку зрения продукта, а не
+                 таблицу маршрутов системы. Умолчание об этом было бы обещанием,
+                 которого продукт не выполняет. -->
+            <forms:MethodCard Thesis="{x:Static vm:DashboardPageViewModel.AdapterNote}"
+                              Detail="{x:Static vm:DashboardPageViewModel.AdapterNoteWhy}" />
+
+            <Border Classes="tile" Padding="10,7" Margin="0,2,0,0"
+                    IsVisible="{Binding AdapterNotice, Converter={x:Static ObjectConverters.IsNotNull}}">
+              <TextBlock Text="{Binding AdapterNotice}" FontSize="12" TextWrapping="Wrap"
+                         Foreground="{StaticResource WarningBrush}" />
+            </Border>
+          </StackPanel>
+
           <ItemsControl ItemsSource="{Binding Adapters}" Margin="0,4,0,0">
             <ItemsControl.ItemTemplate>
               <DataTemplate x:DataType="vm:AdapterRow">
@@ -66,6 +89,33 @@
               </DataTemplate>
             </ItemsControl.ItemTemplate>
           </ItemsControl>
+        </StackPanel>
+      </Border>
+
+      <!-- Как ведёт себя сеть. Список последних прогонов отвечает на «что мерили»;
+           на «стало хуже или нет» отвечает только форма во времени. -->
+      <Border Background="{StaticResource PanelBrush}" CornerRadius="6" Padding="16"
+              IsVisible="{Binding HasTrend}">
+        <StackPanel Spacing="10">
+          <Grid ColumnDefinitions="*,Auto">
+            <StackPanel Grid.Column="0" Spacing="2">
+              <TextBlock Text="Как ведёт себя сеть" FontWeight="SemiBold" FontSize="13" />
+              <TextBlock Text="{Binding TrendSummary}" FontSize="12"
+                         Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap" />
+            </StackPanel>
+
+            <!-- Проба выбирается, а не смешивается: время оборота ping и время
+                 первого байта http — разные величины в одной единице. -->
+            <forms:Picker Grid.Column="1" ItemsSource="{Binding TrendProbes}"
+                          SelectedItem="{Binding TrendProbe, Mode=TwoWay}"
+                          Width="240" VerticalAlignment="Top" />
+          </Grid>
+
+          <sp:AvaPlot Name="Latency" Height="170" />
+          <sp:AvaPlot Name="Answers" Height="120" />
+
+          <TextBlock Text="Точка — прогон. Месяц истории, не больше двухсот прогонов; глубже — в «Журнале»."
+                     FontSize="11" Foreground="{StaticResource TextMutedBrush}" TextWrapping="Wrap" />
         </StackPanel>
       </Border>
 

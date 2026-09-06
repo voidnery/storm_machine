@@ -25,6 +25,8 @@ public partial class App : Avalonia.Application
         {
             _services = AppServices.Build();
 
+            WatchForSilentFailures();
+
             // Подготовка ядра выполняется до создания окна и намеренно синхронно:
             // калибровка порога разрешения и открытие журнала занимают доли секунды,
             // а окно, показанное до их завершения, соврало бы в строке состояния —
@@ -69,6 +71,37 @@ public partial class App : Avalonia.Application
         window.Show();
         window.WindowState = WindowState.Normal;
         window.Activate();
+    }
+
+    /// <summary>
+    /// Сбой, которого никто не поймал, обязан оставить след.
+    /// </summary>
+    /// <remarks>
+    /// Консоль ставит эти два обработчика с И-7; у окна их не было. Разница выходит
+    /// боком там, где её меньше всего ждут: команда страницы — это <c>Task</c>,
+    /// и <c>AsyncRelayCommand</c> исключение из неё не выбрасывает, а кладёт
+    /// в задачу. Ничего не падает, ничего не печатается, кнопка просто не срабатывает
+    /// — и человек остаётся с «не работает» без единого слова о причине.
+    ///
+    /// Обработчики не лечат сбой и не должны: они дают ему имя. Место, где сбой
+    /// объясняется по-человечески, — сама страница; здесь только сеть безопасности
+    /// на то, что мимо страницы прошло.
+    /// </remarks>
+    private void WatchForSilentFailures()
+    {
+        var log = _services!.GetRequiredService<ILogger<App>>();
+
+        AppDomain.CurrentDomain.UnhandledException += (_, e) =>
+            log.LogCritical(e.ExceptionObject as Exception, "Необработанный сбой клиента.");
+
+        // Задача, чьё исключение никто не прочитал, — это ровно случай команды
+        // страницы, оставшейся без catch. Сбор мусора приносит их с задержкой,
+        // поэтому в файле такая запись появляется позже самого события.
+        TaskScheduler.UnobservedTaskException += (_, e) =>
+        {
+            log.LogError(e.Exception, "Сбой в фоновой задаче, который никто не прочитал.");
+            e.SetObserved();
+        };
     }
 
     private void StartScheduler()

@@ -4,6 +4,7 @@ using StormMachine.Application;
 using StormMachine.Agents;
 using StormMachine.Alerting;
 using StormMachine.Application.Abstractions;
+using StormMachine.Application.Adapters;
 using StormMachine.Application.Capabilities;
 using StormMachine.Application.Probes;
 using StormMachine.Application.Presets;
@@ -183,7 +184,17 @@ public static class StormMachineServiceCollectionExtensions
 
         // Платформа
         services.AddSingleton<IHighResolutionClock, HighResolutionClock>();
-        services.AddSingleton<INetworkEnvironment, WindowsNetworkEnvironment>();
+        // Окружение в два слоя. Нижний отвечает, что у машины есть и куда идёт
+        // маршрут по умолчанию; верхний знает, что из этого выбрал оператор.
+        // Все, кто спрашивает «откуда меряем», получают верхний и потому уважают
+        // выбор без единой правки у себя.
+        services.AddSingleton<WindowsNetworkEnvironment>();
+        services.AddSingleton<AdapterChoice>();
+        services.AddSingleton(provider => new ChosenAdapterEnvironment(
+            provider.GetRequiredService<WindowsNetworkEnvironment>(),
+            provider.GetRequiredService<AdapterChoice>()));
+        services.AddSingleton<INetworkEnvironment>(provider =>
+            provider.GetRequiredService<ChosenAdapterEnvironment>());
 
         // Что позволяет сама машина: права, драйвер захвата, сырые сокеты.
         // Определяется проверкой, а не предположением по одному флагу прав.
@@ -262,6 +273,11 @@ public static class StormMachineServiceCollectionExtensions
             // Уборка истории — не условие работы продукта. Не убралось сегодня —
             // уберётся завтра, а измерять надо сейчас.
         }
+
+        // Выбранный оператором адаптер поднимается до первого измерения: строка
+        // состояния и заголовок первого же прогона обязаны назвать тот адаптер,
+        // от которого меряют, а не тот, который система выбрала бы сама.
+        await services.GetRequiredService<AdapterChoice>().LoadAsync(cancellationToken).ConfigureAwait(false);
 
         var clock = services.GetRequiredService<IHighResolutionClock>();
         await clock.CalibrateAsync(cancellationToken).ConfigureAwait(false);

@@ -57,8 +57,9 @@ public sealed record InventoryRow(
             device.VendorDisplay,
             device.LastSeenUtc.ToLocalTime().ToString("dd.MM HH:mm", CultureInfo.InvariantCulture),
 
-            // Тег категории (И-24). Догадка классификатора приходит с вопросом.
-            device.RoleDisplay,
+            // Тег категории (И-24). В таблице цвета у тега нет, и догадку,
+            // как и в консоли, отличает слово.
+            RoleWording.Tag(device.RoleDisplay, device.RoleIsGuessed),
             device.Role == "шлюз",
             device.IsOnline,
             device.Evidence.Any(e => e.Source == EvidenceSource.Manual && e.Kind == EvidenceKind.HostName));

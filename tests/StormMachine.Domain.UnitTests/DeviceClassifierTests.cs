@@ -1,4 +1,4 @@
-using StormMachine.Domain.Discovery;
+﻿using StormMachine.Domain.Discovery;
 
 namespace StormMachine.Domain.UnitTests;
 
@@ -21,7 +21,11 @@ public sealed class DeviceClassifierTests
 
         Assert.Equal("маршрутизатор", device.Role);
         Assert.True(device.RoleIsGuessed);
-        Assert.Equal("маршрутизатор?", device.RoleDisplay);
+
+        // Знак вопроса в теге убран (замечание оператора): «маршрутизатор?» читалось
+        // как опечатка. Догадка осталась догадкой — её несут признак и слово.
+        Assert.Equal("маршрутизатор", device.RoleDisplay);
+        Assert.Equal("похоже на маршрутизатор", RoleWording.Tag(device.RoleDisplay, device.RoleIsGuessed));
     }
 
     [Fact(DisplayName = "Порт печати — принтер")]
@@ -33,7 +37,7 @@ public sealed class DeviceClassifierTests
         Assert.True(device.RoleIsGuessed);
     }
 
-    [Fact(DisplayName = "Правка оператора перекрывает догадку и не помечается вопросом")]
+    [Fact(DisplayName = "Правка оператора перекрывает догадку и не оговаривается")]
     public void OperatorRole_OverridesGuess()
     {
         var device = Build(
@@ -43,6 +47,7 @@ public sealed class DeviceClassifierTests
         Assert.Equal("сервер", device.Role);
         Assert.False(device.RoleIsGuessed);
         Assert.Equal("сервер", device.RoleDisplay);
+        Assert.Equal("сервер", RoleWording.Tag(device.RoleDisplay, device.RoleIsGuessed));
     }
 
     [Fact(DisplayName = "Без уверенных признаков категория честно пуста")]

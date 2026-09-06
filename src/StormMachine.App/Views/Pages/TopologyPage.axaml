@@ -91,7 +91,10 @@
                            StrokeDashArray="0.6,2" />
                 <TextBlock Text="допущение" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" />
               </StackPanel>
-              <TextBlock Text="цвет рамки — категория устройства" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}"
+              <!-- Категория тоже бывает догадкой, и это видно тем же приёмом, что
+                   и у связей: бледное — выведенное, плотное — наблюдённое. -->
+              <TextBlock Text="цвет рамки — категория; бледная рамка — категория выведена, а не наблюдена"
+                         FontSize="11" Foreground="{StaticResource TextSecondaryBrush}"
                          VerticalAlignment="Center" />
               <TextBlock Text="Колесо — масштаб, перетаскивание — сдвиг, щелчок — выбор узла."
                          FontSize="11" Foreground="{StaticResource TextMutedBrush}" VerticalAlignment="Center" />
@@ -139,6 +142,13 @@
               <TextBlock Grid.Column="1" Text="{Binding SelectedNode.Role}" Classes="body"
                          Foreground="{StaticResource AccentBrush}" />
             </Grid>
+
+            <!-- Здесь есть место на фразу — значит, оговорка говорится словами.
+                 Раньше её нёс вопросительный знак в самом теге, и «сервер?»
+                 читалось как сомнение продукта, а не как способ узнать. -->
+            <TextBlock Grid.Column="1" Classes="caption" TextWrapping="Wrap"
+                       Text="Категория выведена по портам, вендору и имени — это догадка, а не наблюдение."
+                       IsVisible="{Binding SelectedNode.RoleIsGuessed}" />
 
             <TextBlock Text="{Binding SelectedNode.Detail}" Classes="caption" TextWrapping="Wrap"
                        IsVisible="{Binding SelectedNode.Detail, Converter={x:Static ObjectConverters.IsNotNull}}" />

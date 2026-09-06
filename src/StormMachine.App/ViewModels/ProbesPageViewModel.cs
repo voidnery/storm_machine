@@ -4,6 +4,7 @@ using System.Globalization;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Microsoft.Extensions.Logging;
 using StormMachine.App.Services;
 using StormMachine.Application.Abstractions;
 using StormMachine.Application.Probes;
@@ -89,6 +90,7 @@ public sealed partial class ProbesPageViewModel : PageViewModel, ITargetAware, I
 
     private readonly ScenarioLibrary _library;
     private readonly IDeviceStore _devices;
+    private readonly ILogger<ProbesPageViewModel> _log;
 
     /// <summary>Подсказки цели из инвентаря (И-24): сеть просканирована — подставляем.</summary>
     public ObservableCollection<TargetSuggestion> Suggestions { get; } = [];
@@ -103,10 +105,12 @@ public sealed partial class ProbesPageViewModel : PageViewModel, ITargetAware, I
         ScenarioLibrary library,
         IScenarioStore scenarios,
         IProbeRegistry registry,
-        IDeviceStore devices)
+        IDeviceStore devices,
+        ILogger<ProbesPageViewModel> log)
         : base(section)
     {
         _devices = devices ?? throw new ArgumentNullException(nameof(devices));
+        _log = log ?? throw new ArgumentNullException(nameof(log));
         _runner = runner ?? throw new ArgumentNullException(nameof(runner));
         _operations = operations ?? throw new ArgumentNullException(nameof(operations));
         _clock = clock ?? throw new ArgumentNullException(nameof(clock));
@@ -289,6 +293,16 @@ public sealed partial class ProbesPageViewModel : PageViewModel, ITargetAware, I
         catch (ArgumentException ex)
         {
             Error = ex.Message;
+        }
+
+        // Всё остальное — тоже ответ оператору, а не повод промолчать. Раньше
+        // сюда доходили отказ базы, отказ сети и отказ файла, и каждый из них
+        // выглядел одинаково: нажал «Запустить» — ничего не произошло. Ровно
+        // на это оператор и пожаловался, сравнив собранный клиент с рабочим.
+        catch (Exception ex)
+        {
+            Error = Trouble.Say(ex);
+            _log.LogError(ex, "Сценарий «{Шаблон}» прерван сбоем.", Template?.Key);
         }
         finally
         {

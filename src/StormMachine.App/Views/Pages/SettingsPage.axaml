@@ -362,6 +362,16 @@
               </WrapPanel>
             </StackPanel>
 
+            <!-- Журнал клиента. Сообщения о сбоях ссылаются сюда словами, и ссылка
+                 обязана вести туда, где путь виден и копируется одним нажатием:
+                 «посмотрите в журнале» без адреса — не помощь, а отговорка. -->
+            <StackPanel Spacing="4">
+              <TextBlock Text="Журнал клиента" Classes="caption" />
+              <forms:CopyChip Text="{Binding LogPath}" />
+              <TextBlock Classes="caption" TextWrapping="Wrap"
+                         Text="Сюда пишутся предупреждения и сбои самого клиента — то, что консоль печатает на экран. Измерения в нём не хранятся: они в базе." />
+            </StackPanel>
+
             <!-- Политика хранения. До И-24 жила только умолчаниями и ключами консоли. -->
             <StackPanel Spacing="10" DataContext="{Binding Retention}">
               <StackPanel x:DataType="vm:RetentionSectionViewModel" Spacing="10">

@@ -3,6 +3,7 @@ using System.Globalization;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Microsoft.Extensions.Logging;
 using StormMachine.App.Controls;
 using StormMachine.App.Services;
 using StormMachine.Application.Abstractions;
@@ -22,6 +23,20 @@ public sealed record ProbeOption(IProbe Probe) : IOption
     string IOption.Caption => Descriptor.Title;
 
     string IOption.About => Descriptor.Description;
+
+    /// <summary>
+    /// Пробе нужна вторая точка — сопряжённый агент.
+    /// </summary>
+    /// <remarks>
+    /// Замечание оператора: по списку не видно, какие пробы работают в одиночку,
+    /// а какие требуют агента на той стороне. Продукт знал это и раньше
+    /// (<c>RequiresAgent</c>), но говорил уже после выбора — подсказкой поля цели.
+    /// Знать надо до выбора, иначе оператор выбирает вслепую и упирается в отказ.
+    ///
+    /// Значок и слова вместе: значок один читается как украшение, слова одни
+    /// не видны боковым зрением при просмотре списка.
+    /// </remarks>
+    string? IOption.Note => Descriptor.RequiresAgent ? "🤖 нужен агент" : null;
 }
 
 /// <summary>Поле формы, построенное из объявления параметра пробы.</summary>
@@ -110,6 +125,7 @@ public sealed partial class ProbeRunnerViewModel : ObservableObject
     private ActiveRunViewModel? _current;
 
     private readonly IDeviceStore _devices;
+    private readonly ILogger _log;
 
     public ProbeRunnerViewModel(
         RunnerService runner,
@@ -117,8 +133,10 @@ public sealed partial class ProbeRunnerViewModel : ObservableObject
         IRunStore store,
         IAgentDirectory agents,
         IDeviceStore devices,
+        ILogger log,
         IEnumerable<string> probeNames)
     {
+        _log = log ?? throw new ArgumentNullException(nameof(log));
         _runner = runner ?? throw new ArgumentNullException(nameof(runner));
         _store = store ?? throw new ArgumentNullException(nameof(store));
         _agents = agents ?? throw new ArgumentNullException(nameof(agents));
@@ -340,22 +358,37 @@ public sealed partial class ProbeRunnerViewModel : ObservableObject
             return;
         }
 
-        if (Save)
+        // Открытие журнала и запуск прогона — за общей оговоркой. Отказ базы
+        // до этого выходил из команды в задачу, а задача исключение не бросает:
+        // получалось «нажал и ничего не произошло» — то же, на что оператор
+        // пожаловался в сценариях. Сам прогон о своих отказах докладывает сам,
+        // через Error прогона; здесь — то, что случилось до его начала.
+        try
         {
-            await _store.InitializeAsync().ConfigureAwait(true);
+            if (Save)
+            {
+                await _store.InitializeAsync().ConfigureAwait(true);
+            }
+
+            _current = _runner.Start(
+                option.Probe,
+                request,
+                Save,
+                option.Descriptor.RequiresTarget ? target.DisplayName : option.Descriptor.Title);
+            _current.Finished += OnFinished;
+
+            IsRunning = true;
+            Status = "Идёт измерение…";
+            StatusState = OperationState.Running;
+            _timer.Start();
         }
-
-        _current = _runner.Start(
-            option.Probe,
-            request,
-            Save,
-            option.Descriptor.RequiresTarget ? target.DisplayName : option.Descriptor.Title);
-        _current.Finished += OnFinished;
-
-        IsRunning = true;
-        Status = "Идёт измерение…";
-        StatusState = OperationState.Running;
-        _timer.Start();
+        catch (Exception ex)
+        {
+            Error = Trouble.Say(ex);
+            Status = "Прогон не начался.";
+            StatusState = OperationState.Failed;
+            _log.LogError(ex, "Проба «{Проба}» не запустилась.", option.Descriptor.Name);
+        }
     }
 
     [RelayCommand(CanExecute = nameof(IsRunning))]
