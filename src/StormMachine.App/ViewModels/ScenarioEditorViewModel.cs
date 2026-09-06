@@ -1,4 +1,4 @@
-using System.Collections.ObjectModel;
+﻿using System.Collections.ObjectModel;
 using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -28,6 +28,73 @@ public sealed partial class ScenarioStepDraftViewModel : ObservableObject
     /// <summary>Пороги: «p95 &lt; 100; потери &lt;= 0», через точку с запятой.</summary>
     [ObservableProperty]
     private string _thresholdsText = string.Empty;
+
+    // ------------------------------------------------------- конструктор порога
+
+    /// <summary>
+    /// Порог собирается из трёх полей — как в форме монитора.
+    /// </summary>
+    /// <remarks>
+    /// Строка «p95 &lt; 100» требует знать заранее ключи, знаки и единицу; ни одного
+    /// из трёх форма не сообщала. Собранное дописывается в ту же строку через точку
+    /// с запятой: строка остаётся правдой о шаге, её видно и можно поправить руками —
+    /// в том числе для порогов по ряду («p95@ttfb») и по фактам пробы, которых
+    /// в списке метрик нет.
+    /// </remarks>
+    public IReadOnlyList<MetricOption> MetricChoices { get; } =
+        [.. MetricWording.Common.Select(m => new MetricOption(m))];
+
+    public IReadOnlyList<ComparisonOption> Comparisons { get; } =
+    [
+        new("<", "меньше"),
+        new("≤", "не больше"),
+        new(">", "больше"),
+        new("≥", "не меньше"),
+    ];
+
+    [ObservableProperty]
+    private MetricOption? _metric;
+
+    [ObservableProperty]
+    private ComparisonOption? _comparison;
+
+    [ObservableProperty]
+    private decimal? _limit;
+
+    public string LimitUnit => Metric?.Help.Unit ?? string.Empty;
+
+    public bool CanAddThreshold => Metric is not null && Comparison is not null && Limit is not null;
+
+    partial void OnMetricChanged(MetricOption? value) => RefreshBuilder();
+
+    partial void OnComparisonChanged(ComparisonOption? value) => RefreshBuilder();
+
+    partial void OnLimitChanged(decimal? value) => RefreshBuilder();
+
+    private void RefreshBuilder()
+    {
+        OnPropertyChanged(nameof(LimitUnit));
+        OnPropertyChanged(nameof(CanAddThreshold));
+        AddThresholdCommand.NotifyCanExecuteChanged();
+    }
+
+    [RelayCommand(CanExecute = nameof(CanAddThreshold))]
+    private void AddThreshold()
+    {
+        if (Metric is not { } metric || Comparison is not { } comparison || Limit is not { } limit)
+        {
+            return;
+        }
+
+        var piece = $"{metric.Help.Key} {comparison.Sign} "
+                    + limit.ToString("0.###", CultureInfo.InvariantCulture);
+
+        ThresholdsText = ThresholdsText.Trim() is { Length: > 0 } already
+            ? $"{already}; {piece}"
+            : piece;
+
+        Limit = null;
+    }
 }
 
 /// <summary>
@@ -81,17 +148,9 @@ public sealed partial class ScenarioEditorViewModel : ObservableObject
     private string? _error;
 
     public static string Note =>
-        "Параметры пишутся через пробел: count=4 interval=200. Пороги — через точку "
-        + "с запятой: p95 < 100; потери <= 0. Пустая цель шага наследует цель предыдущего.";
-
-    /// <summary>
-    /// Что такое метрики порога — тот же словарь, что и у мониторов.
-    /// </summary>
-    /// <remarks>
-    /// Короткий ключ порога ничего не объясняет: «p95 &lt; 100» не говорит ни что
-    /// такое p95, ни в чём эти 100. Здесь на оба вопроса отвечает список метрик.
-    /// </remarks>
-    public static IReadOnlyList<MetricHelp> Metrics => MetricWording.Common;
+        "Параметры пишутся через пробел: count=4 interval=200. Порог собирается полями "
+        + "под шагом и дописывается в строку порогов — там его видно и можно поправить. "
+        + "Пустая цель шага наследует цель предыдущего.";
 
     [RelayCommand]
     private void Toggle() => IsOpen = !IsOpen;

@@ -155,8 +155,6 @@ public sealed partial class MonitorEditorViewModel : ObservableObject
     /// <summary>Пороги, набранные в форме.</summary>
     public ObservableCollection<ThresholdRow> Thresholds { get; } = [];
 
-    /// <summary>Метрики, по которым бывают пороги, — с единицами и объяснением.</summary>
-    public static IReadOnlyList<MetricHelp> Metrics => MetricWording.Common;
 
     /// <summary>
     /// Порог собирается из трёх полей, а не набирается строкой.

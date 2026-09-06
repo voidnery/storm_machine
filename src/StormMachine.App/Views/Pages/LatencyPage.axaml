@@ -1,6 +1,7 @@
 ﻿<UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:StormMachine.App.ViewModels"
+             xmlns:controls="using:StormMachine.App.Views.Controls"
              xmlns:forms="using:StormMachine.App.Controls"
              xmlns:sp="using:ScottPlot.Avalonia"
              xmlns:results="using:StormMachine.Domain.Results"
@@ -85,14 +86,8 @@
 
         <!-- Сквозной принцип: пресет рождается не из формы, а из измерения,
              которое только что оказалось полезным. -->
-        <Grid ColumnDefinitions="Auto,220,Auto,*">
-          <TextBlock Grid.Column="0" Text="Сохранить как пресет:" Classes="body"
-                     Foreground="{StaticResource TextSecondaryBrush}"
-                     VerticalAlignment="Center" Margin="0,0,10,0" />
-          <TextBox Grid.Column="1" Text="{Binding PresetName}" PlaceholderText="имя пресета" FontSize="12" />
-          <Button Grid.Column="2" Content="Сохранить" Command="{Binding SaveAsPresetCommand}"
-                  FontSize="12" Padding="12,5" Margin="8,0,0,0" />
-        </Grid>
+        <!-- Тот же элемент, что на остальных страницах: одно действие — один вид. -->
+        <controls:PresetSave DataContext="{Binding Preset}" HorizontalAlignment="Left" />
 
         <!-- Статусу — постоянное место под панелью запуска. Справа от имени пресета
              он терялся, и «идёт» от «кончилось отказом» ничем не отличалось. -->

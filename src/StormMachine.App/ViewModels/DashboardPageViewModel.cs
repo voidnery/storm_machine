@@ -256,7 +256,7 @@ public sealed partial class DashboardPageViewModel(
         TimerInfo =
             $"Таймер: разрешение {_clock.ResolutionNanoseconds:0.###} нс, "
             + (_clock.CalibrationBaselineMs > 0
-                ? $"порог часов {_clock.CalibrationBaselineMs.ToString("0.000", CultureInfo.InvariantCulture)} мс"
+                ? $"порог часов {Units.Milliseconds(_clock.CalibrationBaselineMs)}"
                 : "порог часов ещё не измерен — калибровка идёт перед первым измерением");
 
         Adapters.Clear();

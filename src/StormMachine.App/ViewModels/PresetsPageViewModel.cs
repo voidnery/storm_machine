@@ -8,6 +8,7 @@ using StormMachine.Application.Abstractions;
 using StormMachine.Application.Presets;
 using StormMachine.Application.Scenarios;
 using StormMachine.Domain.Presets;
+using StormMachine.Domain.Measurements;
 using StormMachine.Domain.Results;
 
 namespace StormMachine.App.ViewModels;
@@ -477,7 +478,7 @@ public sealed partial class PresetsPageViewModel(
         var stats = Domain.Measurements.LatencyStatistics.Compute(result.Samples);
         var median = stats.SampleCount == 0
             ? "—"
-            : stats.P50Ms.ToString("0.000", CultureInfo.InvariantCulture) + " мс";
+            : Units.Milliseconds(stats.P50Ms);
 
         LastOutcome =
             $"«{preset.Name}»: отправлено {result.SentCount}, потери {result.LossPercent:0.0} %, медиана {median}"

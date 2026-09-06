@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using StormMachine.Domain.Measurements;
 
 namespace StormMachine.App.ViewModels;
@@ -28,7 +28,7 @@ public static class ConditionRows
         yield return new ConditionRow(
             "порог часов",
             context.CalibrationBaselineMs > 0
-                ? context.CalibrationBaselineMs.ToString("0.000", CultureInfo.InvariantCulture) + " мс"
+                ? Units.Milliseconds(context.CalibrationBaselineMs)
                 : "не измерен");
 
         yield return new ConditionRow("методика", context.Methodology.ToString());

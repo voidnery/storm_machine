@@ -1,0 +1,53 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:StormMachine.App.ViewModels"
+             xmlns:presets="using:StormMachine.Domain.Presets"
+             x:Class="StormMachine.App.Views.Controls.PresetSave"
+             x:DataType="vm:PresetSaveViewModel">
+
+  <!-- Кнопка и окошко сохранения в пресет. Один элемент на все страницы,
+       где что-то настраивают и запускают: до этого их было четыре штуки,
+       написанных по отдельности, и они успели разойтись в мелочах. -->
+  <StackPanel Orientation="Horizontal">
+    <Button Name="PresetButton" Content="В пресет" Command="{Binding OpenCommand}" />
+
+    <Popup IsOpen="{Binding IsOpen, Mode=TwoWay}" PlacementTarget="{Binding #PresetButton}"
+           Placement="BottomEdgeAlignedLeft" IsLightDismissEnabled="True">
+      <Border Background="{DynamicResource PanelBrush}" BorderBrush="{DynamicResource DividerBrush}"
+              BorderThickness="1" CornerRadius="6" Padding="14" Width="330" Margin="0,6,0,0">
+        <StackPanel Spacing="8">
+          <TextBlock Text="Сохранить как пресет" FontWeight="SemiBold" FontSize="13" />
+          <TextBlock Classes="caption" TextWrapping="Wrap"
+                     Text="Запомнится проба, цель и все параметры формы. Запускать — из «Библиотеки»." />
+
+          <TextBox Text="{Binding Name}" PlaceholderText="название пресета" />
+
+          <!-- Существующие рядом: одноимённый перезаписывается, и это единственный
+               способ поправить пресет, не заводя второй. -->
+          <StackPanel Spacing="3" IsVisible="{Binding Saved.Count}">
+            <TextBlock Text="Или перезаписать существующий" Classes="caption" />
+            <ScrollViewer MaxHeight="130">
+              <ItemsControl ItemsSource="{Binding Saved}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="presets:Preset">
+                    <Button Content="{Binding Name}" FontSize="11" Padding="8,3" Margin="0,0,0,3"
+                            HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                            Command="{Binding $parent[ItemsControl].((vm:PresetSaveViewModel)DataContext).UseCommand}"
+                            CommandParameter="{Binding}" />
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </ScrollViewer>
+          </StackPanel>
+
+          <TextBlock Text="{Binding Message}" Classes="caption" TextWrapping="Wrap"
+                     IsVisible="{Binding Message, Converter={x:Static ObjectConverters.IsNotNull}}" />
+
+          <Button Content="Сохранить" Command="{Binding SaveCommand}"
+                  HorizontalAlignment="Right" Padding="14,6"
+                  Background="{DynamicResource AccentBrush}" Foreground="White" />
+        </StackPanel>
+      </Border>
+    </Popup>
+  </StackPanel>
+</UserControl>

@@ -300,7 +300,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         }
 
         FloorLine = _clock.CalibrationBaselineMs > 0
-            ? $"порог часов {_clock.CalibrationBaselineMs.ToString("0.000", CultureInfo.InvariantCulture)} мс"
+            ? $"порог часов {Units.Milliseconds(_clock.CalibrationBaselineMs)}"
             : "порог не измерен";
     }
 }

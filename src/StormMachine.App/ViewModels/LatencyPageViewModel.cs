@@ -63,6 +63,11 @@ public sealed partial class LatencyPageViewModel : PageViewModel, ITargetAware
     {
         _runner = runner ?? throw new ArgumentNullException(nameof(runner));
         _presets = presets ?? throw new ArgumentNullException(nameof(presets));
+
+        Preset = new PresetSaveViewModel(
+            _presets,
+            name => PresetService.FromRequest(name, "ping", BuildRequest(ParseTarget(TargetText))),
+            () => TargetText is { Length: > 0 } target ? $"Задержка → {target}" : null);
         _registry = registry ?? throw new ArgumentNullException(nameof(registry));
         _store = store ?? throw new ArgumentNullException(nameof(store));
         _clock = clock ?? throw new ArgumentNullException(nameof(clock));
@@ -97,9 +102,6 @@ public sealed partial class LatencyPageViewModel : PageViewModel, ITargetAware
     [ObservableProperty]
     private bool _saveToJournal = true;
 
-    /// <summary>Имя, под которым текущие параметры сохранятся в библиотеку.</summary>
-    [ObservableProperty]
-    private string _presetName = string.Empty;
 
     // ------------------------------------------------------------------ состояние
 
@@ -309,63 +311,15 @@ public sealed partial class LatencyPageViewModel : PageViewModel, ITargetAware
     private async Task RefreshHistoryAsync() => await LoadHistoryAsync().ConfigureAwait(true);
 
     /// <summary>
-    /// Сохраняет текущие параметры как пресет.
+    /// Сохранение в пресет — общим механизмом, как на остальных страницах.
     /// </summary>
     /// <remarks>
-    /// Сквозной принцип §2 анализа: пресет рождается не из формы, а из измерения,
-    /// которое только что оказалось полезным.
+    /// Своя копия этого была здесь с И-8 и успела разойтись с соседними: страницы
+    /// сообщали об успехе разными словами, а список уже сохранённых для перезаписи
+    /// был только у одной. Пресет по-прежнему рождается из измерения, которое
+    /// только что оказалось полезным, — меняется не правило, а число его копий.
     /// </remarks>
-    [RelayCommand]
-    private async Task SaveAsPresetAsync()
-    {
-        ErrorMessage = null;
-
-        if (string.IsNullOrWhiteSpace(PresetName))
-        {
-            ErrorMessage = "Укажи имя пресета.";
-            return;
-        }
-
-        Domain.Targets.Target parsedTarget;
-        try
-        {
-            parsedTarget = ParseTarget(TargetText);
-        }
-        catch (Exception ex)
-        {
-            ErrorMessage = $"Цель «{TargetText}» не разобрана: {ex.Message}";
-            return;
-        }
-
-        var request = BuildRequest(parsedTarget);
-        var preset = PresetService.FromRequest(PresetName.Trim(), "ping", request);
-
-        try
-        {
-            var existing = await _presets.FindByNameAsync(preset.Name).ConfigureAwait(true);
-
-            if (existing is not null)
-            {
-                // Совпадение по имени — тот же тест, а не второй такой же.
-                preset = preset with { Id = existing.Id, CreatedUtc = existing.CreatedUtc };
-            }
-
-            var saved = await _presets.SaveAsync(preset).ConfigureAwait(true);
-
-            StatusLine = existing is null
-                ? $"Сохранено как пресет «{saved.Name}» (редакция {saved.Version}). Он в разделе «Библиотека»."
-                : $"Пресет «{saved.Name}» обновлён (редакция {saved.Version}).";
-            StatusState = OperationState.Done;
-
-            PresetName = string.Empty;
-        }
-        catch (Exception ex)
-        {
-            ErrorMessage = $"Пресет не сохранён: {ex.Message}";
-            StatusLine = "Пресет не сохранён.";
-            StatusState = OperationState.Failed;
-        }
-    }
+    public PresetSaveViewModel Preset { get; }
 
     private ProbeRequest BuildRequest(Domain.Targets.Target target) => new()
     {
@@ -536,8 +490,15 @@ public sealed partial class LatencyPageViewModel : PageViewModel, ITargetAware
         Pdv = Format(stats.PdvMs);
     }
 
-    private static string Format(double value) =>
-        value.ToString("0.000", CultureInfo.InvariantCulture) + " мс";
+    /// <summary>
+    /// Измеренное — правилом продукта, а не своим форматом.
+    /// </summary>
+    /// <remarks>
+    /// Здесь стояло «0.000» с приписанным «мс», то есть третья копия правила точности
+    /// после двух, найденных в разметке при ревизии. Три знака на двухстах
+    /// миллисекундах сообщают точность, которой у сетевого измерения нет.
+    /// </remarks>
+    private static string Format(double value) => Units.Milliseconds(value);
 
     private static Domain.Targets.Target ParseTarget(string raw) => TargetInput.Parse(raw);
 }

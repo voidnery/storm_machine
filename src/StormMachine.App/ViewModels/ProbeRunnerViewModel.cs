@@ -166,6 +166,36 @@ public sealed partial class ProbeRunnerViewModel : ObservableObject
         Probes = options;
         Probe = options[0];
 
+        Preset = new PresetSaveViewModel(
+            _presets,
+            name =>
+            {
+                if (Probe is not { } chosen)
+                {
+                    throw new InvalidOperationException("Проба не выбрана.");
+                }
+
+                var target = chosen.Descriptor.RequiresTarget
+                    ? TargetInput.Parse(Target)
+                    : Domain.Targets.Target.Parse(chosen.Descriptor.Title);
+
+                var parameters = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+
+                foreach (var field in Fields)
+                {
+                    if (field.Value is { } value)
+                    {
+                        parameters[field.Parameter.Name] = value;
+                    }
+                }
+
+                return PresetService.FromRequest(
+                    name,
+                    chosen.Descriptor.Name,
+                    new ProbeRequest { Target = target, Parameters = parameters });
+            },
+            () => Probe is { } probe && Target.Length > 0 ? $"{probe.Descriptor.Title} → {Target}" : null);
+
         // Очередь сырых измерений разбирается по таймеру, как на странице задержки:
         // счётчик проб в панели операций живёт, а дёрганья на каждый сэмпл нет.
         _timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(500) };
@@ -181,141 +211,15 @@ public sealed partial class ProbeRunnerViewModel : ObservableObject
     /// <summary>Подсказки цели из инвентаря (И-24): сеть просканирована — подставляем.</summary>
     public ObservableCollection<TargetSuggestion> Suggestions { get; } = [];
 
-    // ------------------------------------------------------- сохранение в пресет
-
-    /// <summary>Пресеты, в которые можно записать настроенное, — чтобы не плодить копии.</summary>
-    public ObservableCollection<Preset> SavedPresets { get; } = [];
-
-    /// <summary>Окошко сохранения открыто.</summary>
-    [ObservableProperty]
-    private bool _isSavingPreset;
-
-    [ObservableProperty]
-    private string _presetName = string.Empty;
-
-    [ObservableProperty]
-    private string? _presetMessage;
-
     /// <summary>
-    /// Открывает окошко «в пресет» и подтягивает то, что уже сохранено.
+    /// Сохранение настроенного в пресет — общим механизмом.
     /// </summary>
     /// <remarks>
-    /// Замечание оператора: библиотека пресетов есть, а внятной механики нет.
-    /// Так и было: запустить, удалить и выгрузить пресет продукт умел, а <b>завести</b>
-    /// его мышью — нет, только консолью. Пресет собирается из пробы, цели и параметров,
-    /// то есть ровно из того, что сейчас в этой форме, — здесь ему и место.
+    /// Страница приносит только то, что знает сама: как собрать пресет из своей
+    /// формы и как его назвать по умолчанию. Всё остальное — окошко, список
+    /// существующих, перезапись одноимённого — одно на продукт.
     /// </remarks>
-    [RelayCommand]
-    private async Task OpenPresetAsync(CancellationToken cancellationToken = default)
-    {
-        IsSavingPreset = !IsSavingPreset;
-
-        if (!IsSavingPreset)
-        {
-            return;
-        }
-
-        PresetMessage = null;
-
-        // Имя предлагается, а не требуется: «ping → 192.168.1.1» человек всё равно
-        // напишет сам, а пустое поле на открытии выглядит как ещё одна работа.
-        PresetName = Probe is { } probe && Target.Length > 0
-            ? $"{probe.Descriptor.Title} → {Target}"
-            : PresetName;
-
-        try
-        {
-            var saved = await _presets
-                .ListAsync(new PresetQuery { Limit = 100 }, cancellationToken)
-                .ConfigureAwait(true);
-
-            SavedPresets.Clear();
-
-            foreach (var preset in saved)
-            {
-                SavedPresets.Add(preset);
-            }
-        }
-        catch (Exception ex)
-        {
-            PresetMessage = Trouble.Say(ex);
-        }
-    }
-
-    /// <summary>Подставляет имя существующего пресета — значит, перезаписать его.</summary>
-    [RelayCommand]
-    private void UsePreset(Preset? preset)
-    {
-        if (preset is not null)
-        {
-            PresetName = preset.Name;
-        }
-    }
-
-    /// <summary>Сохраняет настроенное в форме как пресет.</summary>
-    [RelayCommand]
-    private async Task SavePresetAsync(CancellationToken cancellationToken = default)
-    {
-        if (Probe is not { } option)
-        {
-            return;
-        }
-
-        if (string.IsNullOrWhiteSpace(PresetName))
-        {
-            PresetMessage = "Назовите пресет — под этим именем его будут искать.";
-
-            return;
-        }
-
-        try
-        {
-            var target = option.Descriptor.RequiresTarget
-                ? TargetInput.Parse(Target)
-                : Domain.Targets.Target.Parse(option.Descriptor.Title);
-
-            var parameters = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
-
-            foreach (var field in Fields)
-            {
-                if (field.Value is { } value)
-                {
-                    parameters[field.Parameter.Name] = value;
-                }
-            }
-
-            var preset = PresetService.FromRequest(
-                PresetName.Trim(),
-                option.Descriptor.Name,
-                new ProbeRequest { Target = target, Parameters = parameters });
-
-            // Одноимённый перезаписывается: два пресета с одним именем невозможно
-            // выбрать осмысленно ни в списке, ни в мониторе.
-            var existing = await _presets.FindByNameAsync(preset.Name, cancellationToken).ConfigureAwait(true);
-
-            if (existing is not null)
-            {
-                preset = preset with { Id = existing.Id, CreatedUtc = existing.CreatedUtc };
-            }
-
-            await _presets.SaveAsync(preset, cancellationToken).ConfigureAwait(true);
-
-            PresetMessage = existing is null
-                ? $"Пресет «{preset.Name}» сохранён — он в «Библиотеке»."
-                : $"Пресет «{preset.Name}» перезаписан.";
-
-            IsSavingPreset = false;
-        }
-        catch (Exception ex) when (ex is ArgumentException or FormatException)
-        {
-            PresetMessage = $"Цель «{Target}» не разобрана: {ex.Message}";
-        }
-        catch (Exception ex)
-        {
-            PresetMessage = Trouble.Say(ex);
-            _log.LogError(ex, "Пресет «{Имя}» не сохранился.", PresetName);
-        }
-    }
+    public PresetSaveViewModel Preset { get; }
 
     public ObservableCollection<SeriesRow> Series { get; } = [];
 

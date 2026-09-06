@@ -8,7 +8,10 @@ using Microsoft.Extensions.Logging;
 using StormMachine.App.Services;
 using StormMachine.Application.Abstractions;
 using StormMachine.Application.Probes;
+using StormMachine.Domain.Presets;
+using StormMachine.Application.Presets;
 using StormMachine.Application.Scenarios;
+using StormMachine.Domain.Measurements;
 using StormMachine.Domain.Results;
 using StormMachine.Domain.Scenarios;
 
@@ -106,6 +109,7 @@ public sealed partial class ProbesPageViewModel : PageViewModel, ITargetAware, I
         IScenarioStore scenarios,
         IProbeRegistry registry,
         IDeviceStore devices,
+        PresetService presets,
         ILogger<ProbesPageViewModel> log)
         : base(section)
     {
@@ -133,7 +137,37 @@ public sealed partial class ProbesPageViewModel : PageViewModel, ITargetAware, I
         Template = Templates[0];
 
         Sets = [.. TargetSets.All.Select(t => t.Key)];
+
+        // Сценарий тоже бывает пресетом — с И-14 пресет умеет хранить цепочку.
+        // Не умел этого только экран: кнопка была у одиночных проб и не была здесь.
+        Preset = new PresetSaveViewModel(
+            presets ?? throw new ArgumentNullException(nameof(presets)),
+            name =>
+            {
+                if (Template is not { } chosen)
+                {
+                    throw new InvalidOperationException("Сценарий не выбран.");
+                }
+
+                var now = DateTimeOffset.UtcNow;
+
+                return new Preset
+                {
+                    Id = Guid.NewGuid(),
+                    Name = name,
+                    Kind = PresetKind.Scenario,
+                    Subject = chosen.Key,
+                    Target = Domain.Targets.Target.Parse(Target),
+                    Version = 1,
+                    CreatedUtc = now,
+                    UpdatedUtc = now,
+                };
+            },
+            () => Template is { } template && Target.Length > 0 ? $"{template.Title} → {Target}" : null);
     }
+
+    /// <summary>Сохранение сценария с целью в пресет — тем же механизмом, что у проб.</summary>
+    public PresetSaveViewModel Preset { get; }
 
     /// <summary>Шаблоны и свои сценарии: до И-24 своё отсюда было не запустить.</summary>
     public ObservableCollection<ScenarioTemplateOption> Templates { get; } = [];
@@ -428,5 +462,5 @@ public sealed partial class ProbesPageViewModel : PageViewModel, ITargetAware, I
     private void UseSet(string key) => Target = key;
 
     public string BaselineCaption =>
-        $"Порог часов {_clock.CalibrationBaselineMs.ToString("0.000", CultureInfo.InvariantCulture)} мс";
+        $"Порог часов {Units.Milliseconds(_clock.CalibrationBaselineMs)}";
 }

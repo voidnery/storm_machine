@@ -63,6 +63,11 @@ public sealed partial class PathPageViewModel : PageViewModel, ITargetAware
     {
         _runner = runner ?? throw new ArgumentNullException(nameof(runner));
         _presets = presets ?? throw new ArgumentNullException(nameof(presets));
+
+        Preset = new PresetSaveViewModel(
+            _presets,
+            name => PresetService.FromRequest(name, "trace", BuildRequest(ParseTarget(TargetText))),
+            () => TargetText is { Length: > 0 } target ? $"Маршрут → {target}" : null);
         _registry = registry ?? throw new ArgumentNullException(nameof(registry));
         _store = store ?? throw new ArgumentNullException(nameof(store));
         _clock = clock ?? throw new ArgumentNullException(nameof(clock));
@@ -101,8 +106,6 @@ public sealed partial class PathPageViewModel : PageViewModel, ITargetAware
     [ObservableProperty]
     private bool _saveToJournal = true;
 
-    [ObservableProperty]
-    private string _presetName = string.Empty;
 
     // ------------------------------------------------------------------ состояние
 
@@ -304,55 +307,16 @@ public sealed partial class PathPageViewModel : PageViewModel, ITargetAware
     [RelayCommand]
     private async Task RefreshHistoryAsync() => await LoadHistoryAsync().ConfigureAwait(true);
 
-    [RelayCommand]
-    private async Task SaveAsPresetAsync()
-    {
-        ErrorMessage = null;
-
-        if (string.IsNullOrWhiteSpace(PresetName))
-        {
-            ErrorMessage = "Укажи имя пресета.";
-            return;
-        }
-
-        Target parsedTarget;
-        try
-        {
-            parsedTarget = ParseTarget(TargetText);
-        }
-        catch (Exception ex)
-        {
-            ErrorMessage = $"Цель «{TargetText}» не разобрана: {ex.Message}";
-            return;
-        }
-
-        var preset = PresetService.FromRequest(PresetName.Trim(), "trace", BuildRequest(parsedTarget));
-
-        try
-        {
-            var existing = await _presets.FindByNameAsync(preset.Name).ConfigureAwait(true);
-
-            if (existing is not null)
-            {
-                preset = preset with { Id = existing.Id, CreatedUtc = existing.CreatedUtc };
-            }
-
-            var saved = await _presets.SaveAsync(preset).ConfigureAwait(true);
-
-            StatusLine = existing is null
-                ? $"Сохранено как пресет «{saved.Name}» (редакция {saved.Version}). Он в разделе «Библиотека»."
-                : $"Пресет «{saved.Name}» обновлён (редакция {saved.Version}).";
-            StatusState = OperationState.Done;
-
-            PresetName = string.Empty;
-        }
-        catch (Exception ex)
-        {
-            ErrorMessage = $"Пресет не сохранён: {ex.Message}";
-            StatusLine = "Пресет не сохранён.";
-            StatusState = OperationState.Failed;
-        }
-    }
+    /// <summary>
+    /// Сохранение в пресет — общим механизмом, как на остальных страницах.
+    /// </summary>
+    /// <remarks>
+    /// Своя копия этого была здесь с И-8 и успела разойтись с соседними: страницы
+    /// сообщали об успехе разными словами, а список уже сохранённых для перезаписи
+    /// был только у одной. Пресет по-прежнему рождается из измерения, которое
+    /// только что оказалось полезным, — меняется не правило, а число его копий.
+    /// </remarks>
+    public PresetSaveViewModel Preset { get; }
 
     private ProbeRequest BuildRequest(Target target) => new()
     {
