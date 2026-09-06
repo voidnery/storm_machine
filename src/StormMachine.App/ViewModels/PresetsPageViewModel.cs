@@ -1,4 +1,4 @@
-using System.Collections.ObjectModel;
+﻿using System.Collections.ObjectModel;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -282,6 +282,101 @@ public sealed partial class PresetsPageViewModel(
             operation.Finish();
             _operations.Remove(operation);
             cts.Dispose();
+        }
+    }
+
+    /// <summary>Что такое пресет и откуда он берётся — тезисом.</summary>
+    public static string Note =>
+        "Пресет — это сохранённый тест: проба, цель и все параметры. Заводится он "
+        + "кнопкой «В пресет» на странице пробы, где эти параметры и настраивают.";
+
+    /// <summary>Зачем он нужен. Раскрывается по кнопке карточки.</summary>
+    /// <remarks>
+    /// Замечание оператора: «не понимаю, зачем нужна библиотека — внятной механики
+    /// не добавлено». Механики и не было: запустить, удалить и обменять пресет
+    /// продукт умел, а завести — только консолью, и библиотека выглядела списком
+    /// неизвестно чего.
+    /// </remarks>
+    public static string NoteWhy =>
+        "Смысл пресета не в экономии набора, а в повторяемости: измерение, которое "
+        + "нельзя повторить теми же параметрами, не с чем сравнить — а сравнение "
+        + "с прошлым и есть то, ради чего продукт существует. Отсюда и порядок: "
+        + "настроили пробу и убедились, что она меряет то, что нужно, — сохранили "
+        + "пресетом. Здесь пресет запускают, переименовывают и передают на другую "
+        + "машину; состав правится там же, где собирался.";
+
+    // ------------------------------------------------------------ правка пресета
+
+    /// <summary>Имя и пояснение выбранного пресета — их правят прямо здесь.</summary>
+    [ObservableProperty]
+    private string _editName = string.Empty;
+
+    [ObservableProperty]
+    private string _editDescription = string.Empty;
+
+    [ObservableProperty]
+    private bool _isEditing;
+
+    /// <summary>
+    /// Открывает правку выбранного пресета.
+    /// </summary>
+    /// <remarks>
+    /// Библиотека умела запускать, удалять и обменивать пресеты — то есть всё,
+    /// кроме двух вещей, ради которых в неё заходят: завести и переименовать.
+    /// Заводится пресет там, где есть проба, цель и параметры (кнопка «В пресет»
+    /// на странице пробы), а правится здесь: имя и пояснение от формы не зависят.
+    /// </remarks>
+    [RelayCommand]
+    private void EditPreset()
+    {
+        if (Selected is not { } preset)
+        {
+            return;
+        }
+
+        IsEditing = !IsEditing;
+        EditName = preset.Name;
+        EditDescription = preset.Description ?? string.Empty;
+    }
+
+    /// <summary>Сохраняет имя и пояснение.</summary>
+    [RelayCommand]
+    private async Task SaveEditAsync(CancellationToken cancellationToken = default)
+    {
+        if (Selected is not { } preset)
+        {
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(EditName))
+        {
+            ErrorMessage = "Имя пресета пустым не бывает — по нему его ищут.";
+
+            return;
+        }
+
+        try
+        {
+            await _presets
+                .SaveAsync(
+                    preset with
+                    {
+                        Name = EditName.Trim(),
+                        Description = string.IsNullOrWhiteSpace(EditDescription) ? null : EditDescription.Trim(),
+                        UpdatedUtc = DateTimeOffset.UtcNow,
+                    },
+                    cancellationToken)
+                .ConfigureAwait(true);
+
+            IsEditing = false;
+            Message = $"Пресет «{EditName.Trim()}» сохранён.";
+            ErrorMessage = null;
+
+            await RefreshAsync(cancellationToken).ConfigureAwait(true);
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = Services.Trouble.Say(ex);
         }
     }
 

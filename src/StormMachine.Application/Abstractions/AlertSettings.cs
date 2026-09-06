@@ -1,4 +1,4 @@
-namespace StormMachine.Application.Abstractions;
+﻿namespace StormMachine.Application.Abstractions;
 
 /// <summary>
 /// Ключи настроек каналов.
@@ -35,17 +35,33 @@ public static class AlertSettings
     /// <summary>Получатели через запятую.</summary>
     public const string SmtpTo = "alerts.smtp.to";
 
-    /// <summary>Все ключи с пояснением и пометкой секрета — для подсказки и для показа.</summary>
-    public static IReadOnlyList<(string Key, string About, bool IsSecret)> All { get; } =
+    /// <summary>
+    /// Одна настройка канала: ключ, человеческое название, пояснение и секретность.
+    /// </summary>
+    /// <remarks>
+    /// Название добавлено, когда каналы стало можно настроить мышью: <c>alerts.smtp.from</c>
+    /// годится как ключ в консоли, но как подпись поля в форме это не название,
+    /// а идентификатор. Оба живут рядом по той же причине, по которой рядом живут
+    /// ключ и пояснение: форма и консоль обязаны называть одно и то же одинаково.
+    /// </remarks>
+    public sealed record AlertSetting(string Key, string Title, string About, bool IsSecret)
+    {
+        /// <summary>Настройка относится к почте, а не к webhook: форма группирует их отдельно.</summary>
+        public bool IsMail => Key.StartsWith("alerts.smtp.", StringComparison.Ordinal);
+    }
+
+    /// <summary>Все ключи с пояснением и пометкой секрета — для подсказки, показа и формы.</summary>
+    public static IReadOnlyList<AlertSetting> All { get; } =
     [
-        (WebhookUrl, "Адрес, куда слать POST с JSON.", false),
-        (WebhookAuthorization, "Значение заголовка Authorization, если приёмник его требует.", true),
-        (SmtpHost, "Сервер исходящей почты.", false),
-        (SmtpPort, "Порт: 587 для STARTTLS, 465 для неявного TLS, 25 для внутреннего релея.", false),
-        (SmtpTls, "Шифровать соединение: да или нет. По умолчанию да.", false),
-        (SmtpUser, "Имя пользователя. Пусто — без аутентификации.", false),
-        (SmtpPassword, "Пароль. Хранится зашифрованным средствами Windows.", true),
-        (SmtpFrom, "Адрес отправителя.", false),
-        (SmtpTo, "Получатели через запятую.", false),
+        new(WebhookUrl, "Адрес", "Адрес, куда слать POST с JSON.", false),
+        new(WebhookAuthorization, "Заголовок Authorization",
+            "Значение заголовка Authorization, если приёмник его требует.", true),
+        new(SmtpHost, "Сервер почты", "Сервер исходящей почты.", false),
+        new(SmtpPort, "Порт", "587 для STARTTLS, 465 для неявного TLS, 25 для внутреннего релея.", false),
+        new(SmtpTls, "Шифровать соединение", "Да или нет. По умолчанию да.", false),
+        new(SmtpUser, "Пользователь", "Пусто — без аутентификации.", false),
+        new(SmtpPassword, "Пароль", "Хранится зашифрованным средствами Windows.", true),
+        new(SmtpFrom, "От кого", "Адрес отправителя.", false),
+        new(SmtpTo, "Кому", "Получатели через запятую.", false),
     ];
 }

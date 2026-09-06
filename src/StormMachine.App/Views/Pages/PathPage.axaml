@@ -1,6 +1,7 @@
-<UserControl xmlns="https://github.com/avaloniaui"
+﻿<UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:StormMachine.App.ViewModels"
+             xmlns:measure="using:StormMachine.Domain.Measurements"
              xmlns:forms="using:StormMachine.App.Controls"
              xmlns:results="using:StormMachine.Domain.Results"
              x:Class="StormMachine.App.Views.Pages.PathPage"
@@ -160,11 +161,11 @@
             <TextBlock Grid.Column="0" Text="хоп" Classes="label" ToolTip.Tip="Номер узла на пути пакета" />
             <TextBlock Grid.Column="1" Text="узел" Classes="label" />
             <TextBlock Grid.Column="2" Text="отправлено" Classes="label" />
-            <TextBlock Grid.Column="3" Text="потери" Classes="label" />
-            <TextBlock Grid.Column="4" Text="мин" Classes="label" />
-            <TextBlock Grid.Column="5" Text="медиана" Classes="label" />
-            <TextBlock Grid.Column="6" Text="макс" Classes="label" />
-            <TextBlock Grid.Column="7" Text="джиттер" Classes="label"
+            <TextBlock Grid.Column="3" Text="{x:Static measure:TableHeaders.Loss}" Classes="label" />
+            <TextBlock Grid.Column="4" Text="{x:Static measure:TableHeaders.Min}" Classes="label" />
+            <TextBlock Grid.Column="5" Text="{x:Static measure:TableHeaders.Median}" Classes="label" />
+            <TextBlock Grid.Column="6" Text="{x:Static measure:TableHeaders.Max}" Classes="label" />
+            <TextBlock Grid.Column="7" Text="{x:Static measure:TableHeaders.Jitter}" Classes="label"
                        ToolTip.Tip="Дрожание задержки по RFC 3550: насколько неровно приходят ответы" />
             <TextBlock Grid.Column="8" Text="MOS" Classes="label"
                        ToolTip.Tip="Оценка разговорной связи по шкале от 1 до 5" />
@@ -221,7 +222,7 @@
           <StackPanel Grid.Row="2" Spacing="6" Margin="4,8,4,0">
             <!-- Единица названа один раз для всей таблицы: у сорока чисел
                  «мс» у каждого превратило бы её в частокол. -->
-            <TextBlock Text="Времена в миллисекундах. MOS — оценка речи по шкале от 1 до 5."
+            <TextBlock Text="MOS — оценка речи по шкале от 1 до 5."
                        Classes="caption" />
 
             <!-- Главная методическая оговорка экрана: ради неё разбор и строился.

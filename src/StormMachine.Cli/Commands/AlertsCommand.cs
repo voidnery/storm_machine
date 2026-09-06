@@ -1,4 +1,4 @@
-using System.CommandLine;
+﻿using System.CommandLine;
 using Microsoft.Extensions.DependencyInjection;
 using StormMachine.Application.Abstractions;
 using StormMachine.Cli.Rendering;
@@ -106,9 +106,11 @@ internal static class AlertsCommand
 
             Console.WriteLine("Настройки:");
 
-            foreach (var (key, about, secret) in AlertSettings.All)
+            foreach (var setting in AlertSettings.All)
             {
-                Console.WriteLine($"  {key,-32} {about}{(secret ? "  [хранится зашифрованным]" : string.Empty)}");
+                Console.WriteLine(
+                    $"  {setting.Key,-32} {setting.About}"
+                    + (setting.IsSecret ? "  [хранится зашифрованным]" : string.Empty));
             }
 
             return 0;
@@ -136,7 +138,7 @@ internal static class AlertsCommand
             var known = AlertSettings.All.FirstOrDefault(k =>
                 string.Equals(k.Key, name, StringComparison.OrdinalIgnoreCase));
 
-            if (known.Key is null)
+            if (known is null)
             {
                 Console.Error.WriteLine($"Ключ «{name}» неизвестен. Список: storm alerts channels.");
 

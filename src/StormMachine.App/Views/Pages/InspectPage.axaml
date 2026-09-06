@@ -1,6 +1,7 @@
-<UserControl xmlns="https://github.com/avaloniaui"
+﻿<UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:StormMachine.App.ViewModels"
+             xmlns:measure="using:StormMachine.Domain.Measurements"
              xmlns:forms="using:StormMachine.App.Controls"
              x:Class="StormMachine.App.Views.Pages.InspectPage"
              x:DataType="vm:InspectPageViewModel">
@@ -66,11 +67,11 @@
                рядом с «12 мс» приходилось разгадывать. -->
           <Grid ColumnDefinitions="200,90,50,110,*" Margin="0,4,0,0">
             <TextBlock Grid.Column="0" Text="что" Classes="label" />
-            <TextBlock Grid.Column="1" Text="медиана" Classes="label" HorizontalAlignment="Right"
-                       Margin="0,0,10,0" />
+            <TextBlock Grid.Column="1" Text="{x:Static measure:TableHeaders.Median}" Classes="label"
+                       HorizontalAlignment="Right" Margin="0,0,10,0" />
             <TextBlock Grid.Column="2" Text="доля" Classes="label" HorizontalAlignment="Right"
                        Margin="0,0,10,0" />
-            <TextBlock Grid.Column="3" Text="потери" Classes="label" />
+            <TextBlock Grid.Column="3" Text="{x:Static measure:TableHeaders.Loss}" Classes="label" />
           </Grid>
 
           <ItemsControl ItemsSource="{Binding Series}">

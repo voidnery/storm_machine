@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 using StormMachine.App.Services;
 using StormMachine.App.ViewModels;
 using StormMachine.Application.Abstractions;
+using StormMachine.Application.Presets;
 using StormMachine.Application.Probes;
 
 namespace StormMachine.App.UnitTests;
@@ -107,6 +108,7 @@ public sealed class ProbeRunnerTests(HeadlessSessionFixture fixture)
             services.GetRequiredService<IRunStore>(),
             services.GetRequiredService<IAgentDirectory>(),
             services.GetRequiredService<IDeviceStore>(),
+            services.GetRequiredService<PresetService>(),
             services.GetRequiredService<ILogger<ProbeRunnerViewModel>>(),
             probes);
 }

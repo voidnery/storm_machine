@@ -1,4 +1,4 @@
-using StormMachine.Application.Abstractions;
+﻿using StormMachine.Application.Abstractions;
 
 namespace StormMachine.Alerting.UnitTests;
 
@@ -24,9 +24,12 @@ public sealed class EmailChannelTests
         var missing = channel.MissingConfiguration;
 
         Assert.NotNull(missing);
-        Assert.Contains(AlertSettings.SmtpHost, missing, StringComparison.Ordinal);
-        Assert.Contains(AlertSettings.SmtpFrom, missing, StringComparison.Ordinal);
-        Assert.Contains(AlertSettings.SmtpTo, missing, StringComparison.Ordinal);
+
+        // Названо так же, как подписаны поля формы: ключ «alerts.smtp.from» годится
+        // в консоли, но человеку, читающему «не заданы», он не говорит, что заполнить.
+        Assert.Contains(Wording(AlertSettings.SmtpHost), missing, StringComparison.Ordinal);
+        Assert.Contains(Wording(AlertSettings.SmtpFrom), missing, StringComparison.Ordinal);
+        Assert.Contains(Wording(AlertSettings.SmtpTo), missing, StringComparison.Ordinal);
     }
 
     /// <summary>Настроенный канал не жалуется — иначе жалоба обесценится.</summary>
@@ -54,8 +57,8 @@ public sealed class EmailChannelTests
         await channel.RefreshAsync();
 
         Assert.False(channel.IsConfigured);
-        Assert.Contains(AlertSettings.SmtpTo, channel.MissingConfiguration!, StringComparison.Ordinal);
-        Assert.DoesNotContain(AlertSettings.SmtpHost, channel.MissingConfiguration!, StringComparison.Ordinal);
+        Assert.Contains(Wording(AlertSettings.SmtpTo), channel.MissingConfiguration!, StringComparison.Ordinal);
+        Assert.DoesNotContain(Wording(AlertSettings.SmtpHost), channel.MissingConfiguration!, StringComparison.Ordinal);
     }
 
     /// <summary>
@@ -87,14 +90,19 @@ public sealed class EmailChannelTests
     }
 
     [Fact]
-    public async Task WebhookChannel_SaysWhereToSetTheAddress()
+    public async Task WebhookChannel_NamesTheMissingSetting()
     {
         using var http = new HttpClient();
         var channel = new WebhookAlertChannel(new FakeSettings(), http);
         await channel.RefreshAsync();
 
         Assert.False(channel.IsConfigured);
-        Assert.Contains(AlertSettings.WebhookUrl, channel.MissingConfiguration!, StringComparison.Ordinal);
+        Assert.Contains(Wording(AlertSettings.WebhookUrl), channel.MissingConfiguration!, StringComparison.OrdinalIgnoreCase);
+
+        // Команды консоли в жалобе больше нет: канал настраивается на той же
+        // странице, где эта жалоба показана, и отправлять человека в другую
+        // программу продукту незачем.
+        Assert.DoesNotContain("storm alerts set", channel.MissingConfiguration!, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -109,6 +117,10 @@ public sealed class EmailChannelTests
         Assert.True(channel.IsConfigured);
         Assert.Null(channel.MissingConfiguration);
     }
+
+    /// <summary>Как настройка называется для человека — по общему объявлению.</summary>
+    private static string Wording(string key) =>
+        AlertSettings.All.First(setting => setting.Key == key).Title.ToLowerInvariant();
 
     private static FakeSettings Configured() => new()
     {

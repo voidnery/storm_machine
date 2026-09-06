@@ -1,4 +1,4 @@
-<UserControl xmlns="https://github.com/avaloniaui"
+﻿<UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:StormMachine.App.ViewModels"
              xmlns:forms="using:StormMachine.App.Controls"
@@ -381,12 +381,7 @@
                 <forms:MethodCard Thesis="{x:Static vm:RetentionSectionViewModel.Note}"
                                      Detail="{x:Static vm:RetentionSectionViewModel.NoteWhy}" />
 
-                <StackPanel Spacing="4">
-                  <TextBlock Text="Та же уборка из консоли" Classes="caption" />
-                  <forms:CopyChip Text="{x:Static vm:RetentionSectionViewModel.PurgeCommand}" />
-                </StackPanel>
-
-                <Grid ColumnDefinitions="*,8,*">
+                                <Grid ColumnDefinitions="*,8,*">
                   <StackPanel Grid.Column="0" Spacing="2">
                     <TextBlock Text="Сырые измерения, дней" Classes="caption" ToolTip.Tip="Каждый отдельный отсчёт прогона. Их больше всего, и место занимают они" />
                     <NumericUpDown Value="{Binding RawDays}" Minimum="1" Maximum="3650" Increment="1"
@@ -434,14 +429,7 @@
                 <!-- Чего перенос не делает — голосом предупреждения, а рядом команды,
                      которыми заводят заново то, что не переехало. -->
                 <forms:Caveat Text="{x:Static vm:TransferSectionViewModel.SecretsCaveat}" />
-                <WrapPanel>
-                  <forms:CopyChip Text="{x:Static vm:TransferSectionViewModel.SnmpCredsCommand}"
-                                     Margin="0,0,6,4" />
-                  <forms:CopyChip Text="{x:Static vm:TransferSectionViewModel.AlertsCommand}"
-                                     Margin="0,0,6,4" />
-                </WrapPanel>
-
-                <Grid ColumnDefinitions="Auto,Auto,*">
+                                <Grid ColumnDefinitions="Auto,Auto,*">
                   <Button Grid.Column="0" Content="Выгрузить в файл" Command="{Binding ExportCommand}"
                           Padding="12,5" Margin="0,0,6,0" />
                   <Button Grid.Column="1" Content="Загрузить из файла" Command="{Binding ImportCommand}"

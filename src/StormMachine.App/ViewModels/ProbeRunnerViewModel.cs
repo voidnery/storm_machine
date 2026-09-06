@@ -8,6 +8,8 @@ using StormMachine.App.Controls;
 using StormMachine.App.Services;
 using StormMachine.Application.Abstractions;
 using StormMachine.Application.Probes;
+using StormMachine.Domain.Presets;
+using StormMachine.Application.Presets;
 using StormMachine.Domain.Measurements;
 using StormMachine.Domain.Results;
 
@@ -126,6 +128,7 @@ public sealed partial class ProbeRunnerViewModel : ObservableObject
 
     private readonly IDeviceStore _devices;
     private readonly ILogger _log;
+    private readonly PresetService _presets;
 
     public ProbeRunnerViewModel(
         RunnerService runner,
@@ -133,9 +136,11 @@ public sealed partial class ProbeRunnerViewModel : ObservableObject
         IRunStore store,
         IAgentDirectory agents,
         IDeviceStore devices,
+        PresetService presets,
         ILogger log,
         IEnumerable<string> probeNames)
     {
+        _presets = presets ?? throw new ArgumentNullException(nameof(presets));
         _log = log ?? throw new ArgumentNullException(nameof(log));
         _runner = runner ?? throw new ArgumentNullException(nameof(runner));
         _store = store ?? throw new ArgumentNullException(nameof(store));
@@ -176,6 +181,142 @@ public sealed partial class ProbeRunnerViewModel : ObservableObject
     /// <summary>Подсказки цели из инвентаря (И-24): сеть просканирована — подставляем.</summary>
     public ObservableCollection<TargetSuggestion> Suggestions { get; } = [];
 
+    // ------------------------------------------------------- сохранение в пресет
+
+    /// <summary>Пресеты, в которые можно записать настроенное, — чтобы не плодить копии.</summary>
+    public ObservableCollection<Preset> SavedPresets { get; } = [];
+
+    /// <summary>Окошко сохранения открыто.</summary>
+    [ObservableProperty]
+    private bool _isSavingPreset;
+
+    [ObservableProperty]
+    private string _presetName = string.Empty;
+
+    [ObservableProperty]
+    private string? _presetMessage;
+
+    /// <summary>
+    /// Открывает окошко «в пресет» и подтягивает то, что уже сохранено.
+    /// </summary>
+    /// <remarks>
+    /// Замечание оператора: библиотека пресетов есть, а внятной механики нет.
+    /// Так и было: запустить, удалить и выгрузить пресет продукт умел, а <b>завести</b>
+    /// его мышью — нет, только консолью. Пресет собирается из пробы, цели и параметров,
+    /// то есть ровно из того, что сейчас в этой форме, — здесь ему и место.
+    /// </remarks>
+    [RelayCommand]
+    private async Task OpenPresetAsync(CancellationToken cancellationToken = default)
+    {
+        IsSavingPreset = !IsSavingPreset;
+
+        if (!IsSavingPreset)
+        {
+            return;
+        }
+
+        PresetMessage = null;
+
+        // Имя предлагается, а не требуется: «ping → 192.168.1.1» человек всё равно
+        // напишет сам, а пустое поле на открытии выглядит как ещё одна работа.
+        PresetName = Probe is { } probe && Target.Length > 0
+            ? $"{probe.Descriptor.Title} → {Target}"
+            : PresetName;
+
+        try
+        {
+            var saved = await _presets
+                .ListAsync(new PresetQuery { Limit = 100 }, cancellationToken)
+                .ConfigureAwait(true);
+
+            SavedPresets.Clear();
+
+            foreach (var preset in saved)
+            {
+                SavedPresets.Add(preset);
+            }
+        }
+        catch (Exception ex)
+        {
+            PresetMessage = Trouble.Say(ex);
+        }
+    }
+
+    /// <summary>Подставляет имя существующего пресета — значит, перезаписать его.</summary>
+    [RelayCommand]
+    private void UsePreset(Preset? preset)
+    {
+        if (preset is not null)
+        {
+            PresetName = preset.Name;
+        }
+    }
+
+    /// <summary>Сохраняет настроенное в форме как пресет.</summary>
+    [RelayCommand]
+    private async Task SavePresetAsync(CancellationToken cancellationToken = default)
+    {
+        if (Probe is not { } option)
+        {
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(PresetName))
+        {
+            PresetMessage = "Назовите пресет — под этим именем его будут искать.";
+
+            return;
+        }
+
+        try
+        {
+            var target = option.Descriptor.RequiresTarget
+                ? TargetInput.Parse(Target)
+                : Domain.Targets.Target.Parse(option.Descriptor.Title);
+
+            var parameters = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var field in Fields)
+            {
+                if (field.Value is { } value)
+                {
+                    parameters[field.Parameter.Name] = value;
+                }
+            }
+
+            var preset = PresetService.FromRequest(
+                PresetName.Trim(),
+                option.Descriptor.Name,
+                new ProbeRequest { Target = target, Parameters = parameters });
+
+            // Одноимённый перезаписывается: два пресета с одним именем невозможно
+            // выбрать осмысленно ни в списке, ни в мониторе.
+            var existing = await _presets.FindByNameAsync(preset.Name, cancellationToken).ConfigureAwait(true);
+
+            if (existing is not null)
+            {
+                preset = preset with { Id = existing.Id, CreatedUtc = existing.CreatedUtc };
+            }
+
+            await _presets.SaveAsync(preset, cancellationToken).ConfigureAwait(true);
+
+            PresetMessage = existing is null
+                ? $"Пресет «{preset.Name}» сохранён — он в «Библиотеке»."
+                : $"Пресет «{preset.Name}» перезаписан.";
+
+            IsSavingPreset = false;
+        }
+        catch (Exception ex) when (ex is ArgumentException or FormatException)
+        {
+            PresetMessage = $"Цель «{Target}» не разобрана: {ex.Message}";
+        }
+        catch (Exception ex)
+        {
+            PresetMessage = Trouble.Say(ex);
+            _log.LogError(ex, "Пресет «{Имя}» не сохранился.", PresetName);
+        }
+    }
+
     public ObservableCollection<SeriesRow> Series { get; } = [];
 
     public ObservableCollection<FactRow> Facts { get; } = [];
@@ -208,6 +349,19 @@ public sealed partial class ProbeRunnerViewModel : ObservableObject
     /// <summary>Номер сохранённого прогона: по нему его ищут в журнале.</summary>
     [ObservableProperty]
     private string? _savedRunId;
+
+    /// <summary>Шапка колонок с единицей: она зависит от пробы и меняется с прогоном.</summary>
+    [ObservableProperty]
+    private string _minHeader = TableHeaders.Min;
+
+    [ObservableProperty]
+    private string _medianHeader = TableHeaders.Median;
+
+    [ObservableProperty]
+    private string _maxHeader = TableHeaders.Max;
+
+    [ObservableProperty]
+    private string _jitterHeader = TableHeaders.Jitter;
 
     /// <summary>В чём измерены ряды — подписью под таблицей.</summary>
     [ObservableProperty]
@@ -427,6 +581,14 @@ public sealed partial class ProbeRunnerViewModel : ObservableObject
         // ряды — мегабиты в секунду, и подпись «времена в миллисекундах» была
         // не отсутствием единицы, а неверной единицей.
         SeriesUnit = Units.TableCaption(result.Unit);
+
+        // Шапка таблицы несёт единицу той пробы, что прогнали: у скорости это
+        // мегабиты, и «медиана, мс» над мегабитами была бы не отсутствием
+        // подписи, а неверной подписью.
+        MinHeader = Units.Column("мин", result.Unit);
+        MedianHeader = Units.Column("медиана", result.Unit);
+        MaxHeader = Units.Column("макс", result.Unit);
+        JitterHeader = Units.Column("джиттер", result.Unit);
 
         // Раскладка та же, что в журнале и хранилище, — по объявленной форме.
         foreach (var series in SeriesBreakdown.Compute(run.Descriptor.Shape, result.Samples))

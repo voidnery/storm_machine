@@ -1,4 +1,4 @@
-<UserControl xmlns="https://github.com/avaloniaui"
+﻿<UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:StormMachine.App.ViewModels"
              xmlns:forms="using:StormMachine.App.Controls"
@@ -90,9 +90,54 @@
               </ItemsControl.ItemTemplate>
             </ItemsControl>
 
-            <forms:MethodCard Thesis="Каналы настраиваются из консоли."
-                              Detail="Пароли хранятся зашифрованными средствами Windows и привязаны к этой учётной записи." />
-            <forms:CopyChip Text="storm alerts set" />
+            <forms:MethodCard Thesis="Ненастроенный канал молчит — и на него при этом рассчитывают."
+                              Detail="Пароли хранятся зашифрованными средствами Windows и привязаны к этой учётной записи: копия базы, унесённая на другую машину, их не раскроет — но и не восстановит." />
+
+            <Button Content="Настроить каналы" Command="{Binding ToggleSettingsCommand}"
+                    Padding="12,5" HorizontalAlignment="Left" />
+
+            <!-- Настройка там же, где видно, что канал молчит: отправлять чинить
+                 это в другую программу — не помощь. Поля строятся по объявлению
+                 настроек, поэтому новый ключ появится здесь сам. -->
+            <StackPanel Spacing="10" IsVisible="{Binding IsSettingsOpen}">
+
+              <StackPanel Spacing="4">
+                <TextBlock Text="HTTP POST на заданный адрес" Classes="label" />
+                <ItemsControl ItemsSource="{Binding WebhookFields}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:AlertSettingField">
+                      <StackPanel Spacing="2" Margin="0,0,0,6">
+                        <TextBlock Text="{Binding Title}" Classes="caption" />
+                        <TextBox Text="{Binding Value}" PlaceholderText="{Binding Placeholder}"
+                                 PasswordChar="{Binding IsSecret, Converter={x:Static vm:SecretCharConverter.Instance}}" />
+                      </StackPanel>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </StackPanel>
+
+              <StackPanel Spacing="4">
+                <TextBlock Text="Письмо через SMTP" Classes="label" />
+                <ItemsControl ItemsSource="{Binding MailFields}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:AlertSettingField">
+                      <StackPanel Spacing="2" Margin="0,0,0,6">
+                        <TextBlock Text="{Binding Title}" Classes="caption" />
+                        <TextBox Text="{Binding Value}" PlaceholderText="{Binding Placeholder}"
+                                 PasswordChar="{Binding IsSecret, Converter={x:Static vm:SecretCharConverter.Instance}}" />
+                      </StackPanel>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </StackPanel>
+
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <Button Content="Сохранить" Command="{Binding SaveSettingsCommand}"
+                        Padding="14,6" Background="{StaticResource AccentBrush}" Foreground="White" />
+                <TextBlock Text="{Binding SettingsMessage}" Classes="caption" VerticalAlignment="Center"
+                           TextWrapping="Wrap" />
+              </StackPanel>
+            </StackPanel>
           </StackPanel>
         </ScrollViewer>
       </Border>

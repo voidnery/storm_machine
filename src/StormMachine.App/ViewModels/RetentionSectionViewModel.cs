@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using StormMachine.Application.Abstractions;
@@ -41,9 +41,6 @@ public sealed partial class RetentionSectionViewModel(RetentionSettings settings
     public static string NoteWhy =>
         "Политика применяется при каждом запуске продукта, а не только по кнопке: "
         + "уборка, о которой надо помнить, не выполняется.";
-
-    /// <summary>Та же уборка из консоли — чипом, чтобы не набирать руками.</summary>
-    public static string PurgeCommand => "storm runs purge";
 
     public async Task LoadAsync(CancellationToken cancellationToken = default)
     {

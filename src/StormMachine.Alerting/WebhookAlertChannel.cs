@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text;
@@ -85,7 +85,10 @@ public sealed class WebhookAlertChannel(ISettingsStore settings, HttpClient http
 
     public string? MissingConfiguration => IsConfigured
         ? null
-        : $"не задан адрес — «storm alerts set {AlertSettings.WebhookUrl} <адрес>»";
+        // Названо тем же словом, что и поле формы: раньше здесь стояла команда
+        // консоли, и окно, показывая её, отправляло чинить настройку в другую
+        // программу — при том, что настроить канал можно прямо на этой странице.
+        : $"не задан «{AlertSettings.All.First(s => s.Key == AlertSettings.WebhookUrl).Title}»";
 
     public async Task RefreshAsync(CancellationToken cancellationToken = default)
     {

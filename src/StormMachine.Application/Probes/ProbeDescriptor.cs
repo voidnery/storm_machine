@@ -1,4 +1,4 @@
-using StormMachine.Domain.Measurements;
+﻿using StormMachine.Domain.Measurements;
 using StormMachine.Domain.Results;
 
 namespace StormMachine.Application.Probes;
@@ -87,6 +87,19 @@ public sealed record ProbeDescriptor
     /// <summary>Имя для командной строки: <c>ping</c>, <c>tcp</c>, <c>dns</c>.</summary>
     public required string Name { get; init; }
 
+    /// <summary>
+    /// Название пробы для человека.
+    /// </summary>
+    /// <remarks>
+    /// Правило именования, по замечанию оператора: <b>сначала то, что человек узнаёт,
+    /// потом технический термин в скобках</b>. «ICMP Echo» знает тот, кто и так знает,
+    /// что это ping; «Ping (ICMP Echo)» понятен обоим и ничего не теряет для инженера.
+    /// То же с «Проверка порта (TCP-connect)» и «Маршрут до цели (traceroute, MTR)».
+    /// <para>
+    /// Название методики при этом остаётся техническим: «ICMP Echo (RFC 792)» — это
+    /// ссылка на стандарт, и упрощать её нельзя, ей аргументируют перед провайдером.
+    /// </para>
+    /// </remarks>
     public required string Title { get; init; }
 
     public required string Description { get; init; }

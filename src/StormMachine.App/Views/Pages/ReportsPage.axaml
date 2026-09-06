@@ -1,4 +1,4 @@
-<UserControl xmlns="https://github.com/avaloniaui"
+﻿<UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:StormMachine.App.ViewModels"
              xmlns:monitors="using:StormMachine.Domain.Monitors"
@@ -52,9 +52,9 @@
               <TextBlock Text="Сравнить с эталоном" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" />
               <forms:Picker ItemsSource="{Binding Baselines}" SelectedItem="{Binding Baseline, Mode=TwoWay}"
                             Placeholder="без сравнения"
-                            Empty="Снятых эталонов нет — снимите первый командой ниже." />
-              <TextBlock Text="Эталоны снимаются из консоли" Classes="caption" />
-              <forms:CopyChip Text="storm baseline capture" />
+                            Empty="Снятых эталонов нет — снимите первый в «Журнале»." />
+              <TextBlock Classes="caption" TextWrapping="Wrap"
+                         Text="Эталон снимается с прогона: откройте «Журнал», выберите прогон и нажмите «Снять эталон»." />
             </StackPanel>
 
             <StackPanel Spacing="6">

@@ -25,8 +25,25 @@ namespace StormMachine.Reporting;
 /// </remarks>
 internal static class RunSection
 {
-    private static readonly string[] SeriesHeaders =
-        ["ряд", "проб", "потери", "мин", "медиана", "макс", "джиттер"];
+    /// <summary>
+    /// Шапка таблицы измерений. Единица приходит от пробы: у скорости это мегабиты.
+    /// </summary>
+    /// <remarks>
+    /// До этого шапка была постоянной, а единица стояла подписью под таблицей.
+    /// В отчёте, который читают на бумаге и по частям, это хуже, чем на экране:
+    /// подпись остаётся на другой странице, а колонка «медиана 0.476» уходит
+    /// в разговор с провайдером без единицы вовсе.
+    /// </remarks>
+    private static string[] SeriesHeaders(MeasurementUnit unit) =>
+    [
+        "ряд",
+        TableHeaders.Sent,
+        TableHeaders.Loss,
+        Units.Column("мин", unit),
+        Units.Column("медиана", unit),
+        Units.Column("макс", unit),
+        Units.Column("джиттер", unit),
+    ];
 
     /// <summary>Разбор трассировки, если прогон её содержит.</summary>
     /// <remarks>
@@ -168,7 +185,7 @@ internal static class RunSection
 
                 table.Header(header =>
                 {
-                    foreach (var caption in SeriesHeaders)
+                    foreach (var caption in SeriesHeaders(run.Unit))
                     {
                         header.Cell().Element(HeaderCell).Text(caption).FontSize(8).SemiBold();
                     }
@@ -197,8 +214,19 @@ internal static class RunSection
 
     // ------------------------------------------------------------------ маршрут
 
+    /// <summary>Шапка маршрута. Времена здесь всегда в миллисекундах.</summary>
     private static readonly string[] RouteHeaders =
-        ["хоп", "узел", "проб", "потери", "мин", "медиана", "макс", "джиттер", "MOS"];
+    [
+        "хоп",
+        "узел",
+        TableHeaders.Sent,
+        TableHeaders.Loss,
+        TableHeaders.Min,
+        TableHeaders.Median,
+        TableHeaders.Max,
+        TableHeaders.Jitter,
+        "MOS",
+    ];
 
     /// <summary>
     /// Маршрут: таблица хопов и вывод о том, где начинаются потери.

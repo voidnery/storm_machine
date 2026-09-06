@@ -5,6 +5,7 @@ using StormMachine.Agents;
 using StormMachine.Alerting;
 using StormMachine.Application.Abstractions;
 using StormMachine.Application.Adapters;
+using StormMachine.Application.Baselines;
 using StormMachine.Application.Capabilities;
 using StormMachine.Application.Probes;
 using StormMachine.Application.Presets;
@@ -175,6 +176,10 @@ public static class StormMachineServiceCollectionExtensions
         // «что было ночью» и «когда этот сервер появился».
         services.AddSingleton<IObservationStore>(provider => new SqliteObservationStore(
             (SqliteRunStore)provider.GetRequiredService<IRunStore>()));
+
+        // Снятие эталона — общее для окна и консоли: раньше сборка лежала
+        // в команде консоли, и мышью эталон было не снять.
+        services.AddSingleton<BaselineCapture>();
 
         // Отчёты. Движок PDF спрятан за IReportRenderer — замена стоит день, а не месяц.
         services.AddSingleton<IReportRenderer, PdfReportRenderer>();

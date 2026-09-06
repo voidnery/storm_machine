@@ -4,6 +4,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using StormMachine.App.Services;
 using StormMachine.Application.Abstractions;
+using StormMachine.Application.Baselines;
 using StormMachine.Domain.Reports;
 using StormMachine.Domain.Measurements;
 using StormMachine.Domain.Results;
@@ -38,13 +39,15 @@ public sealed partial class RunsPageViewModel(
     IReportRenderer reportRenderer,
     IFilePicker filePicker,
     IRunExporter exporter,
-    IBaselineStore baselines) : PageViewModel(section)
+    IBaselineStore baselines,
+    BaselineCapture capture) : PageViewModel(section)
 {
     private readonly IRunStore _store = store ?? throw new ArgumentNullException(nameof(store));
     private readonly IReportRenderer _reportRenderer = reportRenderer ?? throw new ArgumentNullException(nameof(reportRenderer));
     private readonly IFilePicker _filePicker = filePicker ?? throw new ArgumentNullException(nameof(filePicker));
     private readonly IRunExporter _exporter = exporter ?? throw new ArgumentNullException(nameof(exporter));
     private readonly IBaselineStore _baselines = baselines ?? throw new ArgumentNullException(nameof(baselines));
+    private readonly BaselineCapture _capture = capture ?? throw new ArgumentNullException(nameof(capture));
 
     public ObservableCollection<RunSummary> Runs { get; } = [];
 
@@ -93,6 +96,19 @@ public sealed partial class RunsPageViewModel(
     /// <summary>В чём измерены ряды выбранного прогона.</summary>
     [ObservableProperty]
     private string _seriesUnit = string.Empty;
+
+    /// <summary>Шапка колонок с единицей: она приходит от пробы выбранного прогона.</summary>
+    [ObservableProperty]
+    private string _minHeader = TableHeaders.Min;
+
+    [ObservableProperty]
+    private string _medianHeader = TableHeaders.Median;
+
+    [ObservableProperty]
+    private string _maxHeader = TableHeaders.Max;
+
+    [ObservableProperty]
+    private string _jitterHeader = TableHeaders.Jitter;
 
     [ObservableProperty]
     private string? _errorMessage;
@@ -293,39 +309,20 @@ public sealed partial class RunsPageViewModel(
                 return;
             }
 
-            var metrics = ProbeMetrics.FromStored(run.Series, run.Facts)
-                .Where(m => Baseline.IsComparable(m.Key))
-                .OrderBy(m => m.Key, StringComparer.OrdinalIgnoreCase)
-                .Select(m => new BaselineMetric(m.Key, m.Value, Baseline.HigherIsBetterFor(m.Key, run.Unit)))
-                .ToList();
-
-            if (metrics.Count == 0)
-            {
-                ErrorMessage = "У прогона нет ни одной метрики — фиксировать нечего.";
-
-                return;
-            }
-
             var name = $"{run.Summary.ProbeName} → {run.Summary.TargetDisplay}, "
                        + $"{run.Summary.StartedUtc.ToLocalTime():dd.MM.yyyy HH:mm}";
 
-            var existing = await _baselines.FindAsync(name).ConfigureAwait(true);
+            // Сборка эталона — общая с консолью. Своя копия здесь была третьей:
+            // отбор метрик и правило «выше — лучше» повторялись слово в слово,
+            // и разойтись им мешало только то, что их давно не трогали.
+            var baseline = await _capture.CaptureAsync(run, name).ConfigureAwait(true);
 
-            await _baselines.SaveAsync(new Baseline
-            {
-                Id = existing?.Id ?? Guid.NewGuid(),
-                Name = name,
-                Subject = run.Summary.ProbeName,
-                Target = run.Target,
-                Context = run.Context,
-                Unit = run.Unit,
-                Metrics = metrics,
-                RunId = run.Summary.Id,
-                CapturedUtc = DateTimeOffset.UtcNow,
-            }).ConfigureAwait(true);
-
-            Message = $"Эталон «{name}» зафиксирован: метрик {metrics.Count}. "
-                      + "Сравнить с ним можно на экране отчётов или командой storm baseline compare.";
+            Message = $"Эталон «{baseline.Name}» зафиксирован: метрик {baseline.Metrics.Count}. "
+                      + "Сравнить с ним можно на экране отчётов.";
+        }
+        catch (InvalidOperationException ex)
+        {
+            ErrorMessage = ex.Message;
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -421,6 +418,13 @@ public sealed partial class RunsPageViewModel(
         // Единица берётся у прогона: журнал показывает и ping в миллисекундах,
         // и скорость в мегабитах, и подписывать их одинаково нельзя.
         SeriesUnit = Units.TableCaption(run.Unit);
+
+        // Единица уходит в шапку колонок: подпись под таблицей стояла в другом
+        // месте экрана, чем число, и до неё надо было додуматься.
+        MinHeader = Units.Column("мин", run.Unit);
+        MedianHeader = Units.Column("медиана", run.Unit);
+        MaxHeader = Units.Column("макс", run.Unit);
+        JitterHeader = Units.Column("джиттер", run.Unit);
 
         foreach (var series in run.Series)
         {

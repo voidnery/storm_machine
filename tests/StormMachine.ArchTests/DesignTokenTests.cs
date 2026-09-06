@@ -1,4 +1,4 @@
-using System.Text.RegularExpressions;
+﻿using System.Text.RegularExpressions;
 
 namespace StormMachine.ArchTests;
 
@@ -138,6 +138,50 @@ public sealed class DesignTokenTests
             "Штатный выпадающий список в разметке. Выбор в продукте один — forms:Picker "
             + "(Controls/Picker.cs): у него одна форма пункта, поиск по длинному списку "
             + "и внятная фраза на пустом:"
+            + Environment.NewLine + string.Join(Environment.NewLine, violations));
+    }
+
+    /// <summary>
+    /// Окно не отправляет оператора в консоль за тем, что умеет само.
+    /// </summary>
+    /// <remarks>
+    /// Замечание оператора: чипы «storm monitors add», «storm alerts set» и им подобные
+    /// стояли рядом с формами, которые делают ровно это. Смысл у такой подписи был
+    /// один — сказать «а вообще-то есть консоль», и человек, который открыл окно,
+    /// читал её как «здесь этого нельзя».
+    /// <para>
+    /// Правило: если возможность есть в окне — команду не показываем; если её в окне
+    /// нет — делаем, а не отсылаем. Исключение одно и оно в этом же тесте: страница
+    /// раздела, которого в окне ещё нет, честно называет консольные команды —
+    /// иначе она обещала бы, что возможности нет вовсе.
+    /// </para>
+    /// </remarks>
+    [Fact(DisplayName = "Разметка: окно не отсылает оператора в консоль")]
+    public void Markup_DoesNotSendTheOperatorToTheConsole()
+    {
+        var violations = new List<string>();
+
+        foreach (var file in MarkupFiles())
+        {
+            // Заглушка раздела — единственное место, где команда консоли уместна.
+            if (Path.GetFileName(file).StartsWith("PlaceholderPage", StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            var source = File.ReadAllText(file);
+
+            foreach (Match match in Regex.Matches(source, "Text=\"storm [a-zа-я]"))
+            {
+                var line = source[..match.Index].Count(c => c == '\n') + 1;
+                violations.Add($"{RepositoryLayout.Relative(file)}:{line}");
+            }
+        }
+
+        Assert.True(
+            violations.Count == 0,
+            "Команда консоли в разметке окна. Если возможность есть в окне — команда лишняя; "
+            + "если её нет — её надо сделать, а не отослать за ней в другую программу:"
             + Environment.NewLine + string.Join(Environment.NewLine, violations));
     }
 

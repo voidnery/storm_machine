@@ -1,4 +1,4 @@
-using CommunityToolkit.Mvvm.ComponentModel;
+﻿using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using StormMachine.App.Services;
 using StormMachine.Application.Profiles;
@@ -53,10 +53,6 @@ public sealed partial class TransferSectionViewModel(SettingsTransfer transfer, 
     /// у заказчика.
     /// </remarks>
     public static string SecretsCaveat => SettingsTransfer.SecretsNote;
-
-    public static string SnmpCredsCommand => "storm snmp creds add";
-
-    public static string AlertsCommand => "storm alerts set";
 
     [RelayCommand]
     private async Task ExportAsync(CancellationToken cancellationToken)

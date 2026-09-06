@@ -2,6 +2,8 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:StormMachine.App.ViewModels"
              xmlns:forms="using:StormMachine.App.Controls"
+             xmlns:measure="using:StormMachine.Domain.Measurements"
+             xmlns:presets="using:StormMachine.Domain.Presets"
              x:Class="StormMachine.App.Views.ProbeRunnerView"
              x:DataType="vm:ProbeRunnerViewModel">
 
@@ -44,6 +46,50 @@
                     Command="{Binding StartCommand}" Padding="18,7"
                     Background="{StaticResource AccentBrush}" Foreground="White" />
             <Button Content="Стоп" Command="{Binding StopCommand}" />
+
+            <!-- Пресет собирается из пробы, цели и параметров — то есть ровно
+                 из того, что сейчас в этой форме. Библиотека умела запускать
+                 и удалять пресеты, которые нечем было завести. -->
+            <Button Name="PresetButton" Content="В пресет" Command="{Binding OpenPresetCommand}" />
+
+            <Popup IsOpen="{Binding IsSavingPreset, Mode=TwoWay}" PlacementTarget="{Binding #PresetButton}"
+                   Placement="BottomEdgeAlignedRight" IsLightDismissEnabled="True">
+              <Border Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource DividerBrush}"
+                      BorderThickness="1" CornerRadius="6" Padding="14" Width="330" Margin="0,6,0,0">
+                <StackPanel Spacing="8">
+                  <TextBlock Text="Сохранить как пресет" FontWeight="SemiBold" FontSize="13" />
+                  <TextBlock Classes="caption" TextWrapping="Wrap"
+                             Text="Запомнится проба, цель и все параметры формы. Запускать — из «Библиотеки»." />
+
+                  <TextBox Text="{Binding PresetName}" PlaceholderText="название пресета" />
+
+                  <!-- Существующие рядом: одноимённый перезаписывается, и это
+                       единственный способ поправить пресет, не заводя второй. -->
+                  <StackPanel Spacing="3" IsVisible="{Binding SavedPresets.Count}">
+                    <TextBlock Text="Или перезаписать существующий" Classes="caption" />
+                    <ScrollViewer MaxHeight="130">
+                      <ItemsControl ItemsSource="{Binding SavedPresets}">
+                        <ItemsControl.ItemTemplate>
+                          <DataTemplate x:DataType="presets:Preset">
+                            <Button Content="{Binding Name}" FontSize="11" Padding="8,3" Margin="0,0,0,3"
+                                    HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                                    Command="{Binding $parent[ItemsControl].((vm:ProbeRunnerViewModel)DataContext).UsePresetCommand}"
+                                    CommandParameter="{Binding}" />
+                          </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                      </ItemsControl>
+                    </ScrollViewer>
+                  </StackPanel>
+
+                  <TextBlock Text="{Binding PresetMessage}" Classes="caption" TextWrapping="Wrap"
+                             IsVisible="{Binding PresetMessage, Converter={x:Static ObjectConverters.IsNotNull}}" />
+
+                  <Button Content="Сохранить" Command="{Binding SavePresetCommand}"
+                          HorizontalAlignment="Right" Padding="14,6"
+                          Background="{StaticResource AccentBrush}" Foreground="White" />
+                </StackPanel>
+              </Border>
+            </Popup>
           </StackPanel>
         </WrapPanel>
 
@@ -126,12 +172,12 @@
         <TextBlock Text="Ряды" FontSize="13" FontWeight="SemiBold" />
         <Grid ColumnDefinitions="220,60,70,80,80,80,80">
           <TextBlock Grid.Column="0" Text="ряд" FontSize="10" Foreground="{StaticResource TextMutedBrush}" />
-          <TextBlock Grid.Column="1" Text="проб" FontSize="10" Foreground="{StaticResource TextMutedBrush}" />
-          <TextBlock Grid.Column="2" Text="потери" FontSize="10" Foreground="{StaticResource TextMutedBrush}" />
-          <TextBlock Grid.Column="3" Text="мин" FontSize="10" Foreground="{StaticResource TextMutedBrush}" />
-          <TextBlock Grid.Column="4" Text="медиана" FontSize="10" Foreground="{StaticResource TextMutedBrush}" />
-          <TextBlock Grid.Column="5" Text="макс" FontSize="10" Foreground="{StaticResource TextMutedBrush}" />
-          <TextBlock Grid.Column="6" Text="джиттер" FontSize="10" Foreground="{StaticResource TextMutedBrush}" />
+          <TextBlock Grid.Column="1" Text="{x:Static measure:TableHeaders.Sent}" FontSize="10" Foreground="{StaticResource TextMutedBrush}" />
+          <TextBlock Grid.Column="2" Text="{x:Static measure:TableHeaders.Loss}" FontSize="10" Foreground="{StaticResource TextMutedBrush}" />
+          <TextBlock Grid.Column="3" Text="{Binding MinHeader}" FontSize="10" Foreground="{StaticResource TextMutedBrush}" />
+          <TextBlock Grid.Column="4" Text="{Binding MedianHeader}" FontSize="10" Foreground="{StaticResource TextMutedBrush}" />
+          <TextBlock Grid.Column="5" Text="{Binding MaxHeader}" FontSize="10" Foreground="{StaticResource TextMutedBrush}" />
+          <TextBlock Grid.Column="6" Text="{Binding JitterHeader}" FontSize="10" Foreground="{StaticResource TextMutedBrush}" />
         </Grid>
         <ItemsControl ItemsSource="{Binding Series}">
           <ItemsControl.ItemTemplate>
@@ -148,7 +194,7 @@
             </DataTemplate>
           </ItemsControl.ItemTemplate>
         </ItemsControl>
-        <TextBlock Text="{Binding SeriesUnit}" Classes="caption" />
+
       </StackPanel>
     </Border>
 

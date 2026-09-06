@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using System.Net;
 using System.Net.Mail;
 using StormMachine.Application.Abstractions;
@@ -56,24 +56,31 @@ public sealed class EmailAlertChannel(ISettingsStore settings) : IAlertChannel
 
             var missing = new List<string>();
 
+            // Названия те же, что подписи полей формы: ключ «alerts.smtp.from»
+            // годится в консоли, но человеку, который смотрит на «не заданы»,
+            // он не говорит, что именно заполнить.
             if (string.IsNullOrWhiteSpace(_host))
             {
-                missing.Add(AlertSettings.SmtpHost);
+                missing.Add(Wording(AlertSettings.SmtpHost));
             }
 
             if (string.IsNullOrWhiteSpace(_from))
             {
-                missing.Add(AlertSettings.SmtpFrom);
+                missing.Add(Wording(AlertSettings.SmtpFrom));
             }
 
             if (_to.Length == 0)
             {
-                missing.Add(AlertSettings.SmtpTo);
+                missing.Add(Wording(AlertSettings.SmtpTo));
             }
 
             return "не заданы: " + string.Join(", ", missing);
         }
     }
+
+    /// <summary>Как настройка называется для человека — по общему объявлению.</summary>
+    private static string Wording(string key) =>
+        AlertSettings.All.First(setting => setting.Key == key).Title.ToLowerInvariant();
 
     public async Task RefreshAsync(CancellationToken cancellationToken = default)
     {

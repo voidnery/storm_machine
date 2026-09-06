@@ -1,7 +1,8 @@
-using System.CommandLine;
+﻿using System.CommandLine;
 using System.Globalization;
 using Microsoft.Extensions.DependencyInjection;
 using StormMachine.Application.Abstractions;
+using StormMachine.Application.Baselines;
 using StormMachine.Cli.Rendering;
 using StormMachine.Domain.Reports;
 using StormMachine.Domain.Results;
@@ -80,43 +81,25 @@ internal static class BaselineCommand
                 return 1;
             }
 
-            var metrics = ProbeMetrics.FromStored(stored.Series, stored.Facts);
+            var wanted = parse.GetValue(name)!;
+            var existing = await store.FindAsync(wanted, cancellationToken).ConfigureAwait(false);
 
-            if (metrics.Count == 0)
+            Baseline baseline;
+
+            try
             {
-                Console.Error.WriteLine("У прогона нет ни одной метрики — фиксировать нечего.");
+                // Сборка эталона — общая с окном: раньше она жила здесь, и снять
+                // эталон мышью было нельзя вовсе.
+                baseline = await services.GetRequiredService<BaselineCapture>()
+                    .CaptureAsync(stored, wanted, parse.GetValue(description), cancellationToken)
+                    .ConfigureAwait(false);
+            }
+            catch (InvalidOperationException ex)
+            {
+                Console.Error.WriteLine(ex.Message);
 
                 return 1;
             }
-
-            // Что годится в эталон, решает домен: счётчики проб — настройка замера,
-            // а не свойство сети, и «отправлено 8 против 10» ухудшением не является.
-            var chosen = metrics
-                .Where(m => Baseline.IsComparable(m.Key))
-                .OrderBy(m => m.Key, StringComparer.OrdinalIgnoreCase)
-                .Select(m => new BaselineMetric(
-                    m.Key,
-                    m.Value,
-                    Baseline.HigherIsBetterFor(m.Key, stored.Unit)))
-                .ToList();
-
-            var existing = await store.FindAsync(parse.GetValue(name)!, cancellationToken).ConfigureAwait(false);
-
-            var baseline = new Baseline
-            {
-                Id = existing?.Id ?? Guid.NewGuid(),
-                Name = parse.GetValue(name)!,
-                Description = parse.GetValue(description),
-                Subject = stored.Summary.ProbeName,
-                Target = stored.Target,
-                Context = stored.Context,
-                Unit = stored.Unit,
-                Metrics = chosen,
-                RunId = stored.Summary.Id,
-                CapturedUtc = DateTimeOffset.UtcNow,
-            };
-
-            await store.SaveAsync(baseline, cancellationToken).ConfigureAwait(false);
 
             Console.WriteLine(existing is null
                 ? $"Эталон «{baseline.Name}» зафиксирован."

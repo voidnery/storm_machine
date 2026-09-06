@@ -1,7 +1,8 @@
-using System.Collections.ObjectModel;
+﻿using System.Collections.ObjectModel;
 using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using StormMachine.App.Controls;
 using StormMachine.Application.Abstractions;
 using StormMachine.Application.Probes;
 using StormMachine.Application.Scenarios;
@@ -34,6 +35,38 @@ public sealed record ScheduleOption(string Title, TimeSpan? Interval, string? Cr
 /// ни в чём эти 50 (замечание оператора).
 /// </remarks>
 public sealed record ThresholdRow(string Text, string Explanation);
+
+/// <summary>Метрика в выпадающем списке конструктора порога.</summary>
+/// <remarks>
+/// Название человеческое, ключ в скобках: порог сохраняется ключом («p95 &lt; 50»),
+/// и по нему же его читают в консоли и в чужих сценариях. Прятать ключ значило бы
+/// сделать окно и консоль разными продуктами.
+/// </remarks>
+public sealed record MetricOption(MetricHelp Help) : IOption
+{
+    public override string ToString() => Help.Title;
+
+    string IOption.Caption => $"{Help.Title} ({Help.Key})";
+
+    string? IOption.About => Help.About;
+
+    /// <summary>Единица метрики — пометкой: у времён миллисекунды, у потерь проценты.</summary>
+    string? IOption.Note => Help.Unit is { Length: > 0 } unit ? unit : null;
+}
+
+/// <summary>Знак сравнения словами.</summary>
+/// <remarks>
+/// «&lt;» и «≤» в поле ввода — инженерная запись, и разница между ними на глаз
+/// не читается. Словами она очевидна: «меньше» и «не больше».
+/// </remarks>
+public sealed record ComparisonOption(string Sign, string Caption) : IOption
+{
+    public override string ToString() => Caption;
+
+    string IOption.Caption => Caption;
+
+    string? IOption.About => $"порог соблюдён, пока значение {Caption} заданного";
+}
 
 /// <summary>
 /// Канал доставки, отмечаемый галочкой.
@@ -125,17 +158,82 @@ public sealed partial class MonitorEditorViewModel : ObservableObject
     /// <summary>Метрики, по которым бывают пороги, — с единицами и объяснением.</summary>
     public static IReadOnlyList<MetricHelp> Metrics => MetricWording.Common;
 
+    /// <summary>
+    /// Порог собирается из трёх полей, а не набирается строкой.
+    /// </summary>
+    /// <remarks>
+    /// Замечание оператора: «сейчас прям инженерно прописано». Поле с подсказкой
+    /// «p95 &lt; 50» требует знать три вещи заранее — какие бывают ключи, какие знаки
+    /// и в чём измеряется число. Ни одну из них форма не сообщала: список метрик
+    /// лежал в свёрнутой карточке ниже, а единица не называлась вовсе.
+    /// <para>
+    /// Строкой вписать по-прежнему можно — под свёрнутой карточкой. Это нужно для
+    /// того, чего в списке нет: порогов по отдельному ряду («p95@ttfb») и по фактам
+    /// пробы («Осталось дней»). Убрать эту возможность значило бы отобрать
+    /// у продукта половину его порогов ради простоты формы.
+    /// </para>
+    /// </remarks>
+    public IReadOnlyList<MetricOption> MetricChoices { get; } =
+        [.. MetricWording.Common.Select(m => new MetricOption(m))];
+
+    /// <summary>Знаки сравнения. Порядок — от самого частого.</summary>
+    public IReadOnlyList<ComparisonOption> Comparisons { get; } =
+    [
+        new("<", "меньше"),
+        new("≤", "не больше"),
+        new(">", "больше"),
+        new("≥", "не меньше"),
+    ];
+
+    [ObservableProperty]
+    private MetricOption? _metric;
+
+    [ObservableProperty]
+    private ComparisonOption? _comparison;
+
+    [ObservableProperty]
+    private decimal? _limit;
+
+    /// <summary>Единица выбранной метрики — подписью у поля значения.</summary>
+    public string LimitUnit => Metric?.Help.Unit ?? string.Empty;
+
+    /// <summary>Порог целиком фразой — то, что получится, видно до нажатия.</summary>
+    public string ThresholdPreview =>
+        Metric is { } metric && Comparison is { } comparison && Limit is { } limit
+            ? $"{metric.Help.Title} — {comparison.Caption} "
+              + $"{limit.ToString("0.###", CultureInfo.InvariantCulture)}"
+              + (metric.Help.Unit is { Length: > 0 } unit ? " " + unit : string.Empty)
+            : "Выберите метрику, знак и число.";
+
+    public bool CanAddThreshold => Metric is not null && Comparison is not null && Limit is not null;
+
+    partial void OnMetricChanged(MetricOption? value) => RefreshBuilder();
+
+    partial void OnComparisonChanged(ComparisonOption? value) => RefreshBuilder();
+
+    partial void OnLimitChanged(decimal? value) => RefreshBuilder();
+
+    private void RefreshBuilder()
+    {
+        OnPropertyChanged(nameof(LimitUnit));
+        OnPropertyChanged(nameof(ThresholdPreview));
+        OnPropertyChanged(nameof(CanAddThreshold));
+        AddThresholdCommand.NotifyCanExecuteChanged();
+    }
+
     public static string ThresholdNote =>
-        "Порог — это метрика, знак сравнения и число: p95 < 50.";
+        "Порог — это требование к измерению: что проверяем, каким должно быть и какое число.";
 
     /// <summary>Формат длительности — он же у окна обслуживания и у консоли.</summary>
     public static string DurationHint =>
         "Формат: 30с, 15м, 2ч, 1д. Голое число — минуты.";
 
     public static string ThresholdNoteWhy =>
-        "Знаки: < ≤ > ≥. Метрику берут из списка ниже, единица у каждой своя — "
-        + "у времён миллисекунды, у потерь проценты. Нарушенный порог даёт монитору "
-        + "отказ, а при включённом оповещении — алерт.";
+        "Единица у каждой метрики своя — у времён миллисекунды, у потерь проценты; "
+        + "она показана рядом с полем значения. Нарушенный порог даёт монитору отказ, "
+        + "а при включённом оповещении — алерт. Сохраняется порог короткой записью "
+        + "(«p95 < 50») — той же, что понимает консоль: заведённое здесь читается там "
+        + "и наоборот.";
 
     /// <summary>Каналы доставки: какие отмечены, туда алерт и уйдёт.</summary>
     public IReadOnlyList<ChannelChoice> Channels { get; }
@@ -226,9 +324,25 @@ public sealed partial class MonitorEditorViewModel : ObservableObject
 
     partial void OnMaintenanceChanged(string? value) => Refresh();
 
-    /// <summary>Добавляет набранный порог в список.</summary>
-    [RelayCommand]
+    /// <summary>Добавляет собранный из полей порог.</summary>
+    [RelayCommand(CanExecute = nameof(CanAddThreshold))]
     private void AddThreshold()
+    {
+        if (Metric is not { } metric || Comparison is not { } comparison || Limit is not { } limit)
+        {
+            return;
+        }
+
+        // Сохраняется та же запись, что набирали руками раньше: ключ, знак, число.
+        // Конструктор — способ её собрать, а не другой вид порога.
+        Add($"{metric.Help.Key} {comparison.Sign} {limit.ToString("0.###", CultureInfo.InvariantCulture)}");
+
+        Limit = null;
+    }
+
+    /// <summary>Добавляет порог, вписанный строкой: для рядов и фактов пробы.</summary>
+    [RelayCommand]
+    private void AddThresholdText()
     {
         var text = ThresholdText.Trim();
 
@@ -237,6 +351,14 @@ public sealed partial class MonitorEditorViewModel : ObservableObject
             return;
         }
 
+        if (Add(text))
+        {
+            ThresholdText = string.Empty;
+        }
+    }
+
+    private bool Add(string text)
+    {
         try
         {
             // Разбирается сразу: порог, который не разобрался, лучше отвергнуть
@@ -244,15 +366,18 @@ public sealed partial class MonitorEditorViewModel : ObservableObject
             var parsed = Threshold.Parse(text);
 
             Thresholds.Add(new ThresholdRow(text, MetricWording.Explain(parsed)));
-            ThresholdText = string.Empty;
             Error = null;
+            Refresh();
+
+            return true;
         }
         catch (FormatException ex)
         {
             Error = ex.Message;
-        }
+            Refresh();
 
-        Refresh();
+            return false;
+        }
     }
 
     [RelayCommand]

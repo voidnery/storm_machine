@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using StormMachine.App.Services;
 using StormMachine.Application.Abstractions;
+using StormMachine.Application.Presets;
 using StormMachine.Application.Probes;
 
 namespace StormMachine.App.ViewModels;
@@ -33,10 +34,11 @@ public sealed class LocalTestsPageViewModel : PageViewModel
         IRunStore store,
         IAgentDirectory agents,
         IDeviceStore devices,
+        PresetService presets,
         ILogger<LocalTestsPageViewModel> log)
         : base(section)
     {
-        Runner = new ProbeRunnerViewModel(runner, registry, store, agents, devices, log,
+        Runner = new ProbeRunnerViewModel(runner, registry, store, agents, devices, presets, log,
             ["ping", "tcp", "udp", "dns", "throughput", "channel", "bufferbloat"]);
     }
 
@@ -65,10 +67,11 @@ public sealed class SpeedPageViewModel : PageViewModel
         IRunStore store,
         IAgentDirectory agents,
         IDeviceStore devices,
+        PresetService presets,
         ILogger<SpeedPageViewModel> log)
         : base(section)
     {
-        Runner = new ProbeRunnerViewModel(runner, registry, store, agents, devices, log,
+        Runner = new ProbeRunnerViewModel(runner, registry, store, agents, devices, presets, log,
             ["speedtest", "iperf3", "bufferbloat"]);
     }
 

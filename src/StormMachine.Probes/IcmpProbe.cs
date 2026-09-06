@@ -1,4 +1,4 @@
-using System.Net;
+﻿using System.Net;
 using System.Net.NetworkInformation;
 using System.Runtime.CompilerServices;
 using StormMachine.Application.Abstractions;
@@ -43,7 +43,7 @@ public sealed class IcmpProbe(IHighResolutionClock clock, TargetResolver resolve
     {
         Kind = ProbeKind.Icmp,
         Name = "ping",
-        Title = "ICMP Echo",
+        Title = "Ping (ICMP Echo)",
         Description = "Доступность и задержка: RTT, потери, джиттер по RFC 3550, PDV.",
         Unit = MeasurementUnit.Milliseconds,
         Methodology = Methodology.IcmpEcho,

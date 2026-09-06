@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using System.Net;
 using System.Net.NetworkInformation;
 using System.Runtime.CompilerServices;
@@ -45,7 +45,7 @@ public sealed class TracerouteProbe(
         Kind = ProbeKind.Traceroute,
         Shape = ProbeResultShape.PathTrace,
         Name = "trace",
-        Title = "Traceroute и MTR",
+        Title = "Маршрут до цели (traceroute, MTR)",
         Description = "Маршрут до цели: задержка и потери на каждом хопе.",
         Unit = MeasurementUnit.Milliseconds,
         Methodology = Methodology.Traceroute,

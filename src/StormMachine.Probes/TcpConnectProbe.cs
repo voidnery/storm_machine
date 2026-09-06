@@ -1,4 +1,4 @@
-using System.Net;
+﻿using System.Net;
 using System.Net.Sockets;
 using System.Runtime.CompilerServices;
 using StormMachine.Application.Abstractions;
@@ -26,7 +26,7 @@ public sealed class TcpConnectProbe(IHighResolutionClock clock, TargetResolver r
     {
         Kind = ProbeKind.TcpConnect,
         Name = "tcp",
-        Title = "TCP-connect",
+        Title = "Проверка порта (TCP-connect)",
         Description = "Время установления TCP-соединения с портом. Работает там, где ICMP закрыт.",
         Unit = MeasurementUnit.Milliseconds,
         Methodology = Methodology.TcpConnect,

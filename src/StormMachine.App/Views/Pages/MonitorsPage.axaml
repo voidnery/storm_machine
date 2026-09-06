@@ -1,4 +1,4 @@
-<UserControl xmlns="https://github.com/avaloniaui"
+﻿<UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:StormMachine.App.ViewModels"
              xmlns:forms="using:StormMachine.App.Controls"
@@ -115,11 +115,41 @@
                 <forms:MethodCard Thesis="{x:Static vm:MonitorEditorViewModel.ThresholdNote}"
                                   Detail="{x:Static vm:MonitorEditorViewModel.ThresholdNoteWhy}" />
 
-                <Grid ColumnDefinitions="*,Auto">
-                  <TextBox Grid.Column="0" PlaceholderText="p95 &lt; 50" Text="{Binding ThresholdText}" />
-                  <Button Grid.Column="1" Content="Добавить" Command="{Binding AddThresholdCommand}"
-                          Padding="12,5" Margin="6,0,0,0" />
-                </Grid>
+                <!-- Порог собирается из трёх полей. Строкой «p95 < 50» его набирали
+                     те, кто уже знает и ключи, и знаки, и единицы; форма ни одного
+                     из трёх не сообщала (замечание оператора). -->
+                <WrapPanel Orientation="Horizontal">
+                  <StackPanel Spacing="3" Margin="0,0,8,6" Width="250">
+                    <TextBlock Text="Что проверяем" Classes="caption" />
+                    <forms:Picker ItemsSource="{Binding MetricChoices}"
+                                  SelectedItem="{Binding Metric, Mode=TwoWay}"
+                                  Placeholder="выберите метрику" />
+                  </StackPanel>
+
+                  <StackPanel Spacing="3" Margin="0,0,8,6" Width="150">
+                    <TextBlock Text="Должно быть" Classes="caption" />
+                    <forms:Picker ItemsSource="{Binding Comparisons}"
+                                  SelectedItem="{Binding Comparison, Mode=TwoWay}"
+                                  Placeholder="знак" />
+                  </StackPanel>
+
+                  <StackPanel Spacing="3" Margin="0,0,8,6" Width="150">
+                    <TextBlock Text="Значение" Classes="caption" />
+                    <Grid ColumnDefinitions="*,Auto">
+                      <NumericUpDown Grid.Column="0" Value="{Binding Limit}" Minimum="0"
+                                     Increment="1" FormatString="0.###" ShowButtonSpinner="False" />
+                      <TextBlock Grid.Column="1" Text="{Binding LimitUnit}" Classes="caption"
+                                 VerticalAlignment="Center" Margin="6,0,0,0" />
+                    </Grid>
+                  </StackPanel>
+
+                  <Button Content="Добавить" Command="{Binding AddThresholdCommand}"
+                          Padding="14,6" Margin="0,0,0,6" VerticalAlignment="Bottom" />
+                </WrapPanel>
+
+                <!-- Что получится — видно до нажатия: собранное из трёх полей
+                     читается фразой, а не записью «p95 ≤ 50». -->
+                <TextBlock Text="{Binding ThresholdPreview}" Classes="caption" TextWrapping="Wrap" />
 
                 <!-- Набранное коротко, прочитанное словами: без второй половины
                      поле не отвечало ни что такое p95, ни в чём эти 50. -->
@@ -139,21 +169,19 @@
                   </ItemsControl.ItemTemplate>
                 </ItemsControl>
 
-                <!-- Список метрик прямо в форме: помнить наизусть незачем -->
-                <Expander Header="Какие бывают метрики" FontSize="11">
-                  <ItemsControl ItemsSource="{x:Static vm:MonitorEditorViewModel.Metrics}" Margin="0,6,0,0">
-                    <ItemsControl.ItemTemplate>
-                      <DataTemplate x:DataType="scenarios:MetricHelp">
-                        <Grid ColumnDefinitions="90,70,*" Margin="0,2">
-                          <TextBlock Grid.Column="0" Text="{Binding Key}" Classes="body mono" />
-                          <TextBlock Grid.Column="1" Text="{Binding Unit}" Classes="caption"
-                                     VerticalAlignment="Center" />
-                          <TextBlock Grid.Column="2" Text="{Binding About}" Classes="caption"
-                                     TextWrapping="Wrap" />
-                        </Grid>
-                      </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                  </ItemsControl>
+                <!-- Строкой — для того, чего в списке нет: порогов по отдельному
+                     ряду («p95@ttfb») и по фактам пробы («Осталось дней»). Свёрнуто:
+                     это меньшинство порогов, и выносить его вперёд незачем. -->
+                <Expander Header="Вписать строкой" FontSize="11" HorizontalAlignment="Stretch">
+                  <StackPanel Spacing="4" Margin="0,6,0,0">
+                    <TextBlock Classes="caption" TextWrapping="Wrap"
+                               Text="Для порогов по отдельному ряду и по фактам пробы: «p95@ttfb &lt; 500», «Осталось дней &gt;= 14»." />
+                    <Grid ColumnDefinitions="*,Auto">
+                      <TextBox Grid.Column="0" PlaceholderText="p95@ttfb &lt; 500" Text="{Binding ThresholdText}" />
+                      <Button Grid.Column="1" Content="Добавить" Command="{Binding AddThresholdTextCommand}"
+                              Padding="12,5" Margin="6,0,0,0" />
+                    </Grid>
+                  </StackPanel>
                 </Expander>
 
                 <forms:Caveat Text="Без порогов монитор копит историю, но ни о чём не судит." />
@@ -297,9 +325,8 @@
               </ItemsControl>
             </StackPanel>
 
-            <forms:MethodCard Thesis="Форма даёт разумные умолчания; полная власть над расписанием и гистерезисом — у консоли."
-                              Detail="Экран и консоль работают с одной базой и одним планировщиком: заведённое здесь видно там, и наоборот." />
-            <forms:CopyChip Text="storm monitors add" />
+            <forms:MethodCard Thesis="Заведённое здесь видно в консоли, и наоборот."
+                              Detail="Экран и консоль работают с одной базой и одним планировщиком. Расписание, пороги, каналы и гистерезис задаются формой целиком — команда консоли нужна только для сценариев автоматизации." />
 
           </StackPanel>
         </ScrollViewer>

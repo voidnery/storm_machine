@@ -1,4 +1,4 @@
-using System.Net;
+﻿using System.Net;
 using System.Net.Sockets;
 using System.Runtime.CompilerServices;
 using StormMachine.Application.Abstractions;
@@ -30,7 +30,7 @@ public sealed class UdpProbe(IHighResolutionClock clock, TargetResolver resolver
     {
         Kind = ProbeKind.Udp,
         Name = "udp",
-        Title = "UDP-проба",
+        Title = "Проверка порта по UDP",
         Description = "Отправка датаграммы и ожидание ответа. Различает ответ, молчание и явный отказ порта.",
         Unit = MeasurementUnit.Milliseconds,
         Methodology = Methodology.UdpProbe,
