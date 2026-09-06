@@ -1,4 +1,4 @@
-<Project>
+﻿<Project>
 
   <!-- ЕДИНЫЙ ИСТОЧНИК ВЕРСИИ.
        Отсюда её читает хук .githooks/pre-push и создаёт подписанный тег vX.Y.Z
@@ -6,7 +6,7 @@
   <PropertyGroup>
     <!-- 0.0.0 = предрелизное состояние, тег не создаётся.
          Первый релиз: поднять до 0.1.0 перед переливкой beta -> master. -->
-    <Version>0.2.0-alpha.2</Version>
+    <Version>0.2.0-alpha.3</Version>
   </PropertyGroup>
 
   <PropertyGroup>
@@ -35,9 +35,18 @@
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
   </PropertyGroup>
 
+  <!-- КТО ВЫПУСКАЕТ. Отсюда подпись попадает в три места сразу: в свойства файла,
+       в автора пакета установщика и в правый нижний угол окна — ProductInfo.Vendor
+       читает AssemblyCompany. Писать её в трёх местах по отдельности значило бы
+       завести три копии, которые однажды разойдутся: ровно так уже разъезжались
+       единицы измерения и словари вердиктов.
+
+       Авторские права оставлены на участников проекта: лицензия MIT и файл LICENSE
+       говорят то же самое, и менять правовую строку заодно с подписью нельзя. -->
   <PropertyGroup>
     <Product>Storm Machine</Product>
-    <Company>Storm Machine contributors</Company>
+    <Company>Eterix Tech - by voidnery</Company>
+    <Authors>Eterix Tech - by voidnery</Authors>
     <Copyright>Copyright (c) 2026 Storm Machine contributors</Copyright>
     <RepositoryType>git</RepositoryType>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>

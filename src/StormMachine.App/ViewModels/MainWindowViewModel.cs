@@ -148,6 +148,16 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     public static string WindowTitle => ProductInfo.NameAndVersion;
 
+    /// <summary>
+    /// Подпись в правом нижнем углу: продукт, версия и кто его выпускает.
+    /// </summary>
+    /// <remarks>
+    /// Версия остаётся рядом с подписью намеренно: по ней разбирают случай
+    /// на чужой машине, и убрать её ради красоты значило бы каждый раз спрашивать
+    /// «а какая у вас сборка».
+    /// </remarks>
+    public static string Signature => ProductInfo.Signature;
+
     public static string LevelText => "Уровень 0 — ядро";
 
     /// <summary>

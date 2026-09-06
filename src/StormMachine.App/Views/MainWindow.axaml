@@ -1,4 +1,4 @@
-<Window xmlns="https://github.com/avaloniaui"
+﻿<Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:StormMachine.App.ViewModels"
         xmlns:services="using:StormMachine.App.Services"
@@ -273,7 +273,7 @@
                    VerticalAlignment="Center"
                    IsVisible="{Binding AdapterWarning, Converter={x:Static ObjectConverters.IsNotNull}}" />
 
-        <TextBlock Grid.Column="3" Text="{Binding WindowTitle}" FontSize="12" Foreground="{StaticResource TextMutedBrush}" VerticalAlignment="Center" />
+        <TextBlock Grid.Column="3" Text="{Binding Signature}" FontSize="12" Foreground="{StaticResource TextMutedBrush}" VerticalAlignment="Center" />
       </Grid>
     </Border>
 

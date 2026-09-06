@@ -128,7 +128,7 @@ jobs:
             --packId StormMachine.App `
             --packVersion $version `
             --packTitle "Storm Machine" `
-            --packAuthors "Storm Machine contributors" `
+            --packAuthors "Eterix Tech - by voidnery" `
             --packDir artifacts/StormMachine.App `
             --mainExe StormMachine.exe `
             --icon src/StormMachine.App/Assets/storm.ico `

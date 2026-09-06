@@ -1,4 +1,4 @@
-using System.Reflection;
+﻿using System.Reflection;
 
 namespace StormMachine.Application;
 
@@ -18,5 +18,23 @@ public static class ProductInfo
         ?? typeof(ProductInfo).Assembly.GetName().Version?.ToString()
         ?? "0.0.0";
 
+    /// <summary>
+    /// Кто выпускает продукт.
+    /// </summary>
+    /// <remarks>
+    /// Одно место на всё: подпись в строке состояния окна, автор пакета в установщике
+    /// и сведения о сборке в свойствах файла. Строка приходит из <c>Directory.Build.props</c>
+    /// (<c>Authors</c>) — той же, из которой её берёт упаковщик, — и потому не может
+    /// разойтись с тем, что видно в установщике.
+    /// </remarks>
+    public static string Vendor { get; } =
+        typeof(ProductInfo).Assembly
+            .GetCustomAttribute<AssemblyCompanyAttribute>()?.Company is { Length: > 0 } company
+            ? company
+            : "Eterix Tech - by voidnery";
+
     public static string NameAndVersion => $"{Name} {Version}";
+
+    /// <summary>Подпись для угла окна: продукт, версия и кто его выпускает.</summary>
+    public static string Signature => $"{NameAndVersion} · {Vendor}";
 }
