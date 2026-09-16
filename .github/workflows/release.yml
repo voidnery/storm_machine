@@ -179,10 +179,38 @@ jobs:
         run: |
           Write-Host "::warning::Выпуск не подписан: токен SignPath не задан. SmartScreen покажет предупреждение при установке. Проверять скачанное — по SHA256SUMS.txt."
 
+      # Описание выпуска берётся из docs/RELEASES.md — раздел этой версии целиком.
+      # До этого шапка RELEASES.md обещала «из этого файла берётся описание выпуска»,
+      # а на деле GitHub собирал описание сам из заголовков коммитов, и написанное
+      # для человека до страницы выпуска не доходило.
+      #
+      # Записи нет — выпуск не собирается. Мягкий вариант («соберём без описания»)
+      # кончается черновиком, который публикуют не глядя: у пользователя на руках
+      # установщик без единого слова о том, что в нём и чего от него не ждать.
+      - name: Описание выпуска из RELEASES.md
+        shell: pwsh
+        run: |
+          $version = "${{ github.ref_name }}" -replace '^v', ''
+          $text = Get-Content docs/RELEASES.md -Raw -Encoding utf8
+
+          # Пробел после номера обязателен: иначе «0.2.0» совпало бы с «0.2.0-alpha.3».
+          $pattern = '(?ms)^## ' + [regex]::Escape($version) + '\s.*?(?=^---\s*$|^## |\z)'
+          $found = [regex]::Match($text, $pattern)
+
+          if (-not $found.Success) {
+            Write-Host "::error::В docs/RELEASES.md нет раздела «## $version» — выпуск без описания не собирается."
+            exit 1
+          }
+
+          $found.Value.Trim() | Set-Content release-notes.md -Encoding utf8
+          Get-Content release-notes.md -TotalCount 3 | Write-Host
+
       - name: Создание релиза
         uses: softprops/action-gh-release@v2
         with:
           name: Storm Machine ${{ github.ref_name }}
+          # Сначала написанное человеком, под ним — список изменений, собранный GitHub.
+          body_path: release-notes.md
           generate_release_notes: true
           draft: true          # черновик: оператор проверяет и публикует вручную
           prerelease: ${{ contains(github.ref_name, '-') }}
