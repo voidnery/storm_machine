@@ -73,6 +73,11 @@ internal static class CapabilityRenderer
                 Console.WriteLine($"        Нужно: {how}");
             }
 
+            if (Command(capability.Remedy) is { } command)
+            {
+                Console.WriteLine($"        {command}");
+            }
+
             if (capability.Where is { } where)
             {
                 Console.WriteLine($"        Где: {where}");
@@ -86,6 +91,26 @@ internal static class CapabilityRenderer
 
         Console.WriteLine();
     }
+
+    /// <summary>
+    /// Команда, которой это делается в консоли.
+    /// </summary>
+    /// <remarks>
+    /// Синтаксис команд живёт здесь, а не в ядре. Ядро называет действие, каждый
+    /// клиент выполняет его по-своему: консоль показывает команду, окно ставит
+    /// кнопку. Пока команда лежала в ядре, окно показывало «storm snmp creds add»
+    /// человеку, который открыл окно именно затем, чтобы не ходить в консоль.
+    /// </remarks>
+    private static string? Command(CapabilityRemedy remedy) => remedy switch
+    {
+        CapabilityRemedy.SnmpCredentials =>
+            "Команда: storm snmp creds add \"свитчи\" --версия v2c — пароль спросится отдельно "
+            + "и в историю оболочки не попадёт.",
+        CapabilityRemedy.PairAgent => "Команда: storm agents pair — код сопряжения живёт десять минут.",
+        CapabilityRemedy.Elevate => "Запустить консоль от имени администратора и повторить команду.",
+        CapabilityRemedy.InstallCaptureDriver => null,
+        _ => null,
+    };
 
     private static string Mark(CapabilityState state) => CapabilityWording.Mark(state);
 

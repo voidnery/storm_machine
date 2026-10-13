@@ -1,0 +1,201 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:StormMachine.App.ViewModels"
+             xmlns:forms="using:StormMachine.App.Controls"
+             x:Class="StormMachine.App.Views.Pages.CapturePage"
+             x:DataType="vm:CapturePageViewModel">
+
+  <Grid RowDefinitions="Auto,Auto,*" Margin="24,20">
+
+    <StackPanel Grid.Row="0" Spacing="4">
+      <TextBlock Text="{Binding Title}" Classes="h1" />
+      <TextBlock Text="{Binding Description}" Classes="body"
+                 Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap" />
+    </StackPanel>
+
+    <!-- Пульт прослушивания. Обещание «ничего не отправляем» стоит рядом с кнопкой,
+         а не в документации: читают его здесь. -->
+    <Border Grid.Row="1" Margin="0,12,0,0" Classes="card" Padding="14,10">
+      <StackPanel Spacing="8">
+
+        <!-- Слушать нечем: объяснение и кнопка, которая это чинит -->
+        <StackPanel Spacing="8" IsVisible="{Binding !IsAvailable}">
+          <TextBlock Text="{Binding Availability}" Classes="body"
+                     Foreground="{StaticResource WarningBrush}" TextWrapping="Wrap" LineHeight="18" />
+          <Button Content="Перезапустить от администратора" FontSize="12" Padding="12,5"
+                  HorizontalAlignment="Left"
+                  IsVisible="{Binding CanAskForRights}"
+                  Command="{Binding AskForRightsCommand}" />
+        </StackPanel>
+
+        <Grid ColumnDefinitions="Auto,240,Auto,80,Auto,Auto,*" IsVisible="{Binding IsAvailable}">
+          <TextBlock Grid.Column="0" Text="Слушать на:" Classes="body"
+                     Foreground="{StaticResource TextSecondaryBrush}"
+                     VerticalAlignment="Center" Margin="0,0,10,0" />
+          <!-- Выбор, а не свободный ввод: слушать можно только на той карте,
+               которая у машины есть. -->
+          <forms:Picker Grid.Column="1" SelectedItem="{Binding SelectedAdapter, Mode=TwoWay}"
+                        ItemsSource="{Binding Adapters}" Placeholder="адаптер"
+                        Empty="Подходящих адаптеров не видно" />
+
+          <TextBlock Grid.Column="2" Text="Сколько, с:" Classes="body"
+                     Foreground="{StaticResource TextSecondaryBrush}"
+                     VerticalAlignment="Center" Margin="16,0,8,0" />
+          <NumericUpDown Grid.Column="3" Value="{Binding Seconds}" Minimum="5" Maximum="3600"
+                         Increment="15" FormatString="0" FontSize="12" />
+
+          <Button Grid.Column="4" Content="Слушать" Command="{Binding ListenCommand}"
+                  IsVisible="{Binding !IsRunning}" IsEnabled="{Binding CanStart}"
+                  FontSize="12" Padding="12,5" Margin="12,0,0,0" />
+          <Button Grid.Column="5" Content="Остановить" Command="{Binding StopCommand}"
+                  IsVisible="{Binding IsRunning}"
+                  FontSize="12" Padding="12,5" Margin="12,0,0,0" />
+
+          <forms:StatusLine Grid.Column="6" Text="{Binding StatusLine}"
+                            VerticalAlignment="Center" Margin="16,0,0,0" />
+        </Grid>
+
+        <TextBlock Text="{x:Static vm:CapturePageViewModel.Promise}" Classes="caption"
+                   TextWrapping="Wrap" IsVisible="{Binding IsAvailable}" />
+
+        <TextBlock Text="{Binding Engine}" Classes="caption"
+                   IsVisible="{Binding Engine, Converter={x:Static ObjectConverters.IsNotNull}}" />
+
+        <TextBlock Text="{Binding ErrorMessage}" Classes="body"
+                   Foreground="{StaticResource DangerBrush}" TextWrapping="Wrap"
+                   IsVisible="{Binding ErrorMessage, Converter={x:Static ObjectConverters.IsNotNull}}" />
+      </StackPanel>
+    </Border>
+
+    <ScrollViewer Grid.Row="2" Margin="0,14,0,0">
+      <StackPanel Spacing="14">
+
+        <!-- Услышанное сейчас -->
+        <Border Classes="card" IsVisible="{Binding Summary, Converter={x:Static ObjectConverters.IsNotNull}}">
+          <StackPanel Spacing="8">
+            <TextBlock Text="{Binding Summary}" Classes="h2" TextWrapping="Wrap" />
+
+            <TextBlock Text="Соседи" Classes="label" />
+            <Grid ColumnDefinitions="1.3*,1.2*,0.6*,1.5*" Margin="0,2,0,0">
+              <TextBlock Grid.Column="0" Text="сосед" Classes="caption" />
+              <TextBlock Grid.Column="1" Text="его порт" Classes="caption" />
+              <TextBlock Grid.Column="2" Text="протокол" Classes="caption" />
+              <TextBlock Grid.Column="3" Text="описание" Classes="caption" />
+            </Grid>
+            <ItemsControl ItemsSource="{Binding Neighbors}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:NeighborRow">
+                  <Grid ColumnDefinitions="1.3*,1.2*,0.6*,1.5*" Margin="0,2">
+                    <TextBlock Grid.Column="0" Text="{Binding Name}" Classes="body"
+                               TextTrimming="CharacterEllipsis" Margin="0,0,8,0" />
+                    <TextBlock Grid.Column="1" Text="{Binding Port}" Classes="body"
+                               TextTrimming="CharacterEllipsis" Margin="0,0,8,0" />
+                    <TextBlock Grid.Column="2" Text="{Binding Protocol}" Classes="body"
+                               Foreground="{StaticResource InfoBrush}" />
+                    <TextBlock Grid.Column="3" Text="{Binding About}" Classes="body"
+                               Foreground="{StaticResource TextSecondaryBrush}"
+                               TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding About}" />
+                  </Grid>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <TextBlock Text="{x:Static vm:CapturePageViewModel.NeighborNote}" Classes="caption"
+                       TextWrapping="Wrap" />
+
+            <TextBlock Text="Серверы DHCP" Classes="label" Margin="0,6,0,0" />
+            <Grid ColumnDefinitions="1.1*,1.2*,1.1*,1.5*,0.5*" Margin="0,2,0,0">
+              <TextBlock Grid.Column="0" Text="сервер" Classes="caption" />
+              <TextBlock Grid.Column="1" Text="MAC" Classes="caption" />
+              <TextBlock Grid.Column="2" Text="объявляет шлюз" Classes="caption" />
+              <TextBlock Grid.Column="3" Text="объявляет DNS" Classes="caption" />
+              <TextBlock Grid.Column="4" Text="ответов" Classes="caption" />
+            </Grid>
+            <ItemsControl ItemsSource="{Binding Servers}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:DhcpRow">
+                  <Grid ColumnDefinitions="1.1*,1.2*,1.1*,1.5*,0.5*" Margin="0,2">
+                    <TextBlock Grid.Column="0" Text="{Binding Address}" Classes="body"
+                               TextTrimming="CharacterEllipsis" Margin="0,0,8,0" />
+                    <TextBlock Grid.Column="1" Text="{Binding Mac}" Classes="body"
+                               Foreground="{StaticResource TextSecondaryBrush}"
+                               TextTrimming="CharacterEllipsis" Margin="0,0,8,0" />
+
+                    <!-- Шлюз, которого машина не знает, — единственное утверждение,
+                         которое продукт делает сам. Поэтому оно и выделено. -->
+                    <TextBlock Grid.Column="2" Text="{Binding Gateway}" Classes="body"
+                               TextTrimming="CharacterEllipsis" Margin="0,0,8,0"
+                               Foreground="{StaticResource WarningBrush}"
+                               ToolTip.Tip="Этот шлюз машине неизвестен"
+                               IsVisible="{Binding IsStranger}" />
+                    <TextBlock Grid.Column="2" Text="{Binding Gateway}" Classes="body"
+                               TextTrimming="CharacterEllipsis" Margin="0,0,8,0"
+                               IsVisible="{Binding !IsStranger}" />
+
+                    <TextBlock Grid.Column="3" Text="{Binding Dns}" Classes="body"
+                               Foreground="{StaticResource TextSecondaryBrush}"
+                               TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Dns}" />
+                    <TextBlock Grid.Column="4" Text="{Binding Sightings}" Classes="body" />
+                  </Grid>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <TextBlock Text="{x:Static vm:CapturePageViewModel.DhcpNote}" Classes="caption"
+                       TextWrapping="Wrap" />
+
+            <TextBlock Text="{Binding Caveat}" Classes="caption" TextWrapping="Wrap"
+                       Foreground="{StaticResource WarningBrush}"
+                       IsVisible="{Binding Caveat, Converter={x:Static ObjectConverters.IsNotNull}}" />
+          </StackPanel>
+        </Border>
+
+        <!-- Услышанное раньше: когда сервер появился — это и есть вопрос,
+             ради которого ведут историю -->
+        <Border Classes="card">
+          <StackPanel Spacing="8">
+            <TextBlock Text="Слышали раньше — за 30 дней" Classes="h2" />
+
+            <TextBlock Text="История копится при каждом прослушивании и переживает закрытие программы. Посторонний сервер DHCP сам по себе ничего не доказывает, а появившийся вчера — уже событие."
+                       Classes="caption" TextWrapping="Wrap" LineHeight="15" />
+
+            <ItemsControl ItemsSource="{Binding HeardNeighbors}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:NeighborRow">
+                  <Grid ColumnDefinitions="1.3*,1.2*,0.6*,1.9*" Margin="0,2">
+                    <TextBlock Grid.Column="0" Text="{Binding Name}" Classes="body"
+                               TextTrimming="CharacterEllipsis" Margin="0,0,8,0" />
+                    <TextBlock Grid.Column="1" Text="{Binding Port}" Classes="body"
+                               TextTrimming="CharacterEllipsis" Margin="0,0,8,0" />
+                    <TextBlock Grid.Column="2" Text="{Binding Protocol}" Classes="body"
+                               Foreground="{StaticResource InfoBrush}" />
+                    <TextBlock Grid.Column="3" Text="{Binding Seen}" Classes="caption"
+                               VerticalAlignment="Center" />
+                  </Grid>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <ItemsControl ItemsSource="{Binding HeardServers}" Margin="0,6,0,0">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:DhcpRow">
+                  <Grid ColumnDefinitions="1.1*,1.1*,1.5*,1.9*" Margin="0,2">
+                    <TextBlock Grid.Column="0" Text="{Binding Address}" Classes="body"
+                               TextTrimming="CharacterEllipsis" Margin="0,0,8,0" />
+                    <TextBlock Grid.Column="1" Text="{Binding Gateway}" Classes="body"
+                               TextTrimming="CharacterEllipsis" Margin="0,0,8,0" />
+                    <TextBlock Grid.Column="2" Text="{Binding Dns}" Classes="body"
+                               Foreground="{StaticResource TextSecondaryBrush}"
+                               TextTrimming="CharacterEllipsis" Margin="0,0,8,0" />
+                    <TextBlock Grid.Column="3" Text="{Binding Seen}" Classes="caption"
+                               VerticalAlignment="Center" />
+                  </Grid>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </StackPanel>
+        </Border>
+      </StackPanel>
+    </ScrollViewer>
+  </Grid>
+</UserControl>

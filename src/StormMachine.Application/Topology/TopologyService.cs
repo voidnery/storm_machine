@@ -327,8 +327,10 @@ public sealed class TopologyService(
 
         if (remembered.Count > 0 && options.SnmpTargets.Count == 0)
         {
+            // Без команды консоли: эту же строку читает окно, а там забывают
+            // устройство на карте (сторож в ArchTests).
             note?.Invoke($"Помню устройства: {string.Join(", ", remembered)}. "
-                         + "Забыть — storm topology forget <адрес>.");
+                         + "Любое из них можно забыть, если опрашивать его больше не нужно.");
         }
 
         var found = new List<SnmpDevice>();

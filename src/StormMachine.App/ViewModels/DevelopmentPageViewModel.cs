@@ -26,6 +26,35 @@ public sealed record CapabilityRow(Capability Capability)
 
     /// <summary>Цвет точки состояния. Тот же словарь, что у мониторов и вердиктов.</summary>
     public VerdictLevel Level => DevelopmentPageViewModel.LevelOf(Capability.State);
+
+    /// <summary>
+    /// Подпись кнопки, которая это чинит.
+    /// </summary>
+    /// <remarks>
+    /// Окно делает, а не пересказывает: ядро называет действие, клиент ставит кнопку.
+    /// Замечание оператора — «Завести набор: storm snmp creds add …» стояло в окне,
+    /// открытом именно затем, чтобы не ходить в консоль.
+    /// </remarks>
+    public string? ActionTitle => Capability.Remedy switch
+    {
+        CapabilityRemedy.Elevate => "Перезапустить от администратора",
+        CapabilityRemedy.SnmpCredentials => "Завести учётные данные",
+        CapabilityRemedy.PairAgent => "Сопрячь агента",
+        _ => null,
+    };
+
+    /// <summary>Куда вести, если починка — это другой экран.</summary>
+    public string? ActionRoute => Capability.Remedy switch
+    {
+        CapabilityRemedy.SnmpCredentials or CapabilityRemedy.PairAgent => NavigationMap.Settings,
+        _ => null,
+    };
+
+    /// <summary>Кнопка ведёт на другой экран.</summary>
+    public bool LeadsSomewhere => ActionRoute is not null;
+
+    /// <summary>Кнопка перезапускает продукт с правами — это делает сам клиент.</summary>
+    public bool AsksForRights => Capability.Remedy == CapabilityRemedy.Elevate;
 }
 
 /// <summary>Уровень зависимостей со своими возможностями.</summary>
@@ -70,6 +99,18 @@ public sealed partial class DevelopmentPageViewModel(
 
     public override Task ActivateAsync(CancellationToken cancellationToken = default) =>
         RefreshAsync(cancellationToken);
+
+    /// <summary>
+    /// Перезапуск с правами прямо отсюда.
+    /// </summary>
+    /// <remarks>
+    /// Половина строк этого экрана кончалась словами «перезапустите продукт от имени
+    /// администратора» — действием, которое клиент умеет выполнить сам. Отказ
+    /// в запросе прав обычен и беды не составляет: продукт остаётся работать,
+    /// а строка об этом говорит.
+    /// </remarks>
+    [RelayCommand]
+    private void AskForRights() => ErrorMessage = Services.Elevation.Restart();
 
     [RelayCommand]
     private async Task RefreshAsync(CancellationToken cancellationToken)

@@ -16,6 +16,7 @@ internal static class NavigationMap
     public const string Discovery = "/local/discovery";
     public const string Devices = "/local/devices";
     public const string Topology = "/local/topology";
+    public const string Capture = "/local/capture";
     public const string Runs = "/runs";
     public const string Presets = "/presets";
     public const string Probes = "/internet/probes";
@@ -53,6 +54,10 @@ internal static class NavigationMap
         new(Discovery, "Обнаружение", "Сканирование подсети: какие узлы в ней есть.", null, "Своя сеть"),
         new(Devices, "Устройства", "Инвентарь: адреса, MAC, производитель, имена и что изменилось.", null, "Своя сеть"),
         new(Topology, "Карта сети", "Граф сети с видимым различием подтверждённого и выведенного.", null, "Своя сеть"),
+
+        // Раздел появился в И-25 вместе со встроенным захватом: пока слушать мог
+        // один из ста, прослушивание жило в консоли и это было терпимо.
+        new(Capture, "Эфир", "Соседство по LLDP и CDP и серверы DHCP — из того, что устройства объявляют сами.", null, "Своя сеть"),
         new(LocalTests, "Локальные тесты", "Ping, TCP и UDP до машин своей сети; скорость между точками и сравнение резолверов DNS.", null, "Своя сеть"),
         new(Latency, "Задержка", "Непрерывный ping с живым графиком, джиттером и PDV.", null, "Своя сеть"),
 

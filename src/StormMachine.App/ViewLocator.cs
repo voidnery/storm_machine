@@ -24,6 +24,7 @@ public sealed class ViewLocator : IDataTemplate
         PathPageViewModel => new PathPage(),
         PresetsPageViewModel => new PresetsPage(),
         TopologyPageViewModel => new TopologyPage(),
+        CapturePageViewModel => new CapturePage(),
         RunsPageViewModel => new RunsPage(),
         ProbesPageViewModel => new ProbesPage(),
         InspectPageViewModel => new InspectPage(),

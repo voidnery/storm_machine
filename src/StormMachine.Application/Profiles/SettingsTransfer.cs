@@ -65,7 +65,7 @@ public sealed class SettingsTransfer(
     public const string SecretsNote =
         "Учётные данные SNMP и пароли каналов оповещения в файл не попадают: они зашифрованы "
         + "ключом вашей учётной записи и на другой машине не расшифруются. Их надо завести "
-        + "заново — «storm snmp creds add» и «storm alerts set».";
+        + "заново — там же, где заводили здесь.";
 
     /// <summary>Собирает всё, что можно перенести.</summary>
     public async Task<SettingsBundle> ExportAsync(CancellationToken cancellationToken = default)

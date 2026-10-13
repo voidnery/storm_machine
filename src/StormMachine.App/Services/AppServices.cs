@@ -63,6 +63,7 @@ internal static class AppServices
         NavigationMap.Discovery => ActivatorUtilities.CreateInstance<DiscoveryPageViewModel>(provider, section),
         NavigationMap.Devices => ActivatorUtilities.CreateInstance<DevicesPageViewModel>(provider, section),
         NavigationMap.Topology => ActivatorUtilities.CreateInstance<TopologyPageViewModel>(provider, section),
+        NavigationMap.Capture => ActivatorUtilities.CreateInstance<CapturePageViewModel>(provider, section),
         NavigationMap.Presets => ActivatorUtilities.CreateInstance<PresetsPageViewModel>(provider, section),
         NavigationMap.Runs => ActivatorUtilities.CreateInstance<RunsPageViewModel>(provider, section),
         NavigationMap.Probes => ActivatorUtilities.CreateInstance<ProbesPageViewModel>(provider, section),

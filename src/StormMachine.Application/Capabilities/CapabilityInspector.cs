@@ -1,4 +1,4 @@
-using StormMachine.Application.Abstractions;
+﻿using StormMachine.Application.Abstractions;
 using System.Globalization;
 using StormMachine.Application.Probes;
 using StormMachine.Domain.Capabilities;
@@ -110,8 +110,14 @@ public sealed class CapabilityInspector(
                 {
                     CapabilityState.NeedsElevation => "Перезапустить продукт от имени администратора.",
                     CapabilityState.NeedsAgent =>
-                        "Поставить storm-agent на второй машине и сопрячь: storm agents pair.",
+                        "Поставить агента на второй машине и сопрячь с этой.",
                     _ => null,
+                },
+                Remedy = state switch
+                {
+                    CapabilityState.NeedsElevation => CapabilityRemedy.Elevate,
+                    CapabilityState.NeedsAgent => CapabilityRemedy.PairAgent,
+                    _ => CapabilityRemedy.None,
                 },
             };
         }
@@ -145,8 +151,9 @@ public sealed class CapabilityInspector(
             // До И-17 здесь стояло «появится с уровнем 1». Уровни сделаны, и строка
             // обязана называть действие, а не срок: обещание, пережившее свой срок,
             // хуже отсутствия обещания.
-            HowToEnable = "Точную привязку к портам даёт уровень 1: storm snmp creds add. "
-                          + "Свой порт на коммутаторе — уровень 2: storm topology --захват 60.",
+            HowToEnable = "Точную привязку к портам даёт уровень 1 — учётные данные SNMP. "
+                          + "Свой порт на коммутаторе слышно на уровне 2, прослушиванием эфира.",
+            Remedy = CapabilityRemedy.SnmpCredentials,
         };
 
         yield return new Capability
@@ -164,6 +171,7 @@ public sealed class CapabilityInspector(
                 ? null
                 : "Обычно помогает запуск от имени администратора. На части систем "
                   + "сырые сокеты закрыты политикой и с ним.",
+            Remedy = _system.CanOpenRawSockets ? CapabilityRemedy.None : CapabilityRemedy.Elevate,
         };
 
         yield return new Capability
@@ -231,8 +239,9 @@ public sealed class CapabilityInspector(
                 : "Учётных данных нет — опрашивать оборудование нечем.",
             HowToEnable = configured > 0
                 ? null
-                : "Завести набор: storm snmp creds add \"свитчи\" --версия v2c. "
-                  + "Пароль спрашивается отдельно и в историю оболочки не попадает.",
+                : "Завести набор учётных данных. Пароль хранится отдельно и шифруется "
+                  + "средствами Windows.",
+            Remedy = configured > 0 ? CapabilityRemedy.None : CapabilityRemedy.SnmpCredentials,
         };
     }
 
@@ -269,6 +278,7 @@ public sealed class CapabilityInspector(
             State = state,
             Detail = Detail(refusal, engine, driver),
             HowToEnable = HowToEnable(refusal, engine),
+            Remedy = Remedy(refusal, engine),
             Where = Where(refusal, engine),
         };
 
@@ -282,6 +292,7 @@ public sealed class CapabilityInspector(
             State = state,
             Detail = Detail(refusal, engine, driver),
             HowToEnable = HowToEnable(refusal, engine),
+            Remedy = Remedy(refusal, engine),
             Where = Where(refusal, engine),
         };
     }
@@ -325,6 +336,22 @@ public sealed class CapabilityInspector(
             + "не распространяет — лицензия NPSL это запрещает.",
         _ => "Npcap ставится отдельно и вручную: продукт его не распространяет "
              + "ни при каких условиях — лицензия NPSL это запрещает.",
+    };
+
+    /// <summary>
+    /// Что оператор может сделать своими руками.
+    /// </summary>
+    /// <remarks>
+    /// Перезапуск с правами — действие, которое окно умеет выполнить само. Установка
+    /// стороннего драйвера — нет: это чужая программа, и дальше ссылки продукт
+    /// не идёт.
+    /// </remarks>
+    private static CapabilityRemedy Remedy(CaptureRefusal refusal, CaptureEngine engine) => refusal switch
+    {
+        CaptureRefusal.None or CaptureRefusal.NoAdapters => CapabilityRemedy.None,
+        CaptureRefusal.NeedsElevation => CapabilityRemedy.Elevate,
+        _ when engine == CaptureEngine.WindowsBuiltIn => CapabilityRemedy.Elevate,
+        _ => CapabilityRemedy.InstallCaptureDriver,
     };
 
     /// <summary>

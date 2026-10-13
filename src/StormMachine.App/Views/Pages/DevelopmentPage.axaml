@@ -81,6 +81,20 @@
                               <TextBlock Text="{Binding Where}" FontSize="10" Foreground="{StaticResource TextSecondaryBrush}"
                                          FontFamily="Consolas,Menlo,monospace"
                                          IsVisible="{Binding Where, Converter={x:Static ObjectConverters.IsNotNull}}" />
+
+                              <!-- Кнопка вместо пересказа. Окно, которое умеет сделать
+                                   работу само, не вправе отправлять за ней ни в консоль,
+                                   ни на другой экран словами: туда ведёт кнопка. -->
+                              <Button Content="{Binding ActionTitle}" FontSize="11" Margin="0,4,0,0"
+                                      HorizontalAlignment="Left"
+                                      IsVisible="{Binding AsksForRights}"
+                                      Command="{Binding $parent[UserControl].((vm:DevelopmentPageViewModel)DataContext).AskForRightsCommand}" />
+
+                              <Button Content="{Binding ActionTitle}" FontSize="11" Margin="0,4,0,0"
+                                      HorizontalAlignment="Left"
+                                      IsVisible="{Binding LeadsSomewhere}"
+                                      CommandParameter="{Binding ActionRoute}"
+                                      Command="{Binding $parent[Window].((vm:MainWindowViewModel)DataContext).GoToCommand}" />
                             </StackPanel>
                           </Grid>
                         </Border>

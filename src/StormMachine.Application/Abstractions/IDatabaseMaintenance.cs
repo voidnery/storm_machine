@@ -91,8 +91,10 @@ public static class StorageProblem
             if (e.Message.Contains("malformed", StringComparison.OrdinalIgnoreCase)
                 || e.Message.Contains("not a database", StringComparison.OrdinalIgnoreCase))
             {
-                return "файл базы повреждён и читается не весь. Проверить: storm db check; "
-                     + "вылечить с резервной копией: storm db repair.";
+                // Без команд консоли: это же объяснение видит и окно, где проверка
+                // и лечение базы — кнопки в настройках (сторож в ArchTests).
+                return "файл базы повреждён и читается не весь. Продукт умеет проверить "
+                     + "его и вылечить, сохранив повреждённый файл целиком.";
             }
         }
 

@@ -186,6 +186,61 @@ public sealed class DesignTokenTests
     }
 
     /// <summary>
+    /// Ядро не знает синтаксиса консоли.
+    /// </summary>
+    /// <remarks>
+    /// Разметку окна сторож уже проверял — и пропустил ровно тот же отказ, пришедший
+    /// с другой стороны: текст «Завести набор: storm snmp creds add "свитчи"
+    /// --версия v2c» приехал в окно из <c>CapabilityInspector</c>, то есть из ядра.
+    /// Нашёл это оператор, а не проверка.
+    /// <para>
+    /// Правило: ядро называет <b>действие</b>, а как оно делается — знает клиент.
+    /// Консоль печатает свою команду, окно ставит кнопку. Команда в ядре — это
+    /// та же команда в обоих клиентах, и в окне она читается как «здесь этого нельзя».
+    /// </para>
+    /// <para>
+    /// Комментарии не в счёт: ссылка на команду в пояснении к коду адресована тому,
+    /// кто этот код читает, а не оператору.
+    /// </para>
+    /// </remarks>
+    [Fact(DisplayName = "Ядро не отправляет оператора в консоль")]
+    public void Core_DoesNotSpeakConsoleSyntax()
+    {
+        var violations = new List<string>();
+
+        foreach (var file in RepositoryLayout.SourceFiles("src/StormMachine.Application")
+                     .Concat(RepositoryLayout.SourceFiles("src/StormMachine.Domain")))
+        {
+            var lines = File.ReadAllLines(file);
+
+            for (var i = 0; i < lines.Length; i++)
+            {
+                var line = lines[i].TrimStart();
+
+                if (line.StartsWith("///", StringComparison.Ordinal)
+                    || line.StartsWith("//", StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                // «storm» и слово через пробел — это команда. Дефис не в счёт:
+                // «storm-agent.exe» — имя файла, который ядро и правда собирает,
+                // а не предложение сходить в другую программу.
+                if (Regex.IsMatch(lines[i], @"storm [a-zа-я]"))
+                {
+                    violations.Add($"{RepositoryLayout.Relative(file)}:{i + 1} — {line.Trim()}");
+                }
+            }
+        }
+
+        Assert.True(
+            violations.Count == 0,
+            "Команда консоли в тексте ядра. Ядро называет действие, синтаксис — дело клиента: "
+            + "консоль печатает команду, окно ставит кнопку:"
+            + Environment.NewLine + string.Join(Environment.NewLine, violations));
+    }
+
+    /// <summary>
     /// Разметка не решает сама, как показать измеренное число.
     /// </summary>
     /// <remarks>

@@ -85,7 +85,10 @@ public sealed class CapabilityInspectorTests
         var probe = Find(report, "probe.throughput");
 
         Assert.Equal(CapabilityState.NeedsAgent, probe.State);
-        Assert.Contains("storm agents pair", probe.HowToEnable, StringComparison.Ordinal);
+
+        // Проверяется действие, а не фраза: синтаксис команды — дело консоли,
+        // ядро называет, что надо сделать (И-25).
+        Assert.Equal(CapabilityRemedy.PairAgent, probe.Remedy);
     }
 
     [Fact(DisplayName = "Сопряжённый агент открывает пробу между двумя точками")]
@@ -186,7 +189,11 @@ public sealed class CapabilityInspectorTests
         var capture = Find(await Inspector([Descriptor("ping")]).InspectAsync(), "snmp");
 
         Assert.Equal(CapabilityState.NeedsCredentials, capture.State);
-        Assert.Contains("storm snmp creds add", capture.HowToEnable, StringComparison.Ordinal);
+        Assert.Equal(CapabilityRemedy.SnmpCredentials, capture.Remedy);
+
+        // И ни слова синтаксиса консоли: эту же строку читает окно, где учётные
+        // данные заводят формой (замечание оператора, И-25).
+        Assert.DoesNotContain("storm ", capture.HowToEnable, StringComparison.Ordinal);
     }
 
     [Fact(DisplayName = "Недоступное хранилище агентов не роняет сводку")]
