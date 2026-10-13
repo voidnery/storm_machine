@@ -567,7 +567,9 @@ scenario_i26() {
 
     show "2. Версия поднята по правилу: Z — работа, alpha.N — выпуск"         sh -c "grep -o '<Version>[^<]*</Version>' \"$root/Directory.Build.props\""
 
-    show "3. У поднятой версии есть запись выпуска"         sh -c "grep -c '^## 0.2.1-alpha.3' \"$root/docs/RELEASES.md\""
+    # Номер берётся из проекта, а не хранится здесь копией: копия отстанет
+    # на первой же правке версии, и шаг начнёт проверять прошлое.
+    show "3. У поднятой версии есть запись выпуска"         sh -c "v=\$(sed -n 's:.*<Version>\\(.*\\)</Version>.*:\\1:p' \"$root/Directory.Build.props\" | head -n 1 | tr -d ' \\r') && echo \"версия: \$v\" && grep -c \"^## \$v\" \"$root/docs/RELEASES.md\""
 
     say "Что смотреть глазами:"
     say "  · storm-agent-ui.exe рядом с клиентом: окно агента. Отпечаток и код"
