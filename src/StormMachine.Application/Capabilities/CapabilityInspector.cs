@@ -249,6 +249,7 @@ public sealed class CapabilityInspector(
     {
         var refusal = _capture?.Availability ?? CaptureRefusal.NoDriver;
         var driver = _capture?.DriverDescription;
+        var engine = _capture?.Engine ?? CaptureEngine.None;
 
         var state = refusal switch
         {
@@ -266,9 +267,9 @@ public sealed class CapabilityInspector(
                     + "объявляют сами. Учётных данных не требует.",
             Level = CapabilityLevel.Capture,
             State = state,
-            Detail = Detail(refusal, driver),
-            HowToEnable = HowToEnable(refusal),
-            Where = refusal == CaptureRefusal.NoDriver ? CaptureDriverSite : null,
+            Detail = Detail(refusal, engine, driver),
+            HowToEnable = HowToEnable(refusal, engine),
+            Where = Where(refusal, engine),
         };
 
         yield return new Capability
@@ -279,30 +280,63 @@ public sealed class CapabilityInspector(
                     + "сколько серверов в сегменте и какой шлюз каждый объявляет.",
             Level = CapabilityLevel.Capture,
             State = state,
-            Detail = Detail(refusal, driver),
-            HowToEnable = HowToEnable(refusal),
-            Where = refusal == CaptureRefusal.NoDriver ? CaptureDriverSite : null,
+            Detail = Detail(refusal, engine, driver),
+            HowToEnable = HowToEnable(refusal, engine),
+            Where = Where(refusal, engine),
         };
     }
 
-    private static string Detail(CaptureRefusal refusal, string? driver) => refusal switch
+    /// <summary>
+    /// Чем слушаем и что этому мешает.
+    /// </summary>
+    /// <remarks>
+    /// Текст зависит не только от отказа, но и от источника: «драйвер не установлен»
+    /// и «встроенному захвату нужны права» — разные беды с разной ценой починки,
+    /// и склеить их в одну строку значит отправить человека ставить то, что ему
+    /// не нужно.
+    /// </remarks>
+    private static string Detail(CaptureRefusal refusal, CaptureEngine engine, string? driver) => refusal switch
     {
-        CaptureRefusal.None => $"Драйвер захвата работает: {driver ?? "версия не определена"}. "
+        CaptureRefusal.None => $"Захват работает: {driver ?? "источник не назвался"}. "
                                + "Продукт слушает без неразборчивого режима — только то, "
                                + "что адресовано нам или разослано всем.",
+        CaptureRefusal.NeedsElevation when engine == CaptureEngine.WindowsBuiltIn =>
+            "Встроенный в Windows захват на месте, ставить ничего не нужно — "
+            + "но драйвер pktmon разговаривает только с администратором.",
         CaptureRefusal.NeedsElevation => "Драйвер установлен, но не пускает: Npcap умеет "
                                          + "ставиться с ограничением доступа администраторами.",
-        CaptureRefusal.NoAdapters => "Драйвер есть, но подходящих адаптеров он не показывает.",
+        CaptureRefusal.NoAdapters => "Захват доступен, но подходящих адаптеров не видно.",
+        _ when engine == CaptureEngine.None =>
+            "Слушать нечем: встроенного захвата на этой системе нет, стороннего драйвера тоже.",
         _ => "Драйвер захвата на этой машине не установлен.",
     };
 
-    private static string? HowToEnable(CaptureRefusal refusal) => refusal switch
+    private static string? HowToEnable(CaptureRefusal refusal, CaptureEngine engine) => refusal switch
     {
         CaptureRefusal.None => null,
+        CaptureRefusal.NeedsElevation when engine == CaptureEngine.WindowsBuiltIn =>
+            "Перезапустить продукт от имени администратора. Больше ничего не требуется.",
         CaptureRefusal.NeedsElevation => "Перезапустить продукт от имени администратора "
                                          + "либо переустановить Npcap без ограничения доступа.",
         CaptureRefusal.NoAdapters => "Проверить, что адаптер включён и виден системе.",
+        _ when engine == CaptureEngine.None =>
+            "Встроенный захват появился в Windows 10 1809. На более старой системе "
+            + "остаётся Npcap: он ставится отдельно и вручную, продукт его "
+            + "не распространяет — лицензия NPSL это запрещает.",
         _ => "Npcap ставится отдельно и вручную: продукт его не распространяет "
              + "ни при каких условиях — лицензия NPSL это запрещает.",
     };
+
+    /// <summary>
+    /// Куда идти за недостающим.
+    /// </summary>
+    /// <remarks>
+    /// Ссылка на сайт драйвера уместна ровно тогда, когда ставить его и правда
+    /// нужно. Там, где хватает перезапуска с правами, она сбивает с толку —
+    /// человек идёт ставить стороннее вместо одного действия мышью.
+    /// </remarks>
+    private static string? Where(CaptureRefusal refusal, CaptureEngine engine) =>
+        refusal == CaptureRefusal.NoDriver && engine != CaptureEngine.WindowsBuiltIn
+            ? CaptureDriverSite
+            : null;
 }

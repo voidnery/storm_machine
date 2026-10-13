@@ -17,7 +17,9 @@
     <Project Path="src/StormMachine.Storage/StormMachine.Storage.csproj" />
   </Folder>
   <Folder Name="/plugins/">
+    <Project Path="plugins/StormMachine.Capture.Frames/StormMachine.Capture.Frames.csproj" />
     <Project Path="plugins/StormMachine.Capture.Npcap/StormMachine.Capture.Npcap.csproj" />
+    <Project Path="plugins/StormMachine.Capture.PktMon/StormMachine.Capture.PktMon.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/StormMachine.ArchTests/StormMachine.ArchTests.csproj" />

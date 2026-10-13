@@ -218,12 +218,15 @@ public sealed class CapabilityInspectorTests
     }
 
     /// <summary>Плагин захвата, отвечающий заданным состоянием.</summary>
-    private sealed class FakeCapture(CaptureRefusal refusal) : ICaptureProvider
+    private sealed class FakeCapture(CaptureRefusal refusal, CaptureEngine engine = CaptureEngine.Npcap)
+        : ICaptureProvider
     {
         public FakeCapture(bool driver)
             : this(driver ? CaptureRefusal.None : CaptureRefusal.NoDriver)
         {
         }
+
+        public CaptureEngine Engine { get; } = engine;
 
         public CaptureRefusal Availability { get; } = refusal;
 
@@ -240,10 +243,6 @@ public sealed class CapabilityInspectorTests
     private sealed class FakeSystemCapabilities : ISystemCapabilities
     {
         public bool IsElevated { get; init; }
-
-        public bool IsCaptureDriverInstalled { get; init; }
-
-        public string? CaptureDriverDescription { get; init; }
 
         public bool CanOpenRawSockets { get; init; } = true;
     }

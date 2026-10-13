@@ -7,7 +7,7 @@ using PacketDotNet.Lldp;
 using StormMachine.Domain.Capture;
 using StormMachine.Domain.Discovery;
 
-namespace StormMachine.Capture.Npcap;
+namespace StormMachine.Capture.Frames;
 
 /// <summary>Что удалось вычитать из одного кадра.</summary>
 public sealed record FrameFinding(LinkNeighbor? Neighbor, DhcpSighting? Dhcp)

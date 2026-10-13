@@ -236,6 +236,30 @@ public sealed class SqliteObservationStoreTests : IDisposable
     }
 
     /// <summary>
+    /// Запись в чистую базу, которую никто не готовил.
+    /// </summary>
+    /// <remarks>
+    /// Все остальные проверки в этом файле начинаются с <c>InitializeAsync</c> —
+    /// и ровно поэтому пропустили настоящую беду. Боевой прогон на чистой базе:
+    /// <c>storm capture listen</c> сорок секунд слушал сеть, услышал два коммутатора
+    /// и сервер DHCP, после чего упал на «no such table: heard_neighbors». Всё
+    /// услышанное пропало, а второй раз услышать то же самое нельзя.
+    /// <para>
+    /// Готовить базу — обязанность хранилища, а не того, кто к нему пришёл: забыть
+    /// позвать можно в любом новом месте, а хранилище одно.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public async Task FreshDatabase_NeedsNoPreparation()
+    {
+        var store = CreateStore();
+
+        await store.SaveCaptureAsync(Capture(DateTimeOffset.UnixEpoch));
+
+        Assert.Single(await store.ListNeighborsAsync(DateTimeOffset.UnixEpoch));
+    }
+
+    /// <summary>
     /// Сервер, сменивший объявляемый шлюз, попадает в историю отдельной записью.
     /// </summary>
     /// <remarks>

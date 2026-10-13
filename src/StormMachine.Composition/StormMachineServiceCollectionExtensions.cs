@@ -24,6 +24,7 @@ using StormMachine.Platform.Geo;
 using StormMachine.Probes;
 using StormMachine.Reporting;
 using StormMachine.Capture.Npcap;
+using StormMachine.Capture.PktMon;
 using StormMachine.Snmp;
 using StormMachine.Storage;
 
@@ -82,9 +83,18 @@ public static class StormMachineServiceCollectionExtensions
         services.AddSingleton<ISnmpClient, SharpSnmpClient>();
         services.AddSingleton<SnmpService>();
 
-        // Уровень 2. Драйвер захвата продукт не распространяет — плагин обязан
-        // уметь честно сказать «меня нет» и не упасть при этом. Проверено спайком-09.
-        services.AddSingleton<ICaptureProvider, NpcapCaptureProvider>();
+        // Уровень 2. Источников два, и порядок здесь — это порядок предпочтения.
+        // Npcap отдаёт кадры потоком, но его продукт не распространяет (NPSL),
+        // и стоит он у немногих. Встроенный в Windows pktmon стоит у всех и даёт
+        // те же три вида кадров через журнал — спайк-10. Оба обязаны честно
+        // сказать «меня нет» и не упасть при этом (спайк-09).
+        services.AddSingleton<NpcapCaptureProvider>();
+        services.AddSingleton<PktMonCaptureProvider>();
+        services.AddSingleton<ICaptureProvider>(provider => new ChoosingCaptureProvider(
+        [
+            provider.GetRequiredService<NpcapCaptureProvider>(),
+            provider.GetRequiredService<PktMonCaptureProvider>(),
+        ]));
         services.AddSingleton<CaptureService>();
 
         // Библиотека пресетов делит базу с журналом, поэтому строится поверх него.

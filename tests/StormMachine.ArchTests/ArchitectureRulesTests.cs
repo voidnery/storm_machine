@@ -142,18 +142,42 @@ public sealed class ArchitectureRulesTests
             $"Захват пакетов просочился в src/: {string.Join(", ", leaks)}. "
             + "SharpPcap разрешён только в plugins/.");
 
-        var plugin = RepositoryLayout.PluginProjects
+        var npcap = RepositoryLayout.PluginProjects
             .FirstOrDefault(p => p.Name == "StormMachine.Capture.Npcap");
 
-        Assert.NotNull(plugin);
+        Assert.NotNull(npcap);
 
         Assert.Contains(
-            plugin!.PackageReferences,
+            npcap!.PackageReferences,
             r => r.Contains("SharpPcap", StringComparison.OrdinalIgnoreCase));
 
-        // Плагин видит только слой приложения: реализовать порт — вся его работа.
-        var unexpected = plugin.ProjectReferences
-            .Where(r => !r.Contains("StormMachine.Application", StringComparison.Ordinal))
+        // Разбор кадров общий для источников: байты одни и те же, кто бы их
+        // ни принёс. Поэтому библиотека разбора живёт ровно в одном проекте —
+        // иначе разборов стало бы два, и однажды они разошлись бы.
+        var parsers = RepositoryLayout.PluginProjects
+            .Where(p => p.PackageReferences.Any(r =>
+                r.Contains("PacketDotNet", StringComparison.OrdinalIgnoreCase)))
+            .Select(p => p.Name)
+            .ToList();
+
+        Assert.Equal(["StormMachine.Capture.Frames"], parsers);
+
+        // Встроенный в Windows источник не тянет ничего: pktmon входит в систему,
+        // а кадры разбирает общий проект. Появившаяся здесь зависимость означала бы,
+        // что уровень 2 опять чего-то требует от машины оператора.
+        var builtIn = RepositoryLayout.PluginProjects
+            .FirstOrDefault(p => p.Name == "StormMachine.Capture.PktMon");
+
+        Assert.NotNull(builtIn);
+        Assert.Empty(builtIn!.PackageReferences);
+
+        // Плагины видят слой приложения и общий разбор — и ничего сверх того:
+        // реализовать порт и разобрать байты — вся их работа.
+        var unexpected = RepositoryLayout.PluginProjects
+            .SelectMany(p => p.ProjectReferences.Select(r => (Plugin: p.Name, Reference: r)))
+            .Where(x => !x.Reference.Contains("StormMachine.Application", StringComparison.Ordinal)
+                        && !x.Reference.Contains("StormMachine.Capture.Frames", StringComparison.Ordinal))
+            .Select(x => $"{x.Plugin} → {x.Reference}")
             .ToList();
 
         Assert.True(

@@ -130,7 +130,7 @@ internal static class HistoryRenderer
             Console.WriteLine($"За последние {HistoryCommands.Days(days)} в эфире ничего не слышали.");
             Console.WriteLine();
             Console.WriteLine("История накапливается при прослушивании: «storm capture listen --секунд 60».");
-            Console.WriteLine("Оно требует установленного Npcap — продукт его не распространяет.");
+            Console.WriteLine("Оно требует прав администратора: слушает встроенный в Windows pktmon.");
 
             return;
         }

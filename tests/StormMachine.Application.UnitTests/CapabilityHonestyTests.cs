@@ -123,7 +123,7 @@ public sealed class CapabilityHonestyTests
     [Fact]
     public async Task WithoutDriver_CaptureLevelIsNotAvailable()
     {
-        var report = await InspectAsync(driverInstalled: false);
+        var report = await InspectAsync();
 
         var state = report.StateOf(CapabilityLevel.Capture);
 
@@ -148,11 +148,11 @@ public sealed class CapabilityHonestyTests
         Assert.NotEqual(CapabilityState.Available, report.StateOf(CapabilityLevel.Snmp));
     }
 
-    private static Task<CapabilityReport> InspectAsync(bool driverInstalled = false)
+    private static Task<CapabilityReport> InspectAsync()
     {
         var inspector = new CapabilityInspector(
             new FakeRegistry(new FakeProbe(() => 1.0)),
-            new FakeSystem(driverInstalled),
+            new FakeSystem(),
             new EmptyAgentStore(),
             new NullEnvironment());
 

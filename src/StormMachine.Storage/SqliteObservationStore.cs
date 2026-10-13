@@ -18,8 +18,15 @@ public sealed class SqliteObservationStore(SqliteRunStore runStore) : IObservati
 {
     private readonly SqliteRunStore _runStore = runStore ?? throw new ArgumentNullException(nameof(runStore));
 
-    public Task InitializeAsync(CancellationToken cancellationToken = default) =>
-        _runStore.InitializeAsync(cancellationToken);
+    /// <summary>Создана ли схема в этом сеансе: 0 — ещё нет.</summary>
+    private int _ready;
+
+    public async Task InitializeAsync(CancellationToken cancellationToken = default)
+    {
+        await _runStore.InitializeAsync(cancellationToken).ConfigureAwait(false);
+
+        Volatile.Write(ref _ready, 1);
+    }
 
     // ------------------------------------------------------------ загрузка портов
 
@@ -357,8 +364,34 @@ public sealed class SqliteObservationStore(SqliteRunStore runStore) : IObservati
         return await command.ExecuteNonQueryAsync(cancellationToken).ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// Схема создаётся до первого обращения, а не по просьбе зовущего.
+    /// </summary>
+    /// <remarks>
+    /// Раньше это была обязанность вызывающего, и команда прослушивания её не знала:
+    /// на чистой базе <c>storm capture listen</c> сорок секунд честно слушал сеть,
+    /// а потом падал на «no such table: heard_neighbors», теряя всё услышанное.
+    /// Поймано боевым прогоном, а не проверкой, — и чинится здесь, а не в команде:
+    /// забыть позвать можно в любом новом месте, а хранилище одно.
+    /// </remarks>
+    private async Task ReadyAsync(CancellationToken cancellationToken)
+    {
+        if (Volatile.Read(ref _ready) != 0)
+        {
+            return;
+        }
+
+        // Создание схемы идемпотентно и транзакционно: если сюда войдут двое,
+        // второй не сломает первого.
+        await _runStore.InitializeAsync(cancellationToken).ConfigureAwait(false);
+
+        Volatile.Write(ref _ready, 1);
+    }
+
     private async Task<SqliteConnection> OpenAsync(CancellationToken cancellationToken)
     {
+        await ReadyAsync(cancellationToken).ConfigureAwait(false);
+
         var connection = new SqliteConnection($"Data Source={_runStore.Location}");
         await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
 

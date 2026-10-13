@@ -131,7 +131,7 @@ public sealed partial class DevelopmentPageViewModel(
     {
         CapabilityLevel.Core => "Уровень 0 — работает у всех",
         CapabilityLevel.Snmp => "Уровень 1 — учётные данные оборудования",
-        _ => "Уровень 2 — драйвер захвата",
+        _ => "Уровень 2 — захват кадров",
     };
 
     private static string AboutOf(CapabilityLevel level) => level switch
@@ -140,8 +140,9 @@ public sealed partial class DevelopmentPageViewModel(
                                 + "который достаётся любому оператору сразу после установки.",
         CapabilityLevel.Snmp => "Нужны сообщества или учётные записи SNMP на оборудовании. "
                                 + "Их выдают сетевики, и выдают не всегда.",
-        _ => "Нужен Npcap. Продукт его не распространяет ни при каких условиях: "
-             + "лицензия NPSL это запрещает. Ставится вручную с npcap.com.",
+        _ => "Нужны права администратора: слушает встроенный в Windows pktmon, "
+             + "ставить ничего не требуется. Если на машине есть Npcap, продукт "
+             + "возьмёт его — но сам не распространяет, лицензия NPSL это запрещает.",
     };
 
     internal static string Describe(CapabilityState state) => CapabilityWording.State(state);

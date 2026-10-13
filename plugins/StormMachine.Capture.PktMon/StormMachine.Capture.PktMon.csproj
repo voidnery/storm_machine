@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Захват встроенным в Windows монитором пакетов. Второй источник уровня 2,
+       и единственный, который работает у того, кто ничего не ставил.
+
+       Зависимостей у проекта нет вовсе: pktmon входит в систему, а разбор кадров
+       берётся из общего проекта. Поэтому он и живёт в plugins/ — не из-за лицензии,
+       как сосед по папке, а потому что уровень 2 необязателен целиком и ядро
+       не должно о нём знать. -->
+
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <Description>Захват LLDP, CDP и ответов DHCP встроенным в Windows pktmon — без стороннего драйвера.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\StormMachine.Application\StormMachine.Application.csproj" />
+    <ProjectReference Include="..\StormMachine.Capture.Frames\StormMachine.Capture.Frames.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Разбор кадров. Общий для всех источников захвата: байты одни и те же,
+       кто бы их ни принёс — Npcap или встроенный в Windows pktmon.
+
+       Живёт в plugins/, а не в src/, по той же причине, что и сами источники:
+       PacketDotNet — единственная зависимость этого проекта, и сторож в ArchTests
+       держит её вне ядра. Продукт обязан работать полностью и без уровня 2.
+
+       Своего состояния у разбора нет: ни сокета, ни драйвера, ни файла. Поэтому
+       он и вынесен — спайк-10 показал, что кадры pktmon этот же разборщик понимает
+       байт в байт, и дублировать его под каждый источник было бы ошибкой. -->
+
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <Description>Разбор кадров LLDP, CDP и ответов DHCP. Общий для источников захвата.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\StormMachine.Application\StormMachine.Application.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="PacketDotNet" Version="1.4.8" />
+  </ItemGroup>
+
+</Project>

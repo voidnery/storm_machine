@@ -337,14 +337,10 @@ internal sealed class BrokenProfileStore : IProfileStore
         throw new IOException("база профилей недоступна");
 }
 
-/// <summary>Система, у которой можно задать наличие драйвера захвата.</summary>
-internal sealed class FakeSystem(bool driverInstalled = false) : ISystemCapabilities
+/// <summary>Система без прав и без сырых сокетов.</summary>
+internal sealed class FakeSystem : ISystemCapabilities
 {
     public bool IsElevated => false;
-
-    public bool IsCaptureDriverInstalled { get; } = driverInstalled;
-
-    public string? CaptureDriverDescription => IsCaptureDriverInstalled ? "Npcap 1.79" : null;
 
     public bool CanOpenRawSockets => false;
 }

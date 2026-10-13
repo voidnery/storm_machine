@@ -1,4 +1,5 @@
 ﻿using StormMachine.Application.Abstractions;
+using StormMachine.Application.Adapters;
 using StormMachine.Domain.Capture;
 
 namespace StormMachine.Application.Capture;
@@ -46,19 +47,26 @@ public sealed class CaptureService(
 
     public string? DriverDescription => _capture.DriverDescription;
 
+    /// <summary>Чем слушаем: встроенным в Windows или сторонним драйвером.</summary>
+    public CaptureEngine Engine => _capture.Engine;
+
     /// <summary>Почему нельзя и что с этим делать.</summary>
     public string Explain() => _capture.Availability switch
     {
         CaptureRefusal.None => "Захват доступен.",
+        CaptureRefusal.NeedsElevation when _capture.Engine == CaptureEngine.WindowsBuiltIn =>
+            "Встроенный в Windows захват на месте — ставить ничего не нужно. Но драйвер pktmon "
+            + "разговаривает только с администратором: перезапустите продукт от его имени.",
         CaptureRefusal.NeedsElevation =>
             "Драйвер захвата установлен, но не пускает. Npcap умеет ставиться с ограничением "
             + "доступа администраторами — перезапустите продукт от имени администратора "
             + "либо переустановите драйвер без этого ограничения.",
         CaptureRefusal.NoAdapters =>
-            "Драйвер захвата есть, но подходящих адаптеров он не показывает.",
+            "Захват доступен, но подходящих адаптеров не видно.",
         _ =>
-            "Драйвер захвата не установлен. Npcap ставится отдельно и вручную: продукт "
-            + $"его не распространяет ни при каких условиях — лицензия NPSL это запрещает. {DriverSite}",
+            "Слушать нечем. Встроенный захват есть в Windows начиная с 10 1809; на более "
+            + "старой системе остаётся Npcap — он ставится отдельно и вручную, продукт "
+            + $"его не распространяет ни при каких условиях: лицензия NPSL это запрещает. {DriverSite}",
     };
 
     /// <summary>
@@ -71,9 +79,18 @@ public sealed class CaptureService(
     /// </remarks>
     public IReadOnlyList<CaptureAdapter> Adapters()
     {
-        var system = _environment.GetAdapters()
-            .Where(a => a.MacAddress is not null)
-            .ToDictionary(a => Normalize(a.MacAddress!), a => a.Name, StringComparer.OrdinalIgnoreCase);
+        // MAC у двух адаптеров совпадает чаще, чем кажется: виртуальный коммутатор
+        // носит адрес карты, за которой стоит, а служебный фильтр NDIS — адрес той,
+        // которую фильтрует. Раньше здесь был ToDictionary, и на такой машине захват
+        // падал целиком, с неперехваченным исключением на ровном месте. Побеждает
+        // самый «настоящий» адаптер: его имя оператор и ищет глазами.
+        var system = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var adapter in AdapterRank.MostRealFirst(
+                     _environment.GetAdapters().Where(a => a.MacAddress is not null)))
+        {
+            system.TryAdd(Normalize(adapter.MacAddress!), adapter.Name);
+        }
 
         return
         [

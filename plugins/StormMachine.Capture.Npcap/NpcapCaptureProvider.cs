@@ -2,6 +2,7 @@ using System.Globalization;
 using SharpPcap;
 using SharpPcap.LibPcap;
 using StormMachine.Application.Abstractions;
+using StormMachine.Capture.Frames;
 using StormMachine.Domain.Capture;
 using StormMachine.Domain.Discovery;
 
@@ -26,6 +27,8 @@ namespace StormMachine.Capture.Npcap;
 /// </remarks>
 public sealed class NpcapCaptureProvider : ICaptureProvider
 {
+    public CaptureEngine Engine => CaptureEngine.Npcap;
+
     /// <summary>
     /// Что слушать.
     /// </summary>

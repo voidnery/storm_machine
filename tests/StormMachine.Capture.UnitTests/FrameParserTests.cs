@@ -1,4 +1,4 @@
-using StormMachine.Capture.Npcap;
+using StormMachine.Capture.Frames;
 using StormMachine.Domain.Capture;
 using StormMachine.Domain.Discovery;
 
