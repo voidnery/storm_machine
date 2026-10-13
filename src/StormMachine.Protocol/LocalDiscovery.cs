@@ -1,12 +1,21 @@
-using System.Buffers.Binary;
+﻿using System.Buffers.Binary;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
 
 namespace StormMachine.Protocol;
 
-/// <summary>Агент, объявивший о себе в локальной сети.</summary>
-public sealed record AnnouncedAgent
+/// <summary>
+/// Кто объявил о себе в локальной сети: агент или клиент.
+/// </summary>
+/// <remarks>
+/// Объявляются обе стороны, и запись одна на обе. Раньше она называлась «агентом»,
+/// потому что объявлялся только он: клиент искал агента, а обратно — никак, и на чужой
+/// площадке адрес машины оператора приходилось узнавать и набирать руками. Направление
+/// связи выбирают по тому, где заблокированы входящие, а не по тому, кто кого умеет
+/// найти, — значит, находить должны оба.
+/// </remarks>
+public sealed record AnnouncedPeer
 {
     public required string Address { get; init; }
 
@@ -14,10 +23,18 @@ public sealed record AnnouncedAgent
 
     public required string MachineName { get; init; }
 
+    /// <summary>Чем объявился: <c>storm-agent/версия</c> или <c>storm/версия</c>.</summary>
     public string? Product { get; init; }
 
     /// <summary>Начало отпечатка: сверить с полным при сопряжении.</summary>
     public string? ThumbprintPrefix { get; init; }
+
+    /// <summary>Это агент — удалённая точка измерения.</summary>
+    public bool IsAgent => Product?.StartsWith(LocalDiscovery.AgentProduct, StringComparison.OrdinalIgnoreCase) == true;
+
+    /// <summary>Это клиент — машина оператора, ждущая звонка агента.</summary>
+    public bool IsClient => !IsAgent
+                            && Product?.StartsWith(LocalDiscovery.ClientProduct, StringComparison.OrdinalIgnoreCase) == true;
 
     public string Describe() =>
         $"{MachineName} на {Address}:{Port}"
@@ -43,6 +60,17 @@ public sealed record AnnouncedAgent
 /// </remarks>
 public static class LocalDiscovery
 {
+    /// <summary>Чем объявляется агент — удалённая точка измерения.</summary>
+    public const string AgentProduct = "storm-agent";
+
+    /// <summary>Чем объявляется клиент — машина оператора.</summary>
+    /// <remarks>
+    /// Клиент объявляется только пока ждёт звонка агента, а не всё время работы.
+    /// Станция диагностики, постоянно кричащая о себе в чужой сети, — это не то,
+    /// чем ей следует быть: объявление оправдано ровно тогда, когда его ждут.
+    /// </remarks>
+    public const string ClientProduct = "storm";
+
     /// <summary>Имя службы в DNS-SD.</summary>
     public const string ServiceName = "_storm._tcp.local";
 
@@ -98,13 +126,13 @@ public static class LocalDiscovery
     }
 
     /// <summary>Слушает объявления заданное время.</summary>
-    public static async Task<IReadOnlyList<AnnouncedAgent>> BrowseAsync(
+    public static async Task<IReadOnlyList<AnnouncedPeer>> BrowseAsync(
         TimeSpan duration,
         CancellationToken cancellationToken = default)
     {
         using var socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
 
-        var found = new Dictionary<string, AnnouncedAgent>(StringComparer.OrdinalIgnoreCase);
+        var found = new Dictionary<string, AnnouncedPeer>(StringComparer.OrdinalIgnoreCase);
 
         try
         {
@@ -139,9 +167,9 @@ public static class LocalDiscovery
                     .ConfigureAwait(false);
 
                 if (TryReadAnnouncement(buffer.AsSpan(0, received.ReceivedBytes),
-                        (IPEndPoint)received.RemoteEndPoint, out var agent))
+                        (IPEndPoint)received.RemoteEndPoint, out var peer))
                 {
-                    found[agent.MachineName] = agent;
+                    found[peer.MachineName] = peer;
                 }
             }
         }
@@ -268,9 +296,9 @@ public static class LocalDiscovery
     private static bool TryReadAnnouncement(
         ReadOnlySpan<byte> packet,
         IPEndPoint? from,
-        out AnnouncedAgent agent)
+        out AnnouncedPeer peer)
     {
-        agent = default!;
+        peer = default!;
 
         if (packet.Length < 12 || from is null)
         {
@@ -329,7 +357,7 @@ public static class LocalDiscovery
             return false;
         }
 
-        agent = new AnnouncedAgent
+        peer = new AnnouncedPeer
         {
             Address = from.Address.ToString(),
             Port = port,

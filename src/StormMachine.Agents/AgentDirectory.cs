@@ -108,7 +108,10 @@ public sealed class AgentDirectory(IAgentStore store) : IAgentDirectory, IDispos
 
         progress?.Report(new PairingProgress(
             $"Жду звонка агента на порт {port}. На его машине выполни: "
-            + $"storm-agent connect <адрес этой машины> --код {offer.ForHumans}"
+            + $"storm-agent connect --код {offer.ForHumans} — адрес этой машины агент "
+            + $"найдёт сам, пока я жду.{Environment.NewLine}"
+            + $"Если сети между вами не видно насквозь, назови адрес: "
+            + $"storm-agent connect <адрес этой машины> --код {offer.ForHumans}."
             + $"{Environment.NewLine}Код одноразовый и годен {offer.Lifetime.TotalMinutes:0} мин.",
             offer.ForHumans,
             IsDone: false));
@@ -117,6 +120,20 @@ public sealed class AgentDirectory(IAgentStore store) : IAgentDirectory, IDispos
         // чем сам код годен, — обещание, которое некому выполнить.
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         deadline.CancelAfter(offer.Lifetime);
+
+        // Пока ждём — объявляем себя в сети.
+        //
+        // До этого объявлялся только агент, и обратное направление требовало от человека
+        // на чужой площадке узнать и набрать адрес машины оператора. Направление связи
+        // выбирают по тому, где заблокированы входящие, — находить друг друга должны оба.
+        // Объявление живёт ровно столько, сколько ждём: станция, кричащая о себе в чужой
+        // сети постоянно, — это не то, чем ей следует быть.
+        var announcing = LocalDiscovery.AnnounceAsync(
+            Environment.MachineName,
+            port,
+            $"{LocalDiscovery.ClientProduct}/{ProductInfo.Version}",
+            await GetOwnThumbprintAsync(cancellationToken).ConfigureAwait(false),
+            deadline.Token);
 
         try
         {
@@ -149,6 +166,15 @@ public sealed class AgentDirectory(IAgentStore store) : IAgentDirectory, IDispos
         finally
         {
             listener.Stop();
+
+            try
+            {
+                await announcing.ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+                // Ждать перестали — объявлять больше нечего.
+            }
         }
     }
 

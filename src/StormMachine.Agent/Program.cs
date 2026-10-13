@@ -85,9 +85,10 @@ internal static class Program
 
     private static Command BuildConnect()
     {
-        var addressArgument = new Argument<string>("адрес")
+        var addressArgument = new Argument<string?>("адрес")
         {
-            Description = "Куда дозваниваться: адрес машины с клиентом.",
+            Description = "Куда дозваниваться. Без адреса агент ищет клиента в своей сети сам.",
+            Arity = ArgumentArity.ZeroOrOne,
         };
 
         var portOption = new Option<int>("--порт", "--port")
@@ -113,17 +114,30 @@ internal static class Program
         command.SetAction(async (parseResult, cancellationToken) =>
         {
             var typed = parseResult.GetValue(codeOption);
+            var port = parseResult.GetValue(portOption);
 
             var host = new AgentHost(Settings(
-                parseResult.GetValue(portOption),
+                port,
                 typed is { Length: > 0 } ? PairingOffer.For(typed, PairingCode.Lifetime) : null));
 
             try
             {
-                await host.ConnectAsync(
-                    parseResult.GetValue(addressArgument)!,
-                    parseResult.GetValue(portOption),
-                    cancellationToken).ConfigureAwait(false);
+                var address = parseResult.GetValue(addressArgument);
+
+                if (string.IsNullOrWhiteSpace(address))
+                {
+                    var found = await FindClientAsync(cancellationToken).ConfigureAwait(false);
+
+                    if (found is null)
+                    {
+                        return 1;
+                    }
+
+                    address = found.Address;
+                    port = found.Port;
+                }
+
+                await host.ConnectAsync(address, port, cancellationToken).ConfigureAwait(false);
 
                 return 0;
             }
@@ -327,6 +341,69 @@ internal static class Program
 
             return 1;
         }
+    }
+
+    /// <summary>
+    /// Ищет в своей сети клиента, который ждёт звонка.
+    /// </summary>
+    /// <remarks>
+    /// Обратное направление до И-26 требовало от человека на чужой площадке узнать
+    /// и набрать адрес машины оператора — при том, что в другую сторону продукт искал
+    /// агента сам. Направление связи выбирают по тому, где заблокированы входящие,
+    /// а не по тому, кто кого умеет найти.
+    /// <para>
+    /// Клиент объявляет себя, только пока ждёт звонка, — поэтому молчание эфира
+    /// здесь означает ровно одно: сопряжение на той стороне не запущено. Так и сказано:
+    /// пустой ответ без объяснения человек прочитает как поломку.
+    /// </para>
+    /// </remarks>
+    private static async Task<AnnouncedPeer?> FindClientAsync(CancellationToken cancellationToken)
+    {
+        var waiting = TimeSpan.FromSeconds(6);
+
+        Console.WriteLine($"Адрес не назван — ищу клиента в своей сети ({waiting.TotalSeconds:0} с)...");
+
+        IReadOnlyList<AnnouncedPeer> heard;
+
+        try
+        {
+            heard = await LocalDiscovery.BrowseAsync(waiting, cancellationToken).ConfigureAwait(false);
+        }
+        catch (ProtocolException ex)
+        {
+            Console.Error.WriteLine(ex.Message);
+
+            return null;
+        }
+
+        var clients = heard.Where(p => p.IsClient).ToList();
+
+        if (clients.Count == 0)
+        {
+            Console.Error.WriteLine(
+                "Клиента в сети не слышно. Он объявляет себя, только пока ждёт звонка: "
+                + "запусти на его машине сопряжение (Настройки → Агенты → ждать звонка) "
+                + "и повтори. Если машины в разных подсетях, объявление до нас не дойдёт "
+                + "никогда — назови адрес: storm-agent connect <адрес> --код <код>.");
+
+            return null;
+        }
+
+        if (clients.Count > 1)
+        {
+            Console.Error.WriteLine("Ждут звонка несколько — назови нужного адресом:");
+
+            foreach (var client in clients)
+            {
+                Console.Error.WriteLine($"  {client.Describe()}");
+            }
+
+            return null;
+        }
+
+        Console.WriteLine($"Нашёл: {clients[0].Describe()}");
+
+        return clients[0];
     }
 
     /// <summary>
