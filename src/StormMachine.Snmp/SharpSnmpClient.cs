@@ -50,7 +50,10 @@ public sealed class SharpSnmpClient : ISnmpClient
             ],
             cancellationToken).ConfigureAwait(false);
 
-        var byOid = answer.ToDictionary(v => v.Id.ToString(), v => v.Data, StringComparer.Ordinal);
+        // Повтор OID в ответе — не наша забота, а повод не падать: агенты бывают
+        // кривые, и опрос чужого оборудования обязан это переживать. Побеждает
+        // первое значение: второе — уже следствие ошибки на той стороне.
+        var byOid = SnmpValues.FirstWins(answer, v => v.Id.ToString(), v => v.Data);
 
         if (!byOid.TryGetValue(Oids.SysDescr, out var descr) || descr is Null or NoSuchObject or NoSuchInstance)
         {
@@ -228,10 +231,13 @@ public sealed class SharpSnmpClient : ISnmpClient
         var qStatuses = await Optional(() => Walk(session, Oids.Dot1qTpFdbStatus, cancellationToken))
             .ConfigureAwait(false);
 
-        var qStatus = qStatuses.ToDictionary(
+        // Таблица пересылки живёт: за время обхода запись может уйти и вернуться,
+        // и один и тот же хвост придёт дважды. Это нормальная работа коммутатора,
+        // а не причина уронить опрос.
+        var qStatus = SnmpValues.FirstWins(
+            qStatuses,
             v => SnmpValues.Suffix(v.Id, Oids.Dot1qTpFdbStatus),
-            v => (int)SnmpValues.Number(v.Data),
-            StringComparer.Ordinal);
+            v => (int)SnmpValues.Number(v.Data));
 
         var result = Read(qEntries, Oids.Dot1qTpFdbPort, qStatus, bridgeToIf, vlanAware: true);
 
@@ -240,10 +246,10 @@ public sealed class SharpSnmpClient : ISnmpClient
             var statuses = await Optional(() => Walk(session, Oids.Dot1dTpFdbStatus, cancellationToken))
                 .ConfigureAwait(false);
 
-            var status = statuses.ToDictionary(
+            var status = SnmpValues.FirstWins(
+                statuses,
                 v => SnmpValues.Suffix(v.Id, Oids.Dot1dTpFdbStatus),
-                v => (int)SnmpValues.Number(v.Data),
-                StringComparer.Ordinal);
+                v => (int)SnmpValues.Number(v.Data));
 
             var entries = await Optional(() => Walk(session, Oids.Dot1dTpFdbPort, cancellationToken))
                 .ConfigureAwait(false);
@@ -447,7 +453,7 @@ public sealed class SharpSnmpClient : ISnmpClient
     {
         var found = await Optional(() => Walk(session, column, cancellationToken)).ConfigureAwait(false);
 
-        return found.ToDictionary(v => SnmpValues.Suffix(v.Id, column), v => v.Data, StringComparer.Ordinal);
+        return SnmpValues.FirstWins(found, v => SnmpValues.Suffix(v.Id, column), v => v.Data);
     }
 
     /// <summary>Ветка, которой у устройства может не быть.</summary>

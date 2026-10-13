@@ -113,7 +113,14 @@ internal static class SnmpRenderer
             ? $"  {"#",-4} {"порт",-22} {"состояние",-24} {"скорость",-12} {"вход",-10} {"выход",-10} ошибки"
             : $"  {"#",-4} {"порт",-22} {"состояние",-24} {"скорость",-12} подпись");
 
-        var byIndex = loads.ToDictionary(l => l.Interface.Index);
+        // Не ToDictionary: номер порта приходит от оборудования, и повтор в ответе
+        // кривого агента ронял бы показ таблицы — там, где уже всё измерено.
+        var byIndex = new Dictionary<int, PortLoad>();
+
+        foreach (var load in loads)
+        {
+            byIndex.TryAdd(load.Interface.Index, load);
+        }
 
         foreach (var port in device.Interfaces)
         {

@@ -93,7 +93,10 @@ internal static class CapabilityRenderer
     {
         CapabilityLevel.Core => "Уровень 0 — ядро. Ничего не требует",
         CapabilityLevel.Snmp => "Уровень 1 — SNMP. Нужны учётные данные оборудования",
-        _ => "Уровень 2 — захват кадров. Нужны права администратора",
+        // Без приписки про права: состояние уровня печатается следом и говорит
+        // то же самое. «Нужны права администратора нужны права администратора» —
+        // ровно то, что увидел протокол приёмки.
+        _ => "Уровень 2 — захват кадров",
     };
 
     private static string Describe(CapabilityState state) => CapabilityWording.State(state);

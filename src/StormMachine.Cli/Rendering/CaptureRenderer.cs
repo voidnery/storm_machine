@@ -24,7 +24,10 @@ internal static class CaptureRenderer
         if (capture.IsAvailable)
         {
             Console.WriteLine();
-            Console.WriteLine($"Драйвер: {capture.DriverDescription ?? "версия не определена"}");
+            // «Источник», а не «драйвер»: с И-25 слушать умеет и встроенный
+            // в Windows pktmon, которому слово «драйвер» ставит в голове
+            // оператора задачу, которой нет, — что-то устанавливать.
+            Console.WriteLine($"Источник: {capture.DriverDescription ?? "не назвался"}");
             Console.WriteLine();
             Console.WriteLine("Продукт слушает без неразборчивого режима: только то, что адресовано");
             Console.WriteLine("нам или разослано всем. Чужая переписка по сегменту не собирается.");

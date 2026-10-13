@@ -19,6 +19,50 @@ namespace StormMachine.Snmp;
 /// </remarks>
 internal static class SnmpValues
 {
+    /// <summary>
+    /// Словарь по ответу оборудования: при повторе ключа побеждает первое значение.
+    /// </summary>
+    /// <remarks>
+    /// Обычный <c>ToDictionary</c> на чужом ответе — это необработанное исключение,
+    /// ждущее своего агента. Повторы встречаются и без злого умысла: таблица,
+    /// изменившаяся посреди обхода, вернёт строку дважды. Опрос обязан это пережить:
+    /// он диагностический инструмент и работает в сети, где уже что-то не так.
+    /// <para>
+    /// Первое значение, а не последнее, — чтобы ответ не зависел от того, сколько
+    /// раз агент повторился: повтор не должен менять картину.
+    /// </para>
+    /// </remarks>
+    public static Dictionary<string, TValue> FirstWins<TSource, TValue>(
+        IEnumerable<TSource> source,
+        Func<TSource, string> key,
+        Func<TSource, TValue> value)
+    {
+        var found = new Dictionary<string, TValue>(StringComparer.Ordinal);
+
+        foreach (var item in source)
+        {
+            found.TryAdd(key(item), value(item));
+        }
+
+        return found;
+    }
+
+    /// <summary>То же для числовых ключей — индексов портов.</summary>
+    public static Dictionary<int, TValue> FirstWins<TSource, TValue>(
+        IEnumerable<TSource> source,
+        Func<TSource, int> key,
+        Func<TSource, TValue> value)
+    {
+        var found = new Dictionary<int, TValue>();
+
+        foreach (var item in source)
+        {
+            found.TryAdd(key(item), value(item));
+        }
+
+        return found;
+    }
+
     /// <summary>Хвост идентификатора после столбца: то, что кодирует номер строки.</summary>
     public static string Suffix(ObjectIdentifier oid, string column)
     {

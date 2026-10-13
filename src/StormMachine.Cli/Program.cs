@@ -70,7 +70,71 @@ internal static class Program
         // из файла и падала с непонятной ошибкой разбора.
         var parsing = new ParserConfiguration { ResponseFileTokenReplacer = null };
 
-        return await root.Parse(args, parsing).InvokeAsync().ConfigureAwait(false);
+        try
+        {
+            return await root.Parse(args, parsing).InvokeAsync().ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            // Ctrl+C — не беда, а решение оператора. Говорим об этом по-человечески
+            // и отличаем кодом возврата от настоящего отказа.
+            Console.Error.WriteLine("Прервано.");
+
+            return CancelledCode;
+        }
+        catch (Exception ex)
+        {
+            Fail(services, ex);
+
+            return FailureCode;
+        }
+    }
+
+    /// <summary>Команда прервалась по Ctrl+C — по соглашению оболочек 128 + SIGINT.</summary>
+    private const int CancelledCode = 130;
+
+    /// <summary>
+    /// Беда в самом продукте, а не в измерении.
+    /// </summary>
+    /// <remarks>
+    /// Отличается от 1 намеренно: единицей командам положено отвечать на «измерил
+    /// и получилось плохо». Склеить одно с другим значило бы лишить сценарии
+    /// возможности отличить плохую сеть от сломанного инструмента.
+    /// </remarks>
+    private const int FailureCode = 70;
+
+    /// <summary>
+    /// Отказ, который дошёл до верха.
+    /// </summary>
+    /// <remarks>
+    /// Оператору — одна строка на его языке, журналу — всё остальное. До этого
+    /// наверх прилетал stack trace .NET прямо в терминал: на боевом прогоне
+    /// «storm capture listen» так выбросил сорок секунд прослушивания вместе
+    /// с именем класса Microsoft.Data.Sqlite. Диагностический инструмент не вправе
+    /// объясняться с человеком трассировкой стека.
+    /// </remarks>
+    private static void Fail(IServiceProvider services, Exception error)
+    {
+        Console.Error.WriteLine($"Команда не выполнена: {error.Message}");
+
+        try
+        {
+            var logger = services.GetService<ILoggerFactory>()?.CreateLogger("storm");
+
+            if (logger is not null)
+            {
+                logger.LogError(error, "Команда не выполнена");
+                Console.Error.WriteLine("Подробности — в журнале продукта.");
+
+                return;
+            }
+        }
+        catch (ObjectDisposedException)
+        {
+            // Службы уже разобраны — тогда подробности остаются только здесь.
+        }
+
+        Console.Error.WriteLine(error.ToString());
     }
 
     /// <summary>

@@ -169,7 +169,16 @@ public sealed class SnmpService(
 
         var after = await _client.GetCountersAsync(host, credential, cancellationToken).ConfigureAwait(false);
 
-        var first = before.ToDictionary(c => c.Index);
+        // Не ToDictionary: индекс порта приходит от оборудования, и повтор в ответе
+        // кривого агента ронял бы весь замер загрузки. Побеждает первый снимок —
+        // с ним и считается разница.
+        var first = new Dictionary<int, InterfaceCounters>();
+
+        foreach (var counters in before)
+        {
+            first.TryAdd(counters.Index, counters);
+        }
+
         var result = new List<PortLoad>();
 
         foreach (var port in interfaces)
@@ -322,7 +331,7 @@ public sealed class SnmpService(
         IReadOnlyList<LinkNeighbor> neighbors,
         IReadOnlyList<SnmpInterface> interfaces)
     {
-        var names = interfaces.ToDictionary(i => i.Index, i => i.Name);
+        var names = PortNames(interfaces);
 
         return
         [
@@ -336,7 +345,7 @@ public sealed class SnmpService(
         IReadOnlyList<ForwardingEntry> entries,
         IReadOnlyList<SnmpInterface> interfaces)
     {
-        var names = interfaces.ToDictionary(i => i.Index, i => i.Name);
+        var names = PortNames(interfaces);
 
         return
         [
@@ -344,6 +353,26 @@ public sealed class SnmpService(
                 ? e with { PortName = name }
                 : e),
         ];
+    }
+
+    /// <summary>
+    /// Имена портов по их номерам.
+    /// </summary>
+    /// <remarks>
+    /// Не <c>ToDictionary</c>: номер приходит от оборудования, и повтор в его ответе
+    /// ронял бы подстановку имён вместе со всем опросом. Для подписи порта первое
+    /// имя ничем не хуже второго, а неперехваченное исключение — хуже обоих.
+    /// </remarks>
+    private static Dictionary<int, string> PortNames(IReadOnlyList<SnmpInterface> interfaces)
+    {
+        var names = new Dictionary<int, string>();
+
+        foreach (var port in interfaces)
+        {
+            names.TryAdd(port.Index, port.Name);
+        }
+
+        return names;
     }
 
     private static string Round(TimeSpan span) => span.TotalSeconds < 60

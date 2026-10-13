@@ -178,11 +178,23 @@ public static class PcapNgReader
     /// </remarks>
     private static DateTimeOffset Moment(ulong units, byte resolution)
     {
+        // Сдвиг ограничен шестьюдесятью тремя: в C# сдвиг на большее число берётся
+        // по модулю разрядности и дал бы не ноль, а произвольное время. Значение
+        // приходит из файла, и считать его разумным нельзя.
         var ticks = (resolution & 0x80) != 0
-            ? (long)(units * (ulong)TimeSpan.TicksPerSecond >> (resolution & 0x7F))
+            ? (long)(units * (ulong)TimeSpan.TicksPerSecond >> Math.Min(resolution & 0x7F, 63))
             : FromDecimal(units, resolution);
 
-        return ticks < 0 ? DateTimeOffset.UnixEpoch : DateTimeOffset.UnixEpoch.AddTicks(ticks);
+        if (ticks < 0)
+        {
+            return DateTimeOffset.UnixEpoch;
+        }
+
+        // Испорченное число долей может увести дату за пределы календаря. Время
+        // кадра — не то, ради чего стоит ронять разбор всего журнала.
+        return DateTimeOffset.UnixEpoch.Ticks + ticks > DateTimeOffset.MaxValue.Ticks
+            ? DateTimeOffset.UnixEpoch
+            : DateTimeOffset.UnixEpoch.AddTicks(ticks);
     }
 
     private static long FromDecimal(ulong units, byte resolution)
