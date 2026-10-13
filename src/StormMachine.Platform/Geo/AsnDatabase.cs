@@ -72,19 +72,31 @@ public sealed class AsnDatabase : IAsnDatabase
 
     public string? Description { get; }
 
-    /// <summary>Каталог, куда оператор кладёт базы.</summary>
-    public static string DefaultPath() => Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "StormMachine",
-        "geo");
+    /// <summary>
+    /// Что показать, когда база не открыта вовсе.
+    /// </summary>
+    /// <remarks>
+    /// Каталог здесь больше не вычисляется. Раньше класс знал его сам —
+    /// профиль пользователя плюс «geo», — и это был второй способ ответить на вопрос
+    /// «где продукт держит своё». В портативном режиме второй способ показал бы
+    /// профиль чужой машины, когда данные лежат на флешке рядом с программой.
+    /// Каталог приходит снаружи, от хранилища (<c>IStorageLocation.DataDirectory</c>).
+    /// </remarks>
+    public const string UnknownLocation = "каталог данных не определён";
 
     /// <summary>
     /// Открывает базы из каталога. Всегда возвращает объект: отсутствие файлов —
     /// это состояние «данных нет», а не повод отказать в трассировке.
     /// </summary>
-    public static AsnDatabase Open(string? directory = null)
+    /// <param name="directory">
+    /// Каталог с файлами баз. Обязателен: вычислять его здесь значило бы завести
+    /// второй ответ на вопрос «где продукт держит своё» — см. <see cref="UnknownLocation" />.
+    /// </param>
+    public static AsnDatabase Open(string directory)
     {
-        var location = directory ?? DefaultPath();
+        ArgumentException.ThrowIfNullOrWhiteSpace(directory);
+
+        var location = directory;
 
         if (!Directory.Exists(location))
         {

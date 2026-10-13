@@ -1,5 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using StormMachine.Application;
+using StormMachine.Application.Abstractions;
 using Velopack;
 using Velopack.Sources;
 
@@ -55,9 +56,21 @@ public sealed partial class UpdateService : ObservableObject
     private UpdateManager? _manager;
     private UpdateInfo? _pending;
 
-    public UpdateService(RunnerService runner)
+    /// <summary>
+    /// Копия портативная — об этом говорится отдельными словами.
+    /// </summary>
+    /// <remarks>
+    /// Для Velopack портативная копия и запуск из каталога сборки — одно и то же:
+    /// «не установлено». Для человека — разные вещи: во втором случае он собирает
+    /// продукт и всё понимает сам, в первом он работает на площадке и ему важно
+    /// знать, как получить новую версию, не потеряв данные.
+    /// </remarks>
+    public bool IsPortable { get; }
+
+    public UpdateService(RunnerService runner, IStorageLocation location)
     {
         _runner = runner ?? throw new ArgumentNullException(nameof(runner));
+        IsPortable = (location ?? throw new ArgumentNullException(nameof(location))).IsPortable;
 
         // Оговорка про идущие измерения зависит от списка операций, а не от состояния
         // обновления: без этой подписки она застывала — измерение закончилось,
@@ -125,6 +138,10 @@ public sealed partial class UpdateService : ObservableObject
         UpdateState.Available => $"Доступна версия {AvailableVersion}.",
         UpdateState.Downloading => $"Скачиваю: {Percent}%",
         UpdateState.Ready => $"Версия {AvailableVersion} скачана и готова к установке.",
+        UpdateState.NotInstalled when IsPortable =>
+            "Портативная копия не обновляется: обновление заменяет установленную копию, "
+            + "а эта живёт в своей папке и переносится целиком. Новую версию скачивают "
+            + "и распаковывают поверх — данные останутся, они лежат рядом.",
         UpdateState.NotInstalled =>
             "Продукт запущен не из установленной копии — обновлять нечего. "
             + "Так бывает при работе из каталога сборки или из распакованного архива.",

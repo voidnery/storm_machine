@@ -273,7 +273,14 @@
                    VerticalAlignment="Center"
                    IsVisible="{Binding AdapterWarning, Converter={x:Static ObjectConverters.IsNotNull}}" />
 
-        <TextBlock Grid.Column="3" Text="{Binding Signature}" FontSize="12" Foreground="{StaticResource TextMutedBrush}" VerticalAlignment="Center" />
+        <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+          <!-- Портативность объявляется там же, где остальное необычное в окружении:
+               она меняет ответ на «где мои измерения», и узнавать это из настроек поздно. -->
+          <Border Classes="chip" VerticalAlignment="Center" IsVisible="{Binding IsPortable}">
+            <TextBlock Text="портативный режим" FontSize="10" Foreground="{StaticResource InfoBrush}" />
+          </Border>
+          <TextBlock Text="{Binding Signature}" FontSize="12" Foreground="{StaticResource TextMutedBrush}" VerticalAlignment="Center" />
+        </StackPanel>
       </Grid>
     </Border>
 

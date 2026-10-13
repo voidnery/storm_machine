@@ -205,5 +205,9 @@ public sealed class SqliteMaintenanceTests : IDisposable
     private sealed class StorageLocationStub(string path) : IStorageLocation
     {
         public string DatabasePath => path;
+
+        public string DataDirectory => Path.GetDirectoryName(path) ?? path;
+
+        public bool IsPortable => false;
     }
 }

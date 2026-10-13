@@ -73,6 +73,22 @@ public sealed class SqliteRunStore : IRunStore, IStorageLocation
     public string DatabasePath => Location;
 
     /// <summary>
+    /// Каталог данных — тот, где лежит открытая база.
+    /// </summary>
+    /// <remarks>
+    /// Берётся от самой базы, а не у правила заново: база могла быть открыта
+    /// по явному пути (копия из поддержки, отдельный файл проверок), и журнал
+    /// клиента обязан лечь рядом с ней, а не там, где лежала бы база по умолчанию.
+    /// </remarks>
+    public string DataDirectory =>
+        Path.GetDirectoryName(Location) is { Length: > 0 } directory
+            ? directory
+            : ProductData.Directory;
+
+    /// <summary>Портативный режим: правило каталога данных решило, что данные рядом с программой.</summary>
+    public bool IsPortable => ProductData.IsPortable;
+
+    /// <summary>
     /// Через сколько молчания прогон считается брошенным.
     /// </summary>
     /// <remarks>
@@ -93,17 +109,7 @@ public sealed class SqliteRunStore : IRunStore, IStorageLocation
     /// тестовые измерения в рабочую историю. Без такой возможности единственный
     /// способ ничего не испортить — не запускать продукт, а это плохой способ.
     /// </remarks>
-    public static string DefaultDatabasePath()
-    {
-        var chosen = Environment.GetEnvironmentVariable(StorageEnvironment.PathVariable);
-
-        return string.IsNullOrWhiteSpace(chosen)
-            ? Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "StormMachine",
-                "storm.db")
-            : Path.GetFullPath(chosen.Trim());
-    }
+    public static string DefaultDatabasePath() => ProductData.DefaultDatabasePath();
 
     public async Task InitializeAsync(CancellationToken cancellationToken = default)
     {

@@ -29,10 +29,16 @@ public sealed class HopAnnotator : IHopAnnotator
     private readonly ConcurrentDictionary<string, HopAnnotation> _cache = new(StringComparer.Ordinal);
     private readonly IAsnDatabase? _asn;
 
+    /// <param name="asn">
+    /// База принадлежности адресов. Подсказка «куда положить файл» берётся у неё,
+    /// а не вычисляется здесь: каталог данных решается в одном месте, и в портативном
+    /// режиме он переезжает вместе с продуктом. Вычисленная тут подсказка показывала бы
+    /// профиль пользователя, когда база лежит рядом с программой на флешке.
+    /// </param>
     public HopAnnotator(IAsnDatabase? asn = null)
     {
         _asn = asn;
-        AsnDatabaseHint = asn?.Location ?? AsnDatabase.DefaultPath();
+        AsnDatabaseHint = asn?.Location ?? AsnDatabase.UnknownLocation;
     }
 
     public bool HasAsnData => _asn?.IsAvailable == true;

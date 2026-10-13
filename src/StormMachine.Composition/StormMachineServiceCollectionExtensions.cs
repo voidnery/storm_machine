@@ -210,7 +210,13 @@ public static class StormMachineServiceCollectionExtensions
         // Обогащение маршрута. База принадлежности адресов не входит в поставку —
         // её лицензия несовместима с MIT, поэтому оператор кладёт файл сам, а продукт
         // работает и без него.
-        services.AddSingleton<IAsnDatabase>(_ => AsnDatabase.Open());
+        //
+        // Каталог спрашивается у хранилища, а не вычисляется здесь: правило каталога
+        // данных одно на продукт, и в портативном режиме база принадлежности обязана
+        // переехать вместе с остальным — иначе половина данных уедет на флешке,
+        // а половина останется в профиле чужой машины.
+        services.AddSingleton<IAsnDatabase>(provider => AsnDatabase.Open(
+            Path.Combine(provider.GetRequiredService<IStorageLocation>().DataDirectory, "geo")));
         services.AddSingleton<IHopAnnotator, HopAnnotator>();
 
         // Пробы. Порядок регистрации определяет порядок в `storm probes`:

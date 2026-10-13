@@ -29,7 +29,7 @@ public sealed class FileLogProvider : ILoggerProvider
     private const long LimitBytes = 512 * 1024;
 
     private readonly object _gate = new();
-    private readonly Func<string> _databasePath;
+    private readonly Func<string> _dataDirectory;
 
     private string? _path;
     private bool _asking;
@@ -49,8 +49,8 @@ public sealed class FileLogProvider : ILoggerProvider
     /// Знает путь тот, кто им владеет; журнал только спрашивает.
     /// </para>
     /// </remarks>
-    public FileLogProvider(Func<string> databasePath) =>
-        _databasePath = databasePath ?? throw new ArgumentNullException(nameof(databasePath));
+    public FileLogProvider(Func<string> dataDirectory) =>
+        _dataDirectory = dataDirectory ?? throw new ArgumentNullException(nameof(dataDirectory));
 
     /// <summary>
     /// Путь к журналу; пусто, если хранилище о нём ещё не спросили или спросить нельзя.
@@ -74,7 +74,7 @@ public sealed class FileLogProvider : ILoggerProvider
         {
             _asking = true;
 
-            var directory = Path.GetDirectoryName(Path.GetFullPath(_databasePath()));
+            var directory = _dataDirectory();
 
             _path = Path.Combine(
                 string.IsNullOrEmpty(directory) ? AppContext.BaseDirectory : directory,

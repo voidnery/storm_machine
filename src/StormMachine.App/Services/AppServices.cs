@@ -31,7 +31,7 @@ internal static class AppServices
         // сборке — и сборка служб зацикливалась: хранилище просит журнал, журнал
         // просит хранилище. К первой записи хранилище уже собрано.
         services.AddSingleton(provider => new FileLogProvider(
-            () => provider.GetRequiredService<IStorageLocation>().DatabasePath));
+            () => provider.GetRequiredService<IStorageLocation>().DataDirectory));
         services.AddSingleton<ILoggerProvider>(provider => provider.GetRequiredService<FileLogProvider>());
 
         services.AddSingleton<RunnerService>();

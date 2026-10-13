@@ -79,11 +79,13 @@ public sealed partial class SettingsPageViewModel : PageViewModel
     private readonly ISnmpCredentialStore _credentials;
     private readonly SnmpService _snmp;
     private readonly FileLogProvider _log;
+    private readonly IStorageLocation _location;
 
     public SettingsPageViewModel(
         NavigationSection section,
         ProfileService profiles,
         IRunStore runs,
+        IStorageLocation location,
         UpdateService updates,
         ISnmpCredentialStore credentials,
         SnmpService snmp,
@@ -109,6 +111,7 @@ public sealed partial class SettingsPageViewModel : PageViewModel
         _credentials = credentials ?? throw new ArgumentNullException(nameof(credentials));
         _snmp = snmp ?? throw new ArgumentNullException(nameof(snmp));
         _log = log ?? throw new ArgumentNullException(nameof(log));
+        _location = location ?? throw new ArgumentNullException(nameof(location));
         Updates = updates ?? throw new ArgumentNullException(nameof(updates));
     }
 
@@ -179,6 +182,24 @@ public sealed partial class SettingsPageViewModel : PageViewModel
     public static string Version => ProductInfo.Version;
 
     public string DatabasePath => _runs.Location;
+
+    /// <summary>Как продукт держит свои данные на этой машине.</summary>
+    public string StorageMode => _location.IsPortable ? "портативный режим" : "обычный режим";
+
+    /// <summary>
+    /// Что этот режим означает на деле.
+    /// </summary>
+    /// <remarks>
+    /// Разница не в надписи: портативная копия уносится с площадки вместе
+    /// с измерениями и ничего там не оставляет, обычная — пишет в профиль
+    /// пользователя этой машины. Человеку, который носит станцию по объектам,
+    /// это важнее всего остального на странице.
+    /// </remarks>
+    public string StorageModeNote => _location.IsPortable
+        ? "Данные лежат рядом с программой: папку можно унести целиком, на машине ничего не остаётся."
+        : "Данные лежат в профиле пользователя этой машины. Положите рядом с программой файл "
+          + StorageEnvironment.PortableMarker
+          + " — и она станет портативной.";
 
     /// <summary>
     /// Где искать журнал клиента.

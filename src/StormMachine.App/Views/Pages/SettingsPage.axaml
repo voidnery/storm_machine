@@ -346,6 +346,17 @@
 
             <TextBlock Text="Хранилище" Classes="h2" />
 
+            <!-- Режим называется первым: «где мои измерения» — первый вопрос
+                 к продукту, который носят между машинами. -->
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <Border Classes="chip" VerticalAlignment="Center">
+                <TextBlock Text="{Binding StorageMode}" FontSize="10"
+                           Foreground="{StaticResource InfoBrush}" />
+              </Border>
+              <TextBlock Text="{Binding StorageModeNote}" Classes="caption"
+                         VerticalAlignment="Center" TextWrapping="Wrap" />
+            </StackPanel>
+
             <forms:CopyChip Text="{Binding DatabasePath}" />
 
             <forms:MethodCard Thesis="{x:Static vm:SettingsPageViewModel.StorageNote}"

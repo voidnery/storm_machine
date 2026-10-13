@@ -349,12 +349,30 @@ public sealed class SharpSnmpClientTests
         Assert.Contains("SNMP выключен", error.Message, StringComparison.Ordinal);
     }
 
+    /// <summary>
+    /// Несуществующее имя узла называется своей причиной.
+    /// </summary>
+    /// <remarks>
+    /// Имя выбрано так, чтобы приговор не зависел от сети. Прежнее —
+    /// <c>нет-такого-узла.invalid</c> — опиралось на честный отказ NXDOMAIN, а на сети,
+    /// где провайдер подменяет его своим адресом, несуществующих имён не существует
+    /// вовсе: продукт получает адрес, спрашивает и правильно отвечает «нет ответа».
+    /// Проверка краснела, рассказывая про сеть, а не про продукт (найдено на стенде
+    /// оператора: подменённый ответ 198.18.1.61).
+    /// <para>
+    /// Метка длиннее 63 октетов недопустима по RFC 1035, и ни один резолвер на неё
+    /// не ответит — ни честный, ни подменяющий. Строгость проверки от этого
+    /// не пострадала: путь в продукте тот же самый.
+    /// </para>
+    /// </remarks>
     [Fact(DisplayName = "Несуществующее имя узла называется своей причиной")]
     public async Task UnknownHostIsNamed()
     {
+        var nowhere = new string('я', 70) + ".invalid";
+
         var error = await Assert.ThrowsAsync<SnmpException>(
             () => new SharpSnmpClient().GetSystemAsync(
-                "нет-такого-узла.invalid",
+                nowhere,
                 Credential(161) with { Timeout = TimeSpan.FromMilliseconds(300), Retries = 0 }));
 
         Assert.Equal(SnmpFailure.UnknownHost, error.Reason);

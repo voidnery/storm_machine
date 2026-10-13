@@ -32,8 +32,10 @@ public sealed partial class MainWindowViewModel : ObservableObject
         IHighResolutionClock clock,
         NotificationCenter notifications,
         IDatabaseMaintenance maintenance,
+        IStorageLocation location,
         Func<NavigationSection, PageViewModel> pageFactory)
     {
+        IsPortable = (location ?? throw new ArgumentNullException(nameof(location))).IsPortable;
         Runner = runner ?? throw new ArgumentNullException(nameof(runner));
         Notifications = notifications ?? throw new ArgumentNullException(nameof(notifications));
         _environment = environment ?? throw new ArgumentNullException(nameof(environment));
@@ -145,6 +147,17 @@ public sealed partial class MainWindowViewModel : ObservableObject
 
     [ObservableProperty]
     private string _floorLine = string.Empty;
+
+    /// <summary>
+    /// Копия портативная — и это видно, не заходя в настройки.
+    /// </summary>
+    /// <remarks>
+    /// Объявляется по тому же правилу, по которому строка состояния называет
+    /// виртуальный коммутатор: показывается необычное. Обычный режим — тот,
+    /// в котором продукт установлен и пишет в профиль; портативный меняет ответ
+    /// на вопрос «где мои измерения», и узнавать его из настроек поздно.
+    /// </remarks>
+    public bool IsPortable { get; }
 
     public static string WindowTitle => ProductInfo.NameAndVersion;
 
