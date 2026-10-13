@@ -182,6 +182,15 @@ public sealed class AgentKitWriter(AgentBinaryStore binaries) : IAgentKitBuilder
             $"   {run} connect {address} --порт {request.Port} --код КОД");
         text.AppendLine();
 
+        // Адрес можно и не называть: клиент объявляет себя, пока ждёт звонка.
+        // Строка стоит сразу после команды с адресом, а не вместо неё: в разных
+        // подсетях объявление не дойдёт никогда, и адрес остаётся единственным путём.
+        text.AppendLine("   Если машины в одной сети, адрес можно не называть —");
+        text.AppendLine("   агент найдёт ждущего клиента сам:");
+        text.AppendLine();
+        text.AppendLine(CultureInfo.InvariantCulture, $"   {run} connect --код КОД");
+        text.AppendLine();
+
         if (request.ClientAddresses.Count > 1)
         {
             text.AppendLine("   Если этот адрес недоступен, попробуйте другие адреса клиента:");
@@ -220,6 +229,13 @@ public sealed class AgentKitWriter(AgentBinaryStore binaries) : IAgentKitBuilder
             text.AppendLine(CultureInfo.InvariantCulture, $"   {run} service install");
             text.AppendLine();
             text.AppendLine("Это единственное место, где агенту нужны права администратора.");
+            text.AppendLine();
+            text.AppendLine("ЕСЛИ ХОЧЕТСЯ ВИДЕТЬ, ЧТО ПРОИСХОДИТ");
+            text.AppendLine("------------------------------------");
+            text.AppendLine("У агента есть окно: storm-agent-ui.exe — тот же агент, но с графиком");
+            text.AppendLine("идущего измерения и списком сделанных. В комплект оно не положено:");
+            text.AppendLine("весит втрое больше самого агента. Возьмите его рядом с клиентом,");
+            text.AppendLine("в папке программы, и положите к агенту — файлы они делят.");
         }
         else
         {

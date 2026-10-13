@@ -97,6 +97,26 @@ jobs:
 
           Get-ChildItem $agents | ForEach-Object { "{0,-32} {1,6:N1} МБ" -f $_.Name, ($_.Length / 1MB) } | Write-Host
 
+      # Окно агента — только Windows и только распакованным рядом с клиентом.
+      # В комплект для площадки оно не кладётся: весит втрое больше самого агента,
+      # а качают комплект по чужому каналу.
+      - name: Окно агента
+        if: steps.probe.outputs.found == 'true'
+        shell: pwsh
+        run: |
+          dotnet publish src/StormMachine.Agent.Gui/StormMachine.Agent.Gui.csproj `
+            --configuration Release --output artifacts/agent-ui --nologo --verbosity quiet
+
+          $window = "artifacts/agent-ui/storm-agent-ui.exe"
+
+          if (-not (Test-Path $window)) {
+            Write-Host "::error::Окно агента не собралось"
+            exit 1
+          }
+
+          Copy-Item $window "artifacts/StormMachine.App/storm-agent-ui.exe" -Force
+          "{0,6:N1} МБ  storm-agent-ui.exe" -f ((Get-Item $window).Length / 1MB) | Write-Host
+
       # ------------------------------------------------------------------ подпись
       #
       # SignPath Foundation подписывает выпуски открытых проектов бесплатно.
