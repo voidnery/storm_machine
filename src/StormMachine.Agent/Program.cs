@@ -348,6 +348,10 @@ internal static class Program
             PeerBookPath = Path.Combine(directory, "storm-agent.peers.json"),
             Port = port,
             Pairing = offer,
+
+            // Запуск из консоли: человек рядом и код сопряжения ему видно.
+            // У службы своя сборка настроек, и там этого признака нет.
+            Interactive = true,
         };
     }
 

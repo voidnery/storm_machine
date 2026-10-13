@@ -22,6 +22,16 @@ public sealed record AgentSettings
     /// </remarks>
     public PairingOffer? Pairing { get; init; }
 
+    /// <summary>
+    /// За агентом сидит человек: запуск из консоли, а не службой.
+    /// </summary>
+    /// <remarks>
+    /// Различие нужно ровно для одного: кому показывать код сопряжения. Человеку
+    /// у консоли его показать можно и нужно, а служба работает без него — выдавать
+    /// код в журнал событий, которого никто не читает, бессмысленно.
+    /// </remarks>
+    public bool Interactive { get; init; }
+
     /// <summary>Куда писать происходящее. По умолчанию в консоль.</summary>
     public Action<string> Log { get; init; } = Console.WriteLine;
 }
@@ -48,6 +58,9 @@ public sealed class AgentHost(AgentSettings settings)
     private PeerBook? _book;
     private int _busy;
 
+    /// <summary>Код, выданный агентом самостоятельно, — когда сопрягаться больше не с кем.</summary>
+    private PairingOffer? _offered;
+
     public PeerIdentity Identity => _identity ??= PeerIdentity.LoadOrCreate(_settings.IdentityPath, "storm-agent");
 
     public PeerBook Book => _book ??= new PeerBook(_settings.PeerBookPath);
@@ -71,16 +84,37 @@ public sealed class AgentHost(AgentSettings settings)
 
         _settings.Log($"Слушаю порт {_settings.Port}. Отпечаток: {Identity.ThumbprintForHumans}");
 
-        if (_settings.Pairing is { } offer)
+        // Код выдаётся сам, когда сопрягаться больше не с кем.
+        //
+        // Раньше агент, запущенный без ключей, сообщал, что никого принять не сможет,
+        // и предлагал перезапустить себя с ключом «--сопряжение». Других полезных
+        // действий в этом состоянии у него нет: слушающий агент без единого сопряжения
+        // не умеет ровно ничего. Отправлять человека за флагом ради единственно
+        // возможного шага — та же беда, что и команда консоли в окне: продукт знает,
+        // что нужно, и всё равно просит сделать это руками (замечание оператора, И-25).
+        //
+        // Служба так не делает: кода там никто не увидит, а в журнале событий он
+        // был бы только шумом.
+        var pairing = _settings.Pairing;
+
+        if (pairing is null && _settings.Interactive && Book.Thumbprints.Count == 0)
+        {
+            pairing = _offered = PairingOffer.Issue();
+
+            _settings.Log("Сопряжений ещё нет — выдаю код сам:");
+        }
+
+        if (pairing is { } offer)
         {
             _settings.Log($"Код сопряжения: {offer.ForHumans}");
             _settings.Log($"Код одноразовый и годен {offer.Lifetime.TotalMinutes:0} мин — "
-                          + "после сопряжения по нему второй раз сопрячься нельзя.");
+                          + "после сопряжения по нему второй раз сопрячься нельзя. "
+                          + "Истёк — перезапусти агента, он выдаст новый.");
+            _settings.Log("В клиенте: Настройки → Агенты → ввести этот код и адрес этой машины.");
         }
         else if (Book.Thumbprints.Count == 0)
         {
-            _settings.Log("Сопряжений нет и код не задан — принять никого не смогу. "
-                          + "Запусти с ключом --сопряжение, чтобы получить код.");
+            _settings.Log("Сопряжений нет и код не задан — принять никого не смогу.");
         }
 
         // Напоминание про брандмауэр даётся до первой неудачи, а не после. Слушающий
@@ -301,7 +335,7 @@ public sealed class AgentHost(AgentSettings settings)
 
         // Годен ли код ещё, решает само предложение: истёкший и использованный
         // не подставляются вовсе, и незнакомец получает отказ, а не догадку.
-        PairingCode = _settings.Pairing?.CodeIfValid,
+        PairingCode = (_settings.Pairing ?? _offered)?.CodeIfValid,
         ProductName = $"storm-agent/{ThisVersion}",
         Capabilities =
         [
