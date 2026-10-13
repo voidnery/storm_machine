@@ -65,7 +65,7 @@ public sealed partial class DevelopmentPageViewModel(
         + "эта команда остаётся.";
 
     public static string SummaryNote =>
-        "Сводка считается по фактам этой машины: правам процесса, наличию драйвера, "
+        "Сводка считается по фактам этой машины: правам процесса, источнику захвата, "
         + "сопряжённым агентам. Один и тот же выпуск на двух машинах умеет разное.";
 
     public override Task ActivateAsync(CancellationToken cancellationToken = default) =>
