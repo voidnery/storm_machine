@@ -42,7 +42,7 @@
         <!-- Шкала уровней объясняется здесь, а не только в разделе «Разработка»:
              тот временный и уйдёт из релиза вместе с единственным объяснением. -->
         <Border Grid.Column="1" Background="{StaticResource DividerBrush}" CornerRadius="4" Padding="8,3" Margin="12,0,0,0" VerticalAlignment="Center"
-                ToolTip.Tip="{x:Static vm:MainWindowViewModel.LevelHint}">
+                ToolTip.Tip="{Binding LevelHint}">
           <TextBlock Text="{Binding LevelText}" FontSize="12" />
         </Border>
 

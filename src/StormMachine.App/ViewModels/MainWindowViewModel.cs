@@ -5,6 +5,8 @@ using CommunityToolkit.Mvvm.Input;
 using StormMachine.App.Services;
 using StormMachine.Application;
 using StormMachine.Application.Abstractions;
+using StormMachine.Application.Capabilities;
+using StormMachine.Domain.Capabilities;
 using StormMachine.Domain.Measurements;
 
 namespace StormMachine.App.ViewModels;
@@ -21,6 +23,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
     private readonly Func<NavigationSection, PageViewModel> _pageFactory;
     private readonly INetworkEnvironment _environment;
     private readonly IHighResolutionClock _clock;
+    private readonly CapabilityInspector _capabilities;
     private readonly Dictionary<string, PageViewModel> _pages = new(StringComparer.Ordinal);
 
     /// <summary>Идёт переход — повторный вход через выбор в меню не нужен.</summary>
@@ -33,6 +36,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         NotificationCenter notifications,
         IDatabaseMaintenance maintenance,
         IStorageLocation location,
+        CapabilityInspector capabilities,
         Func<NavigationSection, PageViewModel> pageFactory)
     {
         IsPortable = (location ?? throw new ArgumentNullException(nameof(location))).IsPortable;
@@ -41,6 +45,7 @@ public sealed partial class MainWindowViewModel : ObservableObject
         _environment = environment ?? throw new ArgumentNullException(nameof(environment));
         _clock = clock ?? throw new ArgumentNullException(nameof(clock));
         _pageFactory = pageFactory ?? throw new ArgumentNullException(nameof(pageFactory));
+        _capabilities = capabilities ?? throw new ArgumentNullException(nameof(capabilities));
 
         Sections = NavigationMap.Sections;
 
@@ -171,21 +176,64 @@ public sealed partial class MainWindowViewModel : ObservableObject
     /// </remarks>
     public static string Signature => ProductInfo.Signature;
 
-    public static string LevelText => "Уровень 0 — ядро";
-
     /// <summary>
-    /// Что означают уровни.
+    /// Какие уровни работают на этой машине прямо сейчас.
     /// </summary>
     /// <remarks>
-    /// Шкала объяснялась только в разделе «Разработка», а он временный и уйдёт
-    /// из релизной версии. После его удаления «Уровень 0» в шапке остался бы
-    /// надписью без единого объяснения во всём продукте.
+    /// Была константой «Уровень 0 — ядро» и не менялась никогда: ни от запуска
+    /// с правами, ни от заведённых учётных данных SNMP. Замечание оператора.
+    /// Надпись, которая не может стать другой, не сообщает ничего — а выглядит
+    /// как сообщение о состоянии, и в этом её вред.
+    /// <para>
+    /// Считается по тому же отчёту возможностей, что и экран «Разработка»
+    /// и <c>storm capabilities</c>: три места о состоянии машины не вправе
+    /// расходиться.
+    /// </para>
     /// </remarks>
-    public static string LevelHint =>
-        "Уровень 0 — то, что работает у любого без прав администратора и без "
-        + "дополнительных программ: измерения, инвентарь, карта, отчёты. "
-        + "Уровень 1 добавляет опрос оборудования по SNMP — нужны учётные данные. "
-        + "Уровень 2 добавляет захват кадров — нужны права администратора.";
+    [ObservableProperty]
+    private string _levelText = "Уровень 0 — ядро";
+
+    /// <summary>Что означают уровни и чего не хватает остальным.</summary>
+    [ObservableProperty]
+    private string _levelHint = LevelBadge.Scale;
+
+    /// <summary>
+    /// Пересчитывает уровни по состоянию машины.
+    /// </summary>
+    /// <remarks>
+    /// Зовётся при каждом переходе между разделами, а не один раз на запуск:
+    /// учётные данные SNMP заводят в настройках, не закрывая окна, и надпись обязана
+    /// это заметить. Отчёт возможностей считается за доли секунды — платить за это
+    /// устаревшей надписью незачем.
+    /// <para>
+    /// Уровни независимы: захват требует прав, SNMP — учётных данных, и одно
+    /// без другого бывает. Поэтому показывается не «верхний достигнутый», а те,
+    /// что работают: «Уровни 0 и 2» — такое же законное состояние машины,
+    /// как и «все три».
+    /// </para>
+    /// </remarks>
+    private async Task RefreshLevelsAsync()
+    {
+        try
+        {
+            var report = await _capabilities.InspectAsync().ConfigureAwait(true);
+
+            // Уровень считается работающим, только если работает целиком: это правило
+            // домена (CapabilityReport.StateOf), и шапка опирается на него, а не
+            // на свою догадку. Уровень, где работает половина, обещал бы SNMP там,
+            // где учётных данных нет.
+            var snmp = report.StateOf(CapabilityLevel.Snmp) == CapabilityState.Available;
+            var capture = report.StateOf(CapabilityLevel.Capture) == CapabilityState.Available;
+
+            LevelText = LevelBadge.Describe(snmp, capture);
+            LevelHint = LevelBadge.Hint(snmp, capture);
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or IOException)
+        {
+            // Сводка возможностей не важнее работы продукта: не посчиталась —
+            // надпись остаётся прежней, а беда видна там, где её показывают.
+        }
+    }
 
     partial void OnSelectedSectionChanged(NavigationSection? value)
     {
@@ -294,6 +342,10 @@ public sealed partial class MainWindowViewModel : ObservableObject
         }
 
         UpdateStatus();
+
+        // Уровни пересчитываются при переходе: учётные данные заводят в настройках,
+        // не закрывая окна, и надпись в шапке обязана это заметить.
+        _ = RefreshLevelsAsync();
 
         _ = page.ActivateAsync();
     }
