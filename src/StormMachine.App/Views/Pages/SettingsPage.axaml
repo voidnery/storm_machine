@@ -494,7 +494,12 @@
               <forms:CopyChip Text="{x:Static vm:SettingsPageViewModel.Version}" />
             </StackPanel>
 
-            <StackPanel Spacing="6">
+            <!-- Обновления показываются только там, где они возможны. В портативном
+                 режиме раздела нет вовсе: три серые кнопки и объяснение, почему они
+                 серые, — это рассказ о невозможном на месте, где человек ищет нужное
+                 (замечание оператора). Как получить новую версию, сказано в «Хранилище»,
+                 рядом с режимом. -->
+            <StackPanel Spacing="6" IsVisible="{Binding !Updates.IsPortable}">
               <TextBlock Text="Обновление" Classes="caption" />
               <TextBlock Text="{Binding Updates.StateText}" Classes="label" TextWrapping="Wrap" LineHeight="16" />
 

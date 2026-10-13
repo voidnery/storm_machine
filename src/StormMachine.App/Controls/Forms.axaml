@@ -281,8 +281,12 @@
                  MinWidth="{Binding Bounds.Width, RelativeSource={RelativeSource TemplatedParent}}"
                  IsOpen="{Binding IsOpen, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}"
                  IsLightDismissEnabled="True" InheritsTransform="True">
-            <Border Background="{DynamicResource ChromeBrush}" BorderBrush="{DynamicResource OutlineBrush}"
-                    BorderThickness="1" CornerRadius="4" Padding="4" MaxHeight="360">
+            <!-- Приподнятая поверхность и тень: список висит над страницей,
+                 и это должно быть видно. Тень не украшение — без неё граница
+                 между списком и панелью под ним теряется на тёмной теме. -->
+            <Border Background="{DynamicResource PopupBrush}" BorderBrush="{DynamicResource OutlineBrush}"
+                    BorderThickness="1" CornerRadius="4" Padding="4" MaxHeight="360"
+                    BoxShadow="{DynamicResource PopupShadow}">
               <DockPanel LastChildFill="True">
 
                 <TextBox x:Name="PART_Search" DockPanel.Dock="Top" FontSize="12" Margin="0,0,0,4"
@@ -301,14 +305,17 @@
                       <Setter Property="Padding" Value="8,5" />
                       <Setter Property="MinHeight" Value="28" />
                     </Style>
+                    <!-- Подсветка берётся из кистей всплывающего, а не общих:
+                         поверхность списка теперь светлее панелей, и прежние
+                         TileBrush с ChipBrush темнели бы относительно неё. -->
                     <Style Selector="ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-                      <Setter Property="Background" Value="{DynamicResource TileBrush}" />
+                      <Setter Property="Background" Value="{DynamicResource PopupHoverBrush}" />
                     </Style>
                     <Style Selector="ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
-                      <Setter Property="Background" Value="{DynamicResource ChipBrush}" />
+                      <Setter Property="Background" Value="{DynamicResource PopupPickedBrush}" />
                     </Style>
                     <Style Selector="ListBoxItem:selected:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-                      <Setter Property="Background" Value="{DynamicResource ChipBrush}" />
+                      <Setter Property="Background" Value="{DynamicResource PopupPickedBrush}" />
                     </Style>
                   </ListBox.Styles>
                   <ListBox.ItemTemplate>

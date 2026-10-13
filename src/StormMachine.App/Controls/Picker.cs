@@ -148,6 +148,10 @@ public class Picker : TemplatedControl
     private TextBox? _text;
     private Button? _field;
     private Button? _arrow;
+
+    /// <summary>Прокрутка страницы, на которой открыт список: от неё он закрывается.</summary>
+    private ScrollViewer? _scroller;
+
     private INotifyCollectionChanged? _watched;
     private long _dismissedAt;
     private int _sourceCount;
@@ -322,6 +326,10 @@ public class Picker : TemplatedControl
         base.OnDetachedFromVisualTree(e);
 
         Watch(null);
+
+        // Подписка на прокрутку снимается вместе с остальными: страница ушла,
+        // а её ScrollViewer держал бы закрытый список живым.
+        ForgetScrolling();
     }
 
     protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
@@ -368,6 +376,9 @@ public class Picker : TemplatedControl
             {
                 _dismissedAt = Environment.TickCount64;
                 Search = null;
+
+                // Список закрыт — слушать прокрутку больше незачем.
+                ForgetScrolling();
             }
 
             UpdateState();
@@ -547,6 +558,53 @@ public class Picker : TemplatedControl
     }
 
     /// <summary>
+    /// Прокрутка страницы закрывает список.
+    /// </summary>
+    /// <remarks>
+    /// Раскрытый список живёт в своём окне поверх страницы и за прокруткой не едет:
+    /// страница уходит вниз, а список остаётся висеть посреди чужой панели
+    /// (замечание оператора — «уплывающее меню»). Выбор из списка, оторванного
+    /// от своего поля, — это выбор вслепую: не видно, к чему он относится.
+    /// <para>
+    /// Закрыть честнее, чем тащить за собой: человек, который крутит страницу,
+    /// уже смотрит на другое. Так же ведут себя списки в системных окнах.
+    /// </para>
+    /// </remarks>
+    private void WatchScrolling()
+    {
+        if (_scroller is not null)
+        {
+            return;
+        }
+
+        _scroller = this.FindAncestorOfType<ScrollViewer>();
+
+        if (_scroller is not null)
+        {
+            _scroller.ScrollChanged += OnPageScrolled;
+        }
+    }
+
+    private void OnPageScrolled(object? sender, ScrollChangedEventArgs e)
+    {
+        if (IsOpen)
+        {
+            IsOpen = false;
+        }
+    }
+
+    private void ForgetScrolling()
+    {
+        if (_scroller is null)
+        {
+            return;
+        }
+
+        _scroller.ScrollChanged -= OnPageScrolled;
+        _scroller = null;
+    }
+
+    /// <summary>
     /// Раскрывает список целиком.
     /// </summary>
     /// <remarks>
@@ -564,6 +622,8 @@ public class Picker : TemplatedControl
         Search = null;
 
         Rebuild();
+
+        WatchScrolling();
 
         IsOpen = true;
 

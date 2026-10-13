@@ -90,6 +90,24 @@
     <SolidColorBrush x:Key="PanelBrush">#232A38</SolidColorBrush>
     <SolidColorBrush x:Key="TileBrush">#232B3B</SolidColorBrush>
     <SolidColorBrush x:Key="ChipBrush">#233046</SolidColorBrush>
+
+    <!-- Поверхность того, что лежит ПОВЕРХ страницы: выпадающий список, окошко.
+         Светлее панели намеренно. До этого список красился ChromeBrush — темнее
+         панели, над которой он висел, — и читался не как приподнятый слой,
+         а как дыра в странице (замечание оператора: «тёмное на тёмном»). -->
+    <SolidColorBrush x:Key="PopupBrush">#2B3447</SolidColorBrush>
+
+    <!-- Подсветка пункта внутри всплывающего: оба светлее самой поверхности,
+         иначе наведение и выбор темнели бы относительно списка. Выбранный
+         отличается от наведённого синевой, а не только яркостью. -->
+    <SolidColorBrush x:Key="PopupHoverBrush">#36425A</SolidColorBrush>
+    <SolidColorBrush x:Key="PopupPickedBrush">#3C4F74</SolidColorBrush>
+
+    <!-- Тень приподнятого слоя — тоже токен: цвет в разметке страницы запрещён
+         сторожем, и правильно. Глубина одна на весь продукт, чтобы выпадающий
+         список и окошко не парили на разной высоте. -->
+    <BoxShadows x:Key="PopupShadow">0 10 28 0 #9E000000</BoxShadows>
+
     <SolidColorBrush x:Key="DividerBrush">#2E3746</SolidColorBrush>
     <SolidColorBrush x:Key="OutlineBrush">#3A4356</SolidColorBrush>
     <SolidColorBrush x:Key="ScrimBrush">#CC0F1219</SolidColorBrush>
