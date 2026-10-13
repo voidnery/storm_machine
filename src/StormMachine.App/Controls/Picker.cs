@@ -149,6 +149,9 @@ public class Picker : TemplatedControl
     private Button? _field;
     private Button? _arrow;
 
+    /// <summary>Содержимое раскрытого списка — ему колесо мыши и адресовано.</summary>
+    private Popup? _popup;
+
     /// <summary>Прокрутка страницы, на которой открыт список: от неё он закрывается.</summary>
     private ScrollViewer? _scroller;
 
@@ -156,6 +159,9 @@ public class Picker : TemplatedControl
     private long _dismissedAt;
     private int _sourceCount;
     private bool _syncing;
+
+    /// <summary>Список закрывает сам элемент, а не щелчок мимо него.</summary>
+    private bool _closingOurselves;
 
     public Picker() => UpdateState();
 
@@ -278,11 +284,30 @@ public class Picker : TemplatedControl
             _arrow.Click -= OnOpenClick;
         }
 
+        if (_popup?.Child is InputElement old)
+        {
+            old.RemoveHandler(PointerWheelChangedEvent, OnPopupWheel);
+        }
+
         _list = e.NameScope.Find<ListBox>("PART_List");
         _search = e.NameScope.Find<TextBox>("PART_Search");
         _text = e.NameScope.Find<TextBox>("PART_Text");
         _field = e.NameScope.Find<Button>("PART_Field");
         _arrow = e.NameScope.Find<Button>("PART_Arrow");
+        _popup = e.NameScope.Find<Popup>("PART_Popup");
+
+        // Колесо над раскрытым списком не должно уходить странице.
+        //
+        // Список висит в слое поверх страницы, но событиями остаётся в её дереве:
+        // прокрутка, которую сам список не съел (пунктов меньше, чем высота), уходила
+        // наверх и крутила страницу — а вместе с ней уезжало поле, к которому список
+        // привязан. Замечание оператора: «проматывается вся страница и список
+        // закрывается». Обработчик ставится последним звеном: сперва колесо достаётся
+        // самому списку, и только непрокрученное гасится здесь.
+        if (_popup?.Child is InputElement content)
+        {
+            content.AddHandler(PointerWheelChangedEvent, OnPopupWheel, RoutingStrategies.Bubble);
+        }
 
         if (_list is not null)
         {
@@ -374,7 +399,15 @@ public class Picker : TemplatedControl
             }
             else
             {
-                _dismissedAt = Environment.TickCount64;
+                // Пауза нужна только против собственного закрытия щелчком мимо:
+                // закрытие выбором пункта или Escape не должно мешать открыть список
+                // снова — оператор, выбравший не то, щёлкал по полю и ничего не получал.
+                if (!_closingOurselves)
+                {
+                    _dismissedAt = Environment.TickCount64;
+                }
+
+                _closingOurselves = false;
                 Search = null;
 
                 // Список закрыт — слушать прокрутку больше незачем.
@@ -585,13 +618,30 @@ public class Picker : TemplatedControl
         }
     }
 
+    /// <summary>
+    /// Закрывается только от настоящей прокрутки.
+    /// </summary>
+    /// <remarks>
+    /// <c>ScrollChanged</c> приходит и тогда, когда никто ничего не крутил: раскрытие
+    /// списка меняет раскладку страницы, у неё меняется высота содержимого — и событие
+    /// приходит с нулевым сдвигом. Проверки на сдвиг не было, и список закрывался
+    /// в тот же миг, в который открылся: со стороны это выглядело как «не открывается
+    /// с первого раза, приходится щёлкать несколько раз» — замечание оператора.
+    /// <para>
+    /// Сдвиг отличает прокрутку от перестройки раскладки, и больше здесь ничего
+    /// не нужно: страница уехала — список закрылся.
+    /// </para>
+    /// </remarks>
     private void OnPageScrolled(object? sender, ScrollChangedEventArgs e)
     {
-        if (IsOpen)
+        if (IsOpen && (e.OffsetDelta.Y != 0 || e.OffsetDelta.X != 0))
         {
-            IsOpen = false;
+            Close();
         }
     }
+
+    /// <summary>Колесо, не съеденное списком, гасится: странице оно не адресовано.</summary>
+    private void OnPopupWheel(object? sender, PointerWheelEventArgs e) => e.Handled = true;
 
     private void ForgetScrolling()
     {
@@ -646,13 +696,23 @@ public class Picker : TemplatedControl
         });
     }
 
-    private void Close() => IsOpen = false;
+    private void Close()
+    {
+        _closingOurselves = true;
+        IsOpen = false;
+    }
 
     private void UpdateState()
     {
         // Состояния — обычные свойства, а не псевдоклассы: их видно снаружи, и проверка
         // может спросить у элемента, показывает ли он сейчас поиск, а не гадать по виду.
-        HasSearch = !AcceptsText && _sourceCount >= SearchFrom;
+        //
+        // Поиск есть у ЛЮБОГО длинного списка, включая поле со свободным вводом.
+        // Раньше там его не было: считалось, что набранное в самом поле и есть поиск.
+        // Для двухсот адресов инвентаря это неправда дважды — найти строку, не испортив
+        // набранную цель, было нельзя, и два одинаково выглядящих списка вели себя
+        // по-разному (замечание оператора).
+        HasSearch = _sourceCount >= SearchFrom;
         IsBlank = AcceptsText ? string.IsNullOrEmpty(Text) : SelectedItem is null;
     }
 
