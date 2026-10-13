@@ -123,6 +123,52 @@ public sealed class AgentWindowTests(HeadlessSessionFixture fixture)
             CancellationToken.None);
     }
 
+    [Fact(DisplayName = "Звонок без адреса объясняет, чего не хватает")]
+    public async Task Dial_WithoutAddress_Explains()
+    {
+        await _session.Dispatch(
+            async () =>
+            {
+                var model = new AgentWindowViewModel();
+
+                // Звонок наружу — второе направление связи, и на чужой площадке
+                // основное: входящие там закрыты, а исходящие разрешены.
+                await model.DialCommand.ExecuteAsync(null);
+
+                Assert.NotNull(model.DialState);
+                Assert.Contains("адрес", model.DialState!, StringComparison.OrdinalIgnoreCase);
+                Assert.False(model.IsDialing);
+
+                await Task.CompletedTask;
+            },
+            CancellationToken.None);
+    }
+
+    [Fact(DisplayName = "Окно показывает, кому можно позвонить")]
+    public async Task Window_ShowsTheDialCard()
+    {
+        await _session.Dispatch(
+            async () =>
+            {
+                var model = new AgentWindowViewModel();
+
+                model.Clients.Add(new ClientRow("станция", "192.168.200.104", 47820));
+
+                var window = new AgentWindow { DataContext = model };
+
+                window.Show();
+                window.UpdateLayout();
+
+                Assert.Contains(Texts(window), t => t.Contains("Позвонить клиенту", StringComparison.Ordinal));
+                Assert.Equal("станция — 192.168.200.104:47820", model.Clients[0].Caption);
+
+                window.Close();
+
+                await Task.CompletedTask;
+            },
+            CancellationToken.None);
+    }
+
     private static AgentMoment Moment(AgentMomentKind kind, TestSnapshot? snapshot) => new()
     {
         Kind = kind,

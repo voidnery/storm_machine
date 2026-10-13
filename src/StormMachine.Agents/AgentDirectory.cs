@@ -311,12 +311,24 @@ public sealed class AgentDirectory(IAgentStore store) : IAgentDirectory, IDispos
 
         progress?.Report(new PairingProgress(
             $"Жду звонка агента «{agent.DisplayName}» на порт {port}. "
-            + $"На его машине: storm-agent connect <адрес этой машины>",
+            + "На его машине: storm-agent connect — адрес этой машины он найдёт сам, "
+            + "пока я жду; либо назовите адрес, если сети между вами не видно насквозь.",
             null,
             IsDone: false));
 
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         deadline.CancelAfter(CallTimeout);
+
+        // Объявляемся и здесь, а не только при сопряжении. Иначе получалось так:
+        // сопряглись — агент нас нашёл, а на каждом следующем измерении опять
+        // требовался набранный руками адрес. Ждём мы и там и там одинаково,
+        // и слышно нас должно быть одинаково.
+        var announcing = LocalDiscovery.AnnounceAsync(
+            Environment.MachineName,
+            port,
+            $"{LocalDiscovery.ClientProduct}/{ProductInfo.Version}",
+            await GetOwnThumbprintAsync(cancellationToken).ConfigureAwait(false),
+            deadline.Token);
 
         try
         {
@@ -340,11 +352,21 @@ public sealed class AgentDirectory(IAgentStore store) : IAgentDirectory, IDispos
         {
             throw new InvalidOperationException(
                 $"Агент «{agent.DisplayName}» не позвонил за {CallTimeout.TotalMinutes:0} мин. "
-                + "Запусти на его машине: storm-agent connect <адрес этой машины>.");
+                + "Запусти на его машине: storm-agent connect — или нажми «Позвонить» "
+                + "в его окне.");
         }
         finally
         {
             listener.Stop();
+
+            try
+            {
+                await announcing.ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+                // Ждать перестали — объявлять больше нечего.
+            }
         }
     }
 

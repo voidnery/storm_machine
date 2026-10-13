@@ -93,6 +93,14 @@ public sealed class AgentHost(AgentSettings settings)
     /// <summary>Код, выданный агентом самостоятельно, — когда сопрягаться больше не с кем.</summary>
     private PairingOffer? _offered;
 
+    /// <summary>Код, названный клиентом, — с ним агент звонит сам.</summary>
+    /// <remarks>
+    /// Отдельно от <see cref="AgentSettings.Pairing" />: тот код агент выдаёт, этот —
+    /// получает. Путать их нельзя, иначе звонок предъявил бы собеседнику свой код
+    /// вместо чужого и получил бы отказ.
+    /// </remarks>
+    private PairingOffer? _dialing;
+
     public PeerIdentity Identity => _identity ??= PeerIdentity.LoadOrCreate(_settings.IdentityPath, "storm-agent");
 
     public PeerBook Book => _book ??= new PeerBook(_settings.PeerBookPath);
@@ -212,11 +220,35 @@ public sealed class AgentHost(AgentSettings settings)
     /// профилях Windows, и разрешение требуется не здесь, а на машине оператора, где
     /// оно уместно.
     /// </remarks>
-    public async Task ConnectAsync(string host, int port, CancellationToken cancellationToken)
+    public Task ConnectAsync(string host, int port, CancellationToken cancellationToken) =>
+        ConnectAsync(host, port, null, cancellationToken);
+
+    /// <summary>
+    /// Дозванивается до клиента, предъявляя названный им код сопряжения.
+    /// </summary>
+    /// <param name="pairingCode">
+    /// Код, который клиент показал при первом знакомстве. Пусто — сопряжение уже есть,
+    /// и подтверждать нечего: дальше узнают по отпечатку.
+    /// </param>
+    public async Task ConnectAsync(
+        string host,
+        int port,
+        string? pairingCode,
+        CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(host);
 
+        _dialing = string.IsNullOrWhiteSpace(pairingCode)
+            ? null
+            : PairingOffer.For(pairingCode.Trim(), PairingCode.Lifetime);
+
         _settings.Log($"Дозваниваюсь до {host}:{port}. Отпечаток: {Identity.ThumbprintForHumans}");
+
+        Tell(new AgentMoment
+        {
+            Kind = AgentMomentKind.Listening,
+            Text = $"Дозваниваюсь до {host}:{port}.",
+        });
 
         using var session = await SecureChannel
             .ConnectAsync(host, port, Options(), cancellationToken)
@@ -461,7 +493,9 @@ public sealed class AgentHost(AgentSettings settings)
 
         // Годен ли код ещё, решает само предложение: истёкший и использованный
         // не подставляются вовсе, и незнакомец получает отказ, а не догадку.
-        PairingCode = (_settings.Pairing ?? _offered)?.CodeIfValid,
+        // Порядок не случаен: чужой код при звонке весомее своего. Свой код агент
+        // предъявлял бы собеседнику вместо названного им — и получил бы отказ.
+        PairingCode = (_dialing ?? _settings.Pairing ?? _offered)?.CodeIfValid,
         ProductName = $"storm-agent/{ThisVersion}",
         Capabilities =
         [

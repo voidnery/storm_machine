@@ -1,5 +1,6 @@
-using System.Collections.ObjectModel;
+﻿using System.Collections.ObjectModel;
 using System.Globalization;
+using System.Net.Sockets;
 using Avalonia.Input.Platform;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -10,6 +11,12 @@ namespace StormMachine.Agent.Gui;
 
 /// <summary>Кто сопряжён с этим агентом.</summary>
 public sealed record PeerRow(string Machine, string Product, string Paired, string Thumbprint);
+
+/// <summary>Клиент, услышанный в сети: ему можно позвонить.</summary>
+public sealed record ClientRow(string Machine, string Address, int Port)
+{
+    public string Caption => $"{Machine} — {Address}:{Port.ToString(CultureInfo.InvariantCulture)}";
+}
 
 /// <summary>Одно измерение, сделанное через этого агента.</summary>
 public sealed record MeasurementRow(string At, string Peer, string Test, string Result);
@@ -44,6 +51,9 @@ public sealed partial class AgentWindowViewModel : ObservableObject, IDisposable
     private AgentHost? _host;
     private Task? _work;
 
+    /// <summary>Идущий звонок: его и прерывает «отключиться».</summary>
+    private CancellationTokenSource? _call;
+
     [ObservableProperty]
     private string _fingerprint = "…";
 
@@ -64,6 +74,27 @@ public sealed partial class AgentWindowViewModel : ObservableObject, IDisposable
 
     [ObservableProperty]
     private string _chartTitle = "Измерений ещё не было";
+
+    // ------------------------------------------------------------------ звонок
+
+    /// <summary>Адрес клиента: выбранный из найденных или набранный руками.</summary>
+    [ObservableProperty]
+    private string? _dialAddress;
+
+    /// <summary>Код, который показал клиент. Нужен только при первом знакомстве.</summary>
+    [ObservableProperty]
+    private string? _dialCode;
+
+    [ObservableProperty]
+    private bool _isDialing;
+
+    [ObservableProperty]
+    private string? _dialState;
+
+    [ObservableProperty]
+    private bool _isSearching;
+
+    public ObservableCollection<ClientRow> Clients { get; } = [];
 
     public ObservableCollection<string> Journal { get; } = [];
 
@@ -125,6 +156,8 @@ public sealed partial class AgentWindowViewModel : ObservableObject, IDisposable
 
     public void Stop()
     {
+        _call?.Cancel();
+
         if (!_stopping.IsCancellationRequested)
         {
             _stopping.Cancel();
@@ -135,6 +168,161 @@ public sealed partial class AgentWindowViewModel : ObservableObject, IDisposable
     {
         Stop();
         _stopping.Dispose();
+    }
+
+    /// <summary>
+    /// Ищет в сети клиентов, которые ждут звонка.
+    /// </summary>
+    /// <remarks>
+    /// Клиент объявляет себя, только пока ждёт, — поэтому пустой список здесь значит
+    /// ровно одно: на той стороне ожидание не запущено. Так и сказано: «ничего
+    /// не найдено» без объяснения человек прочитает как поломку.
+    /// </remarks>
+    [RelayCommand]
+    private async Task FindClientsAsync()
+    {
+        if (IsSearching)
+        {
+            return;
+        }
+
+        IsSearching = true;
+        Clients.Clear();
+        DialState = "Слушаю эфир…";
+
+        try
+        {
+            var heard = await Task
+                .Run(() => LocalDiscovery.BrowseAsync(TimeSpan.FromSeconds(6), CancellationToken.None))
+                .ConfigureAwait(true);
+
+            foreach (var client in heard.Where(p => p.IsClient))
+            {
+                Clients.Add(new ClientRow(client.MachineName, client.Address, client.Port));
+            }
+
+            if (Clients.Count == 0)
+            {
+                DialState = "Никто не ждёт звонка. Клиент объявляет себя, только пока ждёт: "
+                            + "на его машине — Настройки → Агенты → ждать звонка. "
+                            + "Если машины в разных подсетях, объявление сюда не дойдёт — "
+                            + "наберите адрес руками.";
+            }
+            else
+            {
+                DialAddress ??= Clients[0].Address;
+                DialState = $"Ждут звонка: {Clients.Count.ToString(CultureInfo.InvariantCulture)}.";
+            }
+        }
+        catch (ProtocolException ex)
+        {
+            DialState = ex.Message;
+        }
+        finally
+        {
+            IsSearching = false;
+        }
+    }
+
+    /// <summary>
+    /// Звонит клиенту сам.
+    /// </summary>
+    /// <remarks>
+    /// Направление, ради которого режим дозвона и существует: входящие на Windows
+    /// закрыты по умолчанию, а правило их открыть требует прав администратора.
+    /// Исходящие разрешены везде — поэтому на чужой площадке звонит агент.
+    /// <para>
+    /// Разговор длится, пока клиент не положит трубку: звонок — не одно действие,
+    /// а состояние, и у него есть «отключиться».
+    /// </para>
+    /// </remarks>
+    [RelayCommand]
+    private async Task DialAsync()
+    {
+        if (IsDialing || _host is null)
+        {
+            return;
+        }
+
+        var address = DialAddress?.Trim();
+
+        if (string.IsNullOrWhiteSpace(address))
+        {
+            DialState = "Некуда звонить: выберите клиента из найденных или наберите адрес.";
+
+            return;
+        }
+
+        var (host, port) = Split(address, SecureChannel.DefaultPort);
+
+        _call = new CancellationTokenSource();
+        IsDialing = true;
+        DialState = $"Звоню {host}:{port.ToString(CultureInfo.InvariantCulture)}…";
+
+        try
+        {
+            await _host.ConnectAsync(host, port, DialCode, _call.Token).ConfigureAwait(true);
+
+            DialState = "Разговор окончен: клиент положил трубку.";
+        }
+        catch (ProtocolException ex)
+        {
+            DialState = ex.Message;
+            Note(ex.Message);
+        }
+        catch (OperationCanceledException)
+        {
+            DialState = "Звонок прерван.";
+        }
+        catch (Exception ex) when (ex is IOException or SocketException)
+        {
+            DialState = $"Дозвониться не вышло: {ex.Message}";
+            Note(DialState);
+        }
+        finally
+        {
+            _call?.Dispose();
+            _call = null;
+            IsDialing = false;
+
+            // Код одноразовый: после разговора он погашен, и оставлять его в поле
+            // значило бы предложить позвонить им второй раз.
+            DialCode = null;
+
+            ReadPeers();
+        }
+    }
+
+    [RelayCommand]
+    private void HangUp() => _call?.Cancel();
+
+    /// <summary>Подставляет найденного в поле адреса — поправить его всё равно можно.</summary>
+    [RelayCommand]
+    private void UseClient(ClientRow? client)
+    {
+        if (client is null)
+        {
+            return;
+        }
+
+        DialAddress = client.Port == SecureChannel.DefaultPort
+            ? client.Address
+            : $"{client.Address}:{client.Port.ToString(CultureInfo.InvariantCulture)}";
+    }
+
+    /// <summary>Адрес с портом или без: «192.168.1.5» и «192.168.1.5:47820» — одно и то же поле.</summary>
+    private static (string Host, int Port) Split(string address, int fallback)
+    {
+        var colon = address.LastIndexOf(':');
+
+        if (colon > 0
+            && int.TryParse(address[(colon + 1)..], CultureInfo.InvariantCulture, out var port)
+            && port is > 0 and < 65536)
+        {
+            return (address[..colon], port);
+        }
+
+        return (address, fallback);
     }
 
     /// <summary>Копирует отпечаток: его сверяют на той стороне глазами, а не на слух.</summary>

@@ -48,6 +48,52 @@
           </StackPanel>
         </Border>
 
+        <!-- Звонок наружу. Второе направление связи, и на чужой площадке оно
+             основное: входящие на Windows закрыты по умолчанию, а исходящие
+             разрешены везде и прав не требуют. -->
+        <Border Classes="card">
+          <StackPanel Spacing="8">
+            <TextBlock Text="Позвонить клиенту" Classes="h2" Foreground="{DynamicResource TextBrush}" />
+            <TextBlock Classes="caption" TextWrapping="Wrap"
+                       Text="Если до этой машины не достучаться — звоните сами. Клиент должен ждать звонка: Настройки → Агенты." />
+
+            <!-- Найденные показаны списком кнопок, а не выбором из списка: ждущих
+                 звонка в сети единицы, и лишний щелчок «раскрыть» тут не окупается.
+                 Нажатие подставляет адрес в поле — его видно и можно поправить. -->
+            <Button Content="Найти в сети" FontSize="12" HorizontalAlignment="Left"
+                    IsEnabled="{Binding !IsSearching}"
+                    Command="{Binding FindClientsCommand}" />
+
+            <ItemsControl ItemsSource="{Binding Clients}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:ClientRow">
+                  <Button Content="{Binding Caption}" FontSize="12" Margin="0,2"
+                          HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                          CommandParameter="{Binding}"
+                          Command="{Binding $parent[Window].((vm:AgentWindowViewModel)DataContext).UseClientCommand}" />
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <Grid ColumnDefinitions="*,160,Auto,Auto" ColumnSpacing="8">
+              <TextBox Grid.Column="0" Text="{Binding DialAddress, Mode=TwoWay}"
+                       Watermark="адрес клиента, можно с :портом" FontSize="12" />
+              <TextBox Grid.Column="1" Text="{Binding DialCode, Mode=TwoWay}"
+                       Watermark="код, если впервые" FontSize="12" />
+              <Button Grid.Column="2" Content="Позвонить" FontSize="12"
+                      IsVisible="{Binding !IsDialing}"
+                      Command="{Binding DialCommand}" />
+              <Button Grid.Column="3" Content="Отключиться" FontSize="12"
+                      IsVisible="{Binding IsDialing}"
+                      Command="{Binding HangUpCommand}" />
+            </Grid>
+
+            <TextBlock Text="{Binding DialState}" Classes="body" TextWrapping="Wrap"
+                       Foreground="{DynamicResource WarningBrush}"
+                       IsVisible="{Binding DialState, Converter={x:Static ObjectConverters.IsNotNull}}" />
+          </StackPanel>
+        </Border>
+
         <!-- Идущее измерение: график по тем же снимкам, что видит оператор -->
         <Border Classes="card">
           <StackPanel Spacing="8">
