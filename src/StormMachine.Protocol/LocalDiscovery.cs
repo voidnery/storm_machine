@@ -193,7 +193,7 @@ public static class LocalDiscovery
     /// уходит раз в десять секунд, и стоит самого хитрого места в разборе DNS —
     /// цена и выгода тут несопоставимы.
     /// </remarks>
-    private static byte[] BuildAnnouncement(
+    internal static byte[] BuildAnnouncement(
         string machineName,
         int port,
         string product,
@@ -293,7 +293,7 @@ public static class LocalDiscovery
     /// из того, откуда пакет пришёл, а не из записи A: запись можно написать любую,
     /// а обратный адрес пакета — тот, с которым придётся разговаривать.
     /// </remarks>
-    private static bool TryReadAnnouncement(
+    internal static bool TryReadAnnouncement(
         ReadOnlySpan<byte> packet,
         IPEndPoint? from,
         out AnnouncedPeer peer)
