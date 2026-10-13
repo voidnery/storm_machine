@@ -129,6 +129,18 @@ public sealed partial class AgentsSectionViewModel(
     [ObservableProperty]
     private string? _progress;
 
+    /// <summary>
+    /// Код ожидания — отдельно от хода и крупно.
+    /// </summary>
+    /// <remarks>
+    /// Был внутри длинной фразы о том, что делать дальше, и терялся в ней:
+    /// оператор, нажавший «ждать звонка», шёл к машине агента, не унеся с собой
+    /// главного. Код диктуют вслух или набирают на другой машине — он обязан
+    /// читаться с одного взгляда.
+    /// </remarks>
+    [ObservableProperty]
+    private string? _waitingCode;
+
     public bool HasAgents => Agents.Count > 0;
 
     public int DefaultPort => _directory.DefaultPort;
@@ -312,15 +324,32 @@ public sealed partial class AgentsSectionViewModel(
     private async Task WaitForCallAsync() =>
         await RunAsync(async token =>
         {
-            var progress = new Progress<PairingProgress>(p =>
-                Dispatcher.UIThread.Post(() => Progress = p.Message));
+            var progress = new Progress<PairingProgress>(p => Dispatcher.UIThread.Post(() =>
+            {
+                Progress = p.Message;
 
-            var agent = await _directory
-                .PairByWaitingAsync(_directory.DefaultPort, progress, token)
-                .ConfigureAwait(true);
+                // Код живёт отдельной строкой, пока ожидание идёт: его уносят
+                // к другой машине, а не читают здесь один раз.
+                if (p.Code is { Length: > 0 })
+                {
+                    WaitingCode = p.Code;
+                }
+            }));
 
-            Message = $"Сопряжён «{agent.DisplayName}». Отпечаток {agent.Thumbprint[..8]} — сверьте его с тем, "
-                      + "что показал агент.";
+            try
+            {
+                var agent = await _directory
+                    .PairByWaitingAsync(_directory.DefaultPort, progress, token)
+                    .ConfigureAwait(true);
+
+                Message = $"Сопряжён «{agent.DisplayName}». Отпечаток {agent.Thumbprint[..8]} — сверьте его с тем, "
+                          + "что показал агент.";
+            }
+            finally
+            {
+                // Код одноразовый: ожидание кончилось — показывать его больше нечего.
+                WaitingCode = null;
+            }
         }).ConfigureAwait(true);
 
     /// <summary>Отменяет идущее сопряжение или поиск.</summary>

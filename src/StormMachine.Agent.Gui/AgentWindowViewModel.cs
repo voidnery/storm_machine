@@ -15,7 +15,10 @@ public sealed record PeerRow(string Machine, string Product, string Paired, stri
 /// <summary>Клиент, услышанный в сети: ему можно позвонить.</summary>
 public sealed record ClientRow(string Machine, string Address, int Port)
 {
-    public string Caption => $"{Machine} — {Address}:{Port.ToString(CultureInfo.InvariantCulture)}";
+    public string Caption => $"{Machine} — {Where}";
+
+    /// <summary>Куда звонить: адрес с портом.</summary>
+    public string Where => $"{Address}:{Port.ToString(CultureInfo.InvariantCulture)}";
 }
 
 /// <summary>Одно измерение, сделанное через этого агента.</summary>

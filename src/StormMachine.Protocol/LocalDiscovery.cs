@@ -1,5 +1,6 @@
 ﻿using System.Buffers.Binary;
 using System.Net;
+using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using System.Text;
 
@@ -99,18 +100,68 @@ public static class LocalDiscovery
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(machineName);
 
-        using var socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
-        socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
-        socket.Bind(new IPEndPoint(IPAddress.Any, 0));
+        // Объявляемся на КАЖДОЙ пригодной карте, а не на одной.
+        //
+        // Раньше адрес и маршрут выбирала система: сокет «подключался» к групповому
+        // адресу, и бралось то, что она вернёт. На машине с туннелем она вернула
+        // 198.18.0.1 — адрес, по которому до нас не достучится никто, и объявление
+        // ушло в туннель вместо локальной сети. Со стороны это выглядело как
+        // «связь не работает»: обнаружение формально работало, а звонить было некуда.
+        //
+        // Поэтому каждая карта объявляет СВОЙ адрес и шлёт со своего интерфейса:
+        // услышавший по этому адресу и дозвонится.
+        var cards = Cards();
 
-        var target = new IPEndPoint(MulticastGroup, MulticastPort);
-        var packet = BuildAnnouncement(machineName, port, product, thumbprint, LocalAddress());
+        if (cards.Count == 0)
+        {
+            return;
+        }
+
+        var sockets = new List<(Socket Socket, byte[] Packet)>(cards.Count);
 
         try
         {
+            foreach (var card in cards)
+            {
+                try
+                {
+                    var socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
+
+                    socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
+                    socket.Bind(new IPEndPoint(card, 0));
+
+                    // Исходящий интерфейс групповой рассылки — тот же, чей адрес
+                    // объявлен: иначе пакет уйдёт не туда, куда зовёт.
+                    socket.SetSocketOption(
+                        SocketOptionLevel.IP,
+                        SocketOptionName.MulticastInterface,
+                        card.GetAddressBytes());
+
+                    sockets.Add((socket, BuildAnnouncement(machineName, port, product, thumbprint, card)));
+                }
+                catch (SocketException)
+                {
+                    // Карта не годится для групповой рассылки — остальные годятся.
+                }
+            }
+
+            var target = new IPEndPoint(MulticastGroup, MulticastPort);
+
             while (!cancellationToken.IsCancellationRequested)
             {
-                await socket.SendToAsync(packet, SocketFlags.None, target, cancellationToken).ConfigureAwait(false);
+                foreach (var (socket, packet) in sockets)
+                {
+                    try
+                    {
+                        await socket.SendToAsync(packet, SocketFlags.None, target, cancellationToken)
+                            .ConfigureAwait(false);
+                    }
+                    catch (SocketException)
+                    {
+                        // Эта карта замолчала — остальные продолжают.
+                    }
+                }
+
                 await Task.Delay(TimeSpan.FromSeconds(10), cancellationToken).ConfigureAwait(false);
             }
         }
@@ -118,11 +169,140 @@ public static class LocalDiscovery
         {
             // Остановлено — объявлять больше нечего.
         }
-        catch (SocketException)
+        finally
         {
-            // Групповая рассылка недоступна (нет маршрута, запрещена политикой).
-            // Это не повод останавливать агента: обнаружение — удобство, а не связь.
+            foreach (var (socket, _) in sockets)
+            {
+                socket.Dispose();
+            }
         }
+    }
+
+    /// <summary>
+    /// Ближе ли новый адрес того же собеседника, чем уже известный.
+    /// </summary>
+    /// <remarks>
+    /// Ближе — значит в одной сети с какой-нибудь нашей картой: по такому адресу
+    /// пакет дойдёт напрямую. Прочие адреса той же машины (внутренний коммутатор,
+    /// туннель) мы слышим, но дозвониться по ним не можем.
+    /// </remarks>
+    /// <summary>
+    /// Насколько адрес «свой»: 0 — сеть маршрута по умолчанию, 1 — какая-то наша сеть, 2 — чужой.
+    /// </summary>
+    /// <remarks>
+    /// Сеть маршрута по умолчанию — та, через которую машина и работает. Прочие наши
+    /// сети (внутренний коммутатор Hyper-V, туннель) тоже «свои», но дозвониться
+    /// по ним можно не всегда и не отовсюду. Разница видна ровно там, где она важна:
+    /// одна и та же машина объявляется со всех карт, и услышать её можно с нескольких
+    /// сразу.
+    /// </remarks>
+    private static int Distance(string address)
+    {
+        if (!IPAddress.TryParse(address, out var peer) || peer.AddressFamily != AddressFamily.InterNetwork)
+        {
+            return 2;
+        }
+
+        var distance = 2;
+
+        try
+        {
+            foreach (var nic in NetworkInterface.GetAllNetworkInterfaces())
+            {
+                if (nic.OperationalStatus != OperationalStatus.Up)
+                {
+                    continue;
+                }
+
+                var properties = nic.GetIPProperties();
+                var routed = properties.GatewayAddresses
+                    .Any(g => g.Address.AddressFamily == AddressFamily.InterNetwork
+                              && !g.Address.Equals(IPAddress.Any));
+
+                foreach (var unicast in properties.UnicastAddresses)
+                {
+                    if (unicast.Address.AddressFamily != AddressFamily.InterNetwork
+                        || !SameNetwork(unicast.Address, peer, unicast.PrefixLength))
+                    {
+                        continue;
+                    }
+
+                    if (routed)
+                    {
+                        return 0;
+                    }
+
+                    distance = Math.Min(distance, 1);
+                }
+            }
+        }
+        catch (NetworkInformationException)
+        {
+            // Список карт не прочитался — считаем адрес обычным.
+        }
+
+        return distance;
+    }
+
+    /// <summary>Лежат ли два адреса в одной сети по длине префикса.</summary>
+    private static bool SameNetwork(IPAddress ours, IPAddress theirs, int prefix)
+    {
+        if (prefix is <= 0 or > 32)
+        {
+            return false;
+        }
+
+        var a = BinaryPrimitives.ReadUInt32BigEndian(ours.GetAddressBytes());
+        var b = BinaryPrimitives.ReadUInt32BigEndian(theirs.GetAddressBytes());
+        var mask = prefix == 32 ? uint.MaxValue : ~(uint.MaxValue >> prefix);
+
+        return (a & mask) == (b & mask);
+    }
+
+    /// <summary>
+    /// Карты, на которых имеет смысл объявляться и слушать.
+    /// </summary>
+    /// <remarks>
+    /// Поднятые, с адресом IPv4, умеющие групповую рассылку и не петлевые. Туннели
+    /// и виртуальные коммутаторы при этом не выбрасываются: за виртуальным
+    /// коммутатором Hyper-V живёт вся сеть машины, и выкинуть его значило бы
+    /// не объявляться вовсе на самой обычной рабочей машине.
+    /// </remarks>
+    private static List<IPAddress> Cards()
+    {
+        var found = new List<IPAddress>();
+
+        try
+        {
+            foreach (var nic in NetworkInterface.GetAllNetworkInterfaces())
+            {
+                if (nic.OperationalStatus != OperationalStatus.Up
+                    || nic.NetworkInterfaceType == NetworkInterfaceType.Loopback
+                    || !nic.SupportsMulticast)
+                {
+                    continue;
+                }
+
+                foreach (var unicast in nic.GetIPProperties().UnicastAddresses)
+                {
+                    if (unicast.Address.AddressFamily == AddressFamily.InterNetwork)
+                    {
+                        found.Add(unicast.Address);
+                    }
+                }
+            }
+        }
+        catch (NetworkInformationException)
+        {
+            // Список карт не прочитался — пусть решает система, как раньше.
+        }
+
+        if (found.Count == 0 && LocalAddress() is { } fallback && !Equals(fallback, IPAddress.Any))
+        {
+            found.Add(fallback);
+        }
+
+        return found;
     }
 
     /// <summary>Слушает объявления заданное время.</summary>
@@ -139,10 +319,35 @@ public static class LocalDiscovery
             socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
             socket.Bind(new IPEndPoint(IPAddress.Any, MulticastPort));
 
-            socket.SetSocketOption(
-                SocketOptionLevel.IP,
-                SocketOptionName.AddMembership,
-                new MulticastOption(MulticastGroup, IPAddress.Any));
+            // Вступаем в группу на каждой карте, а не на той, что выберет система.
+            // Объявление приходит с той карты, где его послали, и слушать одну
+            // значит не услышать соседа, подключённого в другую сеть.
+            var joined = 0;
+
+            foreach (var card in Cards())
+            {
+                try
+                {
+                    socket.SetSocketOption(
+                        SocketOptionLevel.IP,
+                        SocketOptionName.AddMembership,
+                        new MulticastOption(MulticastGroup, card));
+
+                    joined++;
+                }
+                catch (SocketException)
+                {
+                    // На этой карте группа недоступна — остальные годятся.
+                }
+            }
+
+            if (joined == 0)
+            {
+                socket.SetSocketOption(
+                    SocketOptionLevel.IP,
+                    SocketOptionName.AddMembership,
+                    new MulticastOption(MulticastGroup, IPAddress.Any));
+            }
         }
         catch (SocketException ex)
         {
@@ -169,7 +374,16 @@ public static class LocalDiscovery
                 if (TryReadAnnouncement(buffer.AsSpan(0, received.ReceivedBytes),
                         (IPEndPoint)received.RemoteEndPoint, out var peer))
                 {
-                    found[peer.MachineName] = peer;
+                    // Одна машина объявляется со всех своих карт, и слышно её может
+                    // быть с нескольких сразу. Раньше оставался последний услышанный
+                    // адрес — на машине с туннелем это оказывался адрес туннеля,
+                    // по которому до неё не достучаться.
+                    //
+                    // Выбирать за человека нельзя: на машине и у туннеля, и у сети
+                    // бывает шлюз, и какой из адресов «настоящий» — вопрос к тому,
+                    // кто знает свою сеть. Поэтому слышимые адреса не затирают друг
+                    // друга, а показываются все; порядок — от самого вероятного.
+                    found[$"{peer.MachineName}|{peer.Address}"] = peer;
                 }
             }
         }
@@ -182,7 +396,13 @@ public static class LocalDiscovery
             // Эфир оборвался. То, что успели услышать, остаётся в силе.
         }
 
-        return [.. found.Values.OrderBy(a => a.MachineName, StringComparer.OrdinalIgnoreCase)];
+        return
+        [
+            .. found.Values
+                .OrderBy(a => Distance(a.Address))
+                .ThenBy(a => a.MachineName, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(a => a.Address, StringComparer.Ordinal),
+        ];
     }
 
     /// <summary>

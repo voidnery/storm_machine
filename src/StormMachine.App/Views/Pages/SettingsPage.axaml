@@ -212,6 +212,20 @@
                           Padding="10,5" HorizontalAlignment="Left" IsVisible="{Binding IsBusy}" />
                 </Grid>
 
+                <!-- Код ожидания — крупно и отдельно. Он был внутри длинной фразы
+                     и терялся в ней: оператор шёл к машине агента, не унеся
+                     с собой главного. -->
+                <Border Classes="tile" Padding="12,10"
+                        IsVisible="{Binding WaitingCode, Converter={x:Static ObjectConverters.IsNotNull}}">
+                  <StackPanel Spacing="4">
+                    <TextBlock Text="Код для агента" Classes="label" />
+                    <SelectableTextBlock Text="{Binding WaitingCode}" Classes="mono"
+                                         FontSize="24" Foreground="{StaticResource SuccessBrush}" />
+                    <TextBlock Classes="caption" TextWrapping="Wrap"
+                               Text="Пока жду, эта машина слышна в сети. На машине агента: «Найти в сети» → «Сопрячься» → этот код." />
+                  </StackPanel>
+                </Border>
+
                 <!-- Ход сопряжения показывается здесь, а не уходит в консоль:
                      у графического клиента её нет. Именно так в И-19 пропадала
                      просьба «набери на второй машине вот это». -->

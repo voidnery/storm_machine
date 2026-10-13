@@ -24,7 +24,7 @@
          Номер живёт в одном месте — здесь. Отсюда его читает хук
          .githooks/pre-push и создаёт подписанный тег vX.Y.Z при пуше в master,
          отсюда же он попадает в установщик и в окно «О продукте». -->
-    <Version>0.2.1-alpha.3</Version>
+    <Version>0.2.2-alpha.3</Version>
   </PropertyGroup>
 
   <PropertyGroup>

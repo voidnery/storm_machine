@@ -9,10 +9,11 @@
         Width="1040" Height="760" MinWidth="880" MinHeight="600"
         Background="{DynamicResource SurfaceBrush}">
 
-  <Grid RowDefinitions="Auto,*,Auto" Margin="20,16">
+  <Grid RowDefinitions="Auto,*" Margin="20,16">
 
-    <!-- Шапка: всё, без чего агента не подключить -->
-    <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="0,0,0,12">
+    <!-- Шапка: состояние и код. Всё остальное — по вкладкам: окно агента стоит
+         открытым сутками, и каждый раз читать настройки сопряжения ни к чему. -->
+    <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="0,0,0,10">
       <StackPanel Grid.Column="0" Spacing="3">
         <TextBlock Text="Агент Storm Machine" Classes="h1" Foreground="{DynamicResource TextBrush}" />
         <TextBlock Classes="body" Foreground="{DynamicResource TextSecondaryBrush}">
@@ -20,7 +21,17 @@
           <Run Text="·" />
           <Run Text="{Binding StateLine}" />
         </TextBlock>
-        <TextBlock Text="{x:Static vm:AgentWindowViewModel.Promise}" Classes="caption" TextWrapping="Wrap" />
+
+        <!-- Код виден и на обзоре: без него агента не подключить, а ходить
+             за ним во вкладку в самый нужный момент — лишний шаг. -->
+        <StackPanel Orientation="Horizontal" Spacing="8"
+                    IsVisible="{Binding Code, Converter={x:Static ObjectConverters.IsNotNull}}">
+          <TextBlock Text="код сопряжения:" Classes="label" VerticalAlignment="Center" />
+          <SelectableTextBlock Text="{Binding Code}" Classes="mono"
+                               FontSize="18" Foreground="{DynamicResource SuccessBrush}" />
+          <Button Content="скопировать" FontSize="11" Command="{Binding CopyCodeCommand}"
+                  VerticalAlignment="Center" />
+        </StackPanel>
       </StackPanel>
 
       <StackPanel Grid.Column="1" Spacing="4" HorizontalAlignment="Right">
@@ -33,163 +44,180 @@
       </StackPanel>
     </Grid>
 
-    <ScrollViewer Grid.Row="1">
-      <StackPanel Spacing="12">
+    <TabControl Grid.Row="1">
 
-        <!-- Код сопряжения: пока он есть, это главное на экране -->
-        <Border Classes="card" IsVisible="{Binding Code, Converter={x:Static ObjectConverters.IsNotNull}}">
-          <StackPanel Spacing="6">
-            <TextBlock Text="Код сопряжения" Classes="h2" Foreground="{DynamicResource TextBrush}" />
-            <SelectableTextBlock Text="{Binding Code}" Classes="mono"
-                                 FontSize="24" Foreground="{DynamicResource SuccessBrush}" />
-            <TextBlock Text="{Binding CodeNote}" Classes="caption" TextWrapping="Wrap" />
-            <Button Content="Скопировать код" FontSize="11" HorizontalAlignment="Left"
-                    Command="{Binding CopyCodeCommand}" />
-          </StackPanel>
-        </Border>
+      <!-- ОБЗОР: что с агентом делают прямо сейчас -->
+      <TabItem Header="Обзор" FontSize="12">
+        <ScrollViewer Margin="0,8,0,0">
+          <StackPanel Spacing="12">
 
-        <!-- Звонок наружу. Второе направление связи, и на чужой площадке оно
-             основное: входящие на Windows закрыты по умолчанию, а исходящие
-             разрешены везде и прав не требуют. -->
-        <Border Classes="card">
-          <StackPanel Spacing="8">
-            <TextBlock Text="Позвонить клиенту" Classes="h2" Foreground="{DynamicResource TextBrush}" />
-            <TextBlock Classes="caption" TextWrapping="Wrap"
-                       Text="Если до этой машины не достучаться — звоните сами. Клиент должен ждать звонка: Настройки → Агенты." />
+            <Border Classes="card">
+              <StackPanel Spacing="8">
+                <Grid ColumnDefinitions="*,Auto">
+                  <TextBlock Grid.Column="0" Text="{Binding ChartTitle}" Classes="h2"
+                             Foreground="{DynamicResource TextBrush}" />
+                  <TextBlock Grid.Column="1" Text="{Binding Measuring}" Classes="label"
+                             IsVisible="{Binding Measuring, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                </Grid>
 
-            <!-- Найденные показаны списком кнопок, а не выбором из списка: ждущих
-                 звонка в сети единицы, и лишний щелчок «раскрыть» тут не окупается.
-                 Нажатие подставляет адрес в поле — его видно и можно поправить. -->
-            <Button Content="Найти в сети" FontSize="12" HorizontalAlignment="Left"
-                    IsEnabled="{Binding !IsSearching}"
-                    Command="{Binding FindClientsCommand}" />
+                <plot:AvaPlot Name="Chart" Height="260" />
 
-            <ItemsControl ItemsSource="{Binding Clients}">
-              <ItemsControl.ItemTemplate>
-                <DataTemplate x:DataType="vm:ClientRow">
-                  <Button Content="{Binding Caption}" FontSize="12" Margin="0,2"
-                          HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
-                          CommandParameter="{Binding}"
-                          Command="{Binding $parent[Window].((vm:AgentWindowViewModel)DataContext).UseClientCommand}" />
-                </DataTemplate>
-              </ItemsControl.ItemTemplate>
-            </ItemsControl>
+                <TextBlock Classes="caption" TextWrapping="Wrap"
+                           Text="Каждая точка — отрезок между снимками, а не среднее за весь тест: просадку канала на средних не видно." />
+              </StackPanel>
+            </Border>
 
-            <Grid ColumnDefinitions="*,160,Auto,Auto" ColumnSpacing="8">
-              <TextBox Grid.Column="0" Text="{Binding DialAddress, Mode=TwoWay}"
-                       Watermark="адрес клиента, можно с :портом" FontSize="12" />
-              <TextBox Grid.Column="1" Text="{Binding DialCode, Mode=TwoWay}"
-                       Watermark="код, если впервые" FontSize="12" />
-              <Button Grid.Column="2" Content="Позвонить" FontSize="12"
-                      IsVisible="{Binding !IsDialing}"
-                      Command="{Binding DialCommand}" />
-              <Button Grid.Column="3" Content="Отключиться" FontSize="12"
-                      IsVisible="{Binding IsDialing}"
-                      Command="{Binding HangUpCommand}" />
-            </Grid>
+            <Border Classes="card">
+              <StackPanel Spacing="6">
+                <TextBlock Text="Измерения через этого агента" Classes="h2"
+                           Foreground="{DynamicResource TextBrush}" />
 
-            <TextBlock Text="{Binding DialState}" Classes="body" TextWrapping="Wrap"
-                       Foreground="{DynamicResource WarningBrush}"
-                       IsVisible="{Binding DialState, Converter={x:Static ObjectConverters.IsNotNull}}" />
-          </StackPanel>
-        </Border>
+                <Grid ColumnDefinitions="0.5*,1.1*,1.2*,2*">
+                  <TextBlock Grid.Column="0" Text="время" Classes="caption" />
+                  <TextBlock Grid.Column="1" Text="кто просил" Classes="caption" />
+                  <TextBlock Grid.Column="2" Text="что мерили" Classes="caption" />
+                  <TextBlock Grid.Column="3" Text="итог" Classes="caption" />
+                </Grid>
 
-        <!-- Идущее измерение: график по тем же снимкам, что видит оператор -->
-        <Border Classes="card">
-          <StackPanel Spacing="8">
-            <Grid ColumnDefinitions="*,Auto">
-              <TextBlock Grid.Column="0" Text="{Binding ChartTitle}" Classes="h2"
-                         Foreground="{DynamicResource TextBrush}" />
-              <TextBlock Grid.Column="1" Text="{Binding Measuring}" Classes="label"
-                         IsVisible="{Binding Measuring, Converter={x:Static ObjectConverters.IsNotNull}}" />
-            </Grid>
-
-            <plot:AvaPlot Name="Chart" Height="260" />
-
-            <TextBlock Classes="caption" TextWrapping="Wrap"
-                       Text="Каждая точка — отрезок между снимками, а не среднее за весь тест: просадку канала на средних не видно." />
-          </StackPanel>
-        </Border>
-
-        <!-- Что через агента измеряли -->
-        <Border Classes="card">
-          <StackPanel Spacing="6">
-            <TextBlock Text="Измерения через этого агента" Classes="h2"
-                       Foreground="{DynamicResource TextBrush}" />
-
-            <Grid ColumnDefinitions="0.5*,1.1*,1.2*,2*">
-              <TextBlock Grid.Column="0" Text="время" Classes="caption" />
-              <TextBlock Grid.Column="1" Text="кто просил" Classes="caption" />
-              <TextBlock Grid.Column="2" Text="что мерили" Classes="caption" />
-              <TextBlock Grid.Column="3" Text="итог" Classes="caption" />
-            </Grid>
-
-            <ItemsControl ItemsSource="{Binding Measurements}">
-              <ItemsControl.ItemTemplate>
-                <DataTemplate x:DataType="vm:MeasurementRow">
-                  <Grid ColumnDefinitions="0.5*,1.1*,1.2*,2*" Margin="0,2">
-                    <TextBlock Grid.Column="0" Text="{Binding At}" Classes="body mono"
-                               Foreground="{DynamicResource TextSecondaryBrush}" />
-                    <TextBlock Grid.Column="1" Text="{Binding Peer}" Classes="body"
-                               TextTrimming="CharacterEllipsis" Margin="0,0,8,0" />
-                    <TextBlock Grid.Column="2" Text="{Binding Test}" Classes="body"
-                               TextTrimming="CharacterEllipsis" Margin="0,0,8,0" />
-                    <TextBlock Grid.Column="3" Text="{Binding Result}" Classes="body"
-                               Foreground="{DynamicResource InfoBrush}" TextTrimming="CharacterEllipsis" />
-                  </Grid>
-                </DataTemplate>
-              </ItemsControl.ItemTemplate>
-            </ItemsControl>
-
-            <TextBlock Classes="caption" Text="Пока ничего не измеряли."
-                       IsVisible="{Binding !Measurements.Count}" />
-          </StackPanel>
-        </Border>
-
-        <!-- Кто сопряжён -->
-        <Border Classes="card">
-          <StackPanel Spacing="6">
-            <TextBlock Text="Сопряжённые клиенты" Classes="h2" Foreground="{DynamicResource TextBrush}" />
-
-            <ItemsControl ItemsSource="{Binding Peers}">
-              <ItemsControl.ItemTemplate>
-                <DataTemplate x:DataType="vm:PeerRow">
-                  <Border Classes="tile" Margin="0,2">
-                    <StackPanel Spacing="2">
-                      <Grid ColumnDefinitions="*,Auto">
-                        <TextBlock Grid.Column="0" Text="{Binding Machine}" Classes="body"
-                                   Foreground="{DynamicResource TextBrush}" />
-                        <TextBlock Grid.Column="1" Text="{Binding Paired}" Classes="caption" />
+                <ItemsControl ItemsSource="{Binding Measurements}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:MeasurementRow">
+                      <Grid ColumnDefinitions="0.5*,1.1*,1.2*,2*" Margin="0,2">
+                        <TextBlock Grid.Column="0" Text="{Binding At}" Classes="body mono"
+                                   Foreground="{DynamicResource TextSecondaryBrush}" />
+                        <TextBlock Grid.Column="1" Text="{Binding Peer}" Classes="body"
+                                   TextTrimming="CharacterEllipsis" Margin="0,0,8,0" />
+                        <TextBlock Grid.Column="2" Text="{Binding Test}" Classes="body"
+                                   TextTrimming="CharacterEllipsis" Margin="0,0,8,0" />
+                        <TextBlock Grid.Column="3" Text="{Binding Result}" Classes="body"
+                                   Foreground="{DynamicResource InfoBrush}" TextTrimming="CharacterEllipsis" />
                       </Grid>
-                      <TextBlock Text="{Binding Product}" Classes="caption" />
-                      <SelectableTextBlock Text="{Binding Thumbprint}" Classes="mono caption" />
-                    </StackPanel>
-                  </Border>
-                </DataTemplate>
-              </ItemsControl.ItemTemplate>
-            </ItemsControl>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
 
-            <TextBlock Classes="caption" IsVisible="{Binding !Peers.Count}"
-                       Text="Никого. Агент отвечает только сопряжённым — пока сопряжений нет, он никого не пустит." />
+                <TextBlock Classes="caption" Text="Пока ничего не измеряли."
+                           IsVisible="{Binding !Measurements.Count}" />
+              </StackPanel>
+            </Border>
+
+            <Border Classes="card">
+              <StackPanel Spacing="6">
+                <TextBlock Text="Сопряжённые клиенты" Classes="h2" Foreground="{DynamicResource TextBrush}" />
+
+                <ItemsControl ItemsSource="{Binding Peers}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:PeerRow">
+                      <Border Classes="tile" Margin="0,2">
+                        <StackPanel Spacing="2">
+                          <Grid ColumnDefinitions="*,Auto">
+                            <TextBlock Grid.Column="0" Text="{Binding Machine}" Classes="body"
+                                       Foreground="{DynamicResource TextBrush}" />
+                            <TextBlock Grid.Column="1" Text="{Binding Paired}" Classes="caption" />
+                          </Grid>
+                          <TextBlock Text="{Binding Product}" Classes="caption" />
+                          <SelectableTextBlock Text="{Binding Thumbprint}" Classes="mono caption" />
+                        </StackPanel>
+                      </Border>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
+                <TextBlock Classes="caption" IsVisible="{Binding !Peers.Count}"
+                           Text="Никого. Агент отвечает только сопряжённым — пока сопряжений нет, он никого не пустит." />
+              </StackPanel>
+            </Border>
           </StackPanel>
-        </Border>
-      </StackPanel>
-    </ScrollViewer>
-
-    <!-- Журнал: то же, что видно в консольном агенте -->
-    <Border Grid.Row="2" Classes="card" Margin="0,12,0,0" Padding="12,10" MaxHeight="170">
-      <DockPanel LastChildFill="True">
-        <TextBlock DockPanel.Dock="Top" Text="Журнал" Classes="label" Margin="0,0,0,4" />
-        <ScrollViewer>
-          <ItemsControl ItemsSource="{Binding Journal}">
-            <ItemsControl.ItemTemplate>
-              <DataTemplate x:DataType="x:String">
-                <TextBlock Text="{Binding}" Classes="mono caption" TextWrapping="Wrap" />
-              </DataTemplate>
-            </ItemsControl.ItemTemplate>
-          </ItemsControl>
         </ScrollViewer>
-      </DockPanel>
-    </Border>
+      </TabItem>
+
+      <!-- НАСТРОЙКИ: сопряжение и журнал. Сюда ходят раз, при знакомстве. -->
+      <TabItem Header="Настройки" FontSize="12">
+        <ScrollViewer Margin="0,8,0,0">
+          <StackPanel Spacing="12">
+
+            <Border Classes="card" IsVisible="{Binding Code, Converter={x:Static ObjectConverters.IsNotNull}}">
+              <StackPanel Spacing="6">
+                <TextBlock Text="Код сопряжения" Classes="h2" Foreground="{DynamicResource TextBrush}" />
+                <SelectableTextBlock Text="{Binding Code}" Classes="mono"
+                                     FontSize="24" Foreground="{DynamicResource SuccessBrush}" />
+                <TextBlock Text="{Binding CodeNote}" Classes="caption" TextWrapping="Wrap" />
+                <Button Content="Скопировать код" FontSize="11" HorizontalAlignment="Left"
+                        Command="{Binding CopyCodeCommand}" />
+              </StackPanel>
+            </Border>
+
+            <!-- Звонок наружу. На чужой площадке это основное направление:
+                 входящие там закрыты, исходящие разрешены и прав не требуют. -->
+            <Border Classes="card">
+              <StackPanel Spacing="8">
+                <TextBlock Text="Позвонить клиенту" Classes="h2" Foreground="{DynamicResource TextBrush}" />
+                <TextBlock Classes="caption" TextWrapping="Wrap"
+                           Text="Порядок такой: в клиенте — Настройки → Агенты → «Ждать звонка», он покажет код и станет слышен в сети. Здесь — «Найти в сети», затем «Сопрячься» у найденного." />
+
+                <Button Content="Найти в сети" FontSize="12" HorizontalAlignment="Left"
+                        IsEnabled="{Binding !IsSearching}"
+                        Command="{Binding FindClientsCommand}" />
+
+                <ItemsControl ItemsSource="{Binding Clients}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:ClientRow">
+                      <Border Classes="tile" Margin="0,2">
+                        <Grid ColumnDefinitions="*,Auto">
+                          <StackPanel Grid.Column="0" Spacing="1">
+                            <TextBlock Text="{Binding Machine}" Classes="body"
+                                       Foreground="{DynamicResource TextBrush}" />
+                            <TextBlock Text="{Binding Where}" Classes="caption" />
+                          </StackPanel>
+                          <Button Grid.Column="1" Content="Сопрячься" FontSize="11"
+                                  VerticalAlignment="Center"
+                                  CommandParameter="{Binding}"
+                                  Command="{Binding $parent[Window].((vm:AgentWindowViewModel)DataContext).UseClientCommand}" />
+                        </Grid>
+                      </Border>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
+                <Grid ColumnDefinitions="*,160,Auto,Auto" ColumnSpacing="8">
+                  <TextBox Grid.Column="0" Text="{Binding DialAddress, Mode=TwoWay}"
+                           Watermark="адрес клиента, можно с :портом" FontSize="12" />
+                  <TextBox Grid.Column="1" Name="CodeBox" Text="{Binding DialCode, Mode=TwoWay}"
+                           Watermark="код от клиента" FontSize="12" />
+                  <Button Grid.Column="2" Content="Позвонить" FontSize="12"
+                          IsVisible="{Binding !IsDialing}"
+                          Command="{Binding DialCommand}" />
+                  <Button Grid.Column="3" Content="Отключиться" FontSize="12"
+                          IsVisible="{Binding IsDialing}"
+                          Command="{Binding HangUpCommand}" />
+                </Grid>
+
+                <TextBlock Text="{Binding DialState}" Classes="body" TextWrapping="Wrap"
+                           Foreground="{DynamicResource WarningBrush}"
+                           IsVisible="{Binding DialState, Converter={x:Static ObjectConverters.IsNotNull}}" />
+              </StackPanel>
+            </Border>
+
+            <Border Classes="card">
+              <DockPanel LastChildFill="True" MinHeight="220">
+                <TextBlock DockPanel.Dock="Top" Text="Журнал" Classes="h2"
+                           Foreground="{DynamicResource TextBrush}" Margin="0,0,0,6" />
+                <ScrollViewer MaxHeight="320">
+                  <ItemsControl ItemsSource="{Binding Journal}">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate x:DataType="x:String">
+                        <TextBlock Text="{Binding}" Classes="mono caption" TextWrapping="Wrap" />
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                </ScrollViewer>
+              </DockPanel>
+            </Border>
+
+            <TextBlock Text="{x:Static vm:AgentWindowViewModel.Promise}" Classes="caption" TextWrapping="Wrap" />
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+    </TabControl>
   </Grid>
 </Window>
