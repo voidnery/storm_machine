@@ -54,9 +54,34 @@ for rid in $platforms; do
     fi
 done
 
+# Окно агента — только для Windows и только распакованным рядом с клиентом.
+#
+# В комплект для чужой площадки оно не кладётся: шестьдесят мегабайт рисования
+# поверх пятнадцати мегабайт агента утраивают комплект, который человек качает
+# по чужому каналу. Кому нужно окно — тот берёт его отсюда отдельно.
+case "$platforms" in
+    *win-x64*)
+        echo "Собираю окно агента (Windows)..."
+
+        out="$staging/gui"
+        dotnet publish "$root/src/StormMachine.Agent.Gui/StormMachine.Agent.Gui.csproj" \
+            --configuration Release --output "$out" --nologo --verbosity quiet
+
+        if [ -f "$out/storm-agent-ui.exe" ]; then
+            cp "$out/storm-agent-ui.exe" "$dest/storm-agent-ui.exe"
+            echo "  $(wc -c < "$out/storm-agent-ui.exe") байт -> $dest/storm-agent-ui.exe"
+        else
+            echo "Окно агента не собралось — в $out его нет"
+            exit 1
+        fi
+        ;;
+esac
+
 rm -rf "$staging"
 
 echo
 echo "Готово: $agents"
 echo "Комплект для площадки собирается из клиента: «Настройки → Агенты → Собрать комплект»."
 echo "Внутри комплекта — агент, написанные команды и (для Linux) юнит systemd."
+echo "Рядом с клиентом лежит и окно агента: storm-agent-ui.exe — тот же агент,"
+echo "но с графиком идущего измерения. Windows, запускается двойным щелчком."

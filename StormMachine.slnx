@@ -1,6 +1,7 @@
-<Solution>
+﻿<Solution>
   <Folder Name="/src/">
     <Project Path="src/StormMachine.Agent/StormMachine.Agent.csproj" />
+    <Project Path="src/StormMachine.Agent.Gui/StormMachine.Agent.Gui.csproj" />
     <Project Path="src/StormMachine.App/StormMachine.App.csproj" />
     <Project Path="src/StormMachine.Agents/StormMachine.Agents.csproj" />
     <Project Path="src/StormMachine.Alerting/StormMachine.Alerting.csproj" />
@@ -40,5 +41,6 @@
     <Project Path="tests/StormMachine.LoadTests/StormMachine.LoadTests.csproj" />
     <Project Path="tests/StormMachine.App.UnitTests/StormMachine.App.UnitTests.csproj" />
     <Project Path="tests/StormMachine.Agent.UnitTests/StormMachine.Agent.UnitTests.csproj" />
+    <Project Path="tests/StormMachine.Agent.Gui.UnitTests/StormMachine.Agent.Gui.UnitTests.csproj" />
   </Folder>
 </Solution>

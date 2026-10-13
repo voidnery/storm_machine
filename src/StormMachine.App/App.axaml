@@ -1,4 +1,4 @@
-<Application xmlns="https://github.com/avaloniaui"
+﻿<Application xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:local="using:StormMachine.App"
              x:Class="StormMachine.App.App"
@@ -77,78 +77,15 @@
     </Style>
   </Application.Styles>
 
+  <!-- Палитра продукта — в отдельном файле и общая с окном агента: два словаря
+       разошлись бы на первой же правке. Сторож в ArchTests разрешает литеральные
+       цвета только там. -->
   <Application.Resources>
-    <!-- Дизайн-токены — единственный источник цвета в клиенте. Роли и значения —
-         docs/UI-DESIGN-PLAN.md; сторож в ArchTests запрещает литеральные цвета
-         в разметке страниц: 25 случайных оттенков при шести токенах уже было. -->
-
-    <!-- Поверхности, от глубокой к приподнятой -->
-    <SolidColorBrush x:Key="SurfaceBrush">#151922</SolidColorBrush>
-    <SolidColorBrush x:Key="SidebarBrush">#191D26</SolidColorBrush>
-    <SolidColorBrush x:Key="InsetBrush">#1B222E</SolidColorBrush>
-    <SolidColorBrush x:Key="ChromeBrush">#1F2430</SolidColorBrush>
-    <SolidColorBrush x:Key="PanelBrush">#232A38</SolidColorBrush>
-    <SolidColorBrush x:Key="TileBrush">#232B3B</SolidColorBrush>
-    <SolidColorBrush x:Key="ChipBrush">#233046</SolidColorBrush>
-
-    <!-- Поверхность того, что лежит ПОВЕРХ страницы: выпадающий список, окошко.
-         Светлее панели намеренно. До этого список красился ChromeBrush — темнее
-         панели, над которой он висел, — и читался не как приподнятый слой,
-         а как дыра в странице (замечание оператора: «тёмное на тёмном»). -->
-    <SolidColorBrush x:Key="PopupBrush">#2B3447</SolidColorBrush>
-
-    <!-- Подсветка пункта внутри всплывающего: оба светлее самой поверхности,
-         иначе наведение и выбор темнели бы относительно списка. Выбранный
-         отличается от наведённого синевой, а не только яркостью. -->
-    <SolidColorBrush x:Key="PopupHoverBrush">#36425A</SolidColorBrush>
-    <SolidColorBrush x:Key="PopupPickedBrush">#3C4F74</SolidColorBrush>
-
-    <!-- Тень приподнятого слоя — тоже токен: цвет в разметке страницы запрещён
-         сторожем, и правильно. Глубина одна на весь продукт, чтобы выпадающий
-         список и окошко не парили на разной высоте. -->
-    <BoxShadows x:Key="PopupShadow">0 10 28 0 #9E000000</BoxShadows>
-
-    <SolidColorBrush x:Key="DividerBrush">#2E3746</SolidColorBrush>
-    <SolidColorBrush x:Key="OutlineBrush">#3A4356</SolidColorBrush>
-    <SolidColorBrush x:Key="ScrimBrush">#CC0F1219</SolidColorBrush>
-
-    <!-- Текст: ступени цветом, а не Opacity, — контраст не зависит от фона -->
-    <SolidColorBrush x:Key="TextBrush">#E8ECF2</SolidColorBrush>
-    <SolidColorBrush x:Key="TextSecondaryBrush">#A9B4C4</SolidColorBrush>
-    <SolidColorBrush x:Key="TextMutedBrush">#77839A</SolidColorBrush>
-
-    <!-- Смысловые цвета и их тонированные подложки -->
-    <SolidColorBrush x:Key="AccentBrush">#3B82F6</SolidColorBrush>
-    <SolidColorBrush x:Key="SuccessBrush">#7DD3A0</SolidColorBrush>
-    <SolidColorBrush x:Key="WarningBrush">#F59E0B</SolidColorBrush>
-    <SolidColorBrush x:Key="DangerBrush">#EF4444</SolidColorBrush>
-    <SolidColorBrush x:Key="InfoBrush">#8FB8E8</SolidColorBrush>
-    <SolidColorBrush x:Key="SuccessSurfaceBrush">#16321F</SolidColorBrush>
-    <SolidColorBrush x:Key="WarningSurfaceBrush">#3A2E12</SolidColorBrush>
-    <SolidColorBrush x:Key="DangerSurfaceBrush">#3A1E1E</SolidColorBrush>
-
-    <!-- Карта сети. Рисовалка читает эти же ресурсы через DesignTokens: до волны 3
-         она держала свои двадцать кистей, половина из которых дублировала токены
-         с точностью до цифры, а сторож разметки кода не видит. -->
-    <SolidColorBrush x:Key="LinkConfirmedBrush">#4B7FD1</SolidColorBrush>
-    <SolidColorBrush x:Key="LinkInferredBrush">#7A8AA5</SolidColorBrush>
-    <SolidColorBrush x:Key="LinkAssumedBrush">#5D6B82</SolidColorBrush>
-    <SolidColorBrush x:Key="NodeBrush">#1E2635</SolidColorBrush>
-    <SolidColorBrush x:Key="NodeOutlineBrush">#4B5A72</SolidColorBrush>
-    <SolidColorBrush x:Key="SelectionBrush">#60A5FA</SolidColorBrush>
-
-    <!-- Категории устройств. Цвет отвечает на «что это», не утверждая, откуда
-         известно: догадка красится так же, как факт, а вопрос остаётся в подписи. -->
-    <SolidColorBrush x:Key="RoleRouterBrush">#5B8DEF</SolidColorBrush>
-    <SolidColorBrush x:Key="RoleSwitchBrush">#9A6CFF</SolidColorBrush>
-    <SolidColorBrush x:Key="RoleAccessPointBrush">#E0C341</SolidColorBrush>
-    <SolidColorBrush x:Key="RoleServerBrush">#4C9A5A</SolidColorBrush>
-    <SolidColorBrush x:Key="RoleStorageBrush">#2FB5A0</SolidColorBrush>
-    <SolidColorBrush x:Key="RolePrinterBrush">#D9A441</SolidColorBrush>
-    <SolidColorBrush x:Key="RoleCameraBrush">#E05252</SolidColorBrush>
-    <SolidColorBrush x:Key="RoleComputerBrush">#7A9BC8</SolidColorBrush>
-    <SolidColorBrush x:Key="RolePhoneBrush">#5CB8E0</SolidColorBrush>
-    <SolidColorBrush x:Key="RoleMediaBrush">#C05CC0</SolidColorBrush>
+    <ResourceDictionary>
+      <ResourceDictionary.MergedDictionaries>
+        <ResourceInclude Source="avares://StormMachine/Controls/Tokens.axaml" />
+      </ResourceDictionary.MergedDictionaries>
+    </ResourceDictionary>
   </Application.Resources>
 
 </Application>

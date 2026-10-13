@@ -1,0 +1,58 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Окно агента. Отдельный проект, а не ключ у самого агента: окно тянет Avalonia
+       со Skia, а агент собирается под пять платформ и едет на чужую площадку — класть
+       шестьдесят мегабайт рисования в каждую сборку ради Windows значило бы брать
+       плату со всех за удобство для одной.
+
+       Поэтому Windows получает ДВА файла: storm-agent.exe (консоль, как и был)
+       и storm-agent-ui.exe (то же самое в окне). Делают они одно и то же и работают
+       с одними файлами личности и сопряжений — окно не отдельный агент, а другой
+       способ смотреть на того же. -->
+
+  <PropertyGroup>
+    <ApplicationIcon>..\StormMachine.App\Assets\storm.ico</ApplicationIcon>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <AssemblyName>storm-agent-ui</AssemblyName>
+    <RootNamespace>StormMachine.Agent.Gui</RootNamespace>
+    <Description>Storm Machine — окно агента: кто подключился и что мерит.</Description>
+    <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+    <BuiltInComInteropSupport>false</BuiltInComInteropSupport>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <SelfContained>true</SelfContained>
+    <PublishSingleFile>true</PublishSingleFile>
+    <PublishTrimmed>true</PublishTrimmed>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+  </PropertyGroup>
+
+  <!-- Знак продукта и палитра берутся у клиента по ссылке на файл, а не копией:
+       копия разошлась бы. Физический файл один, а собирается он дважды — каждым
+       проектом в свой ресурс, потому что окно агента на сборку клиента ссылаться
+       не может и не должно. -->
+  <ItemGroup>
+    <AvaloniaResource Include="..\StormMachine.App\Assets\storm.ico" Link="Assets\storm.ico" />
+    <AvaloniaResource Include="..\StormMachine.App\Controls\Tokens.axaml" Link="Tokens.axaml" />
+  </ItemGroup>
+
+  <!-- Ссылка ровно одна: сам агент. Через него — Protocol, и больше ничего:
+       окно не знает ни про хранилище оператора, ни про его измерения. -->
+  <ItemGroup>
+    <ProjectReference Include="..\StormMachine.Agent\StormMachine.Agent.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia" Version="12.1.1" />
+    <PackageReference Include="Avalonia.Desktop" Version="12.1.1" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="12.1.1" />
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
+    <PackageReference Include="ScottPlot.Avalonia" Version="5.1.59" />
+  </ItemGroup>
+
+</Project>

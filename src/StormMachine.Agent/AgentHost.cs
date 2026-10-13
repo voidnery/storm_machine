@@ -34,6 +34,38 @@ public sealed record AgentSettings
 
     /// <summary>Куда писать происходящее. По умолчанию в консоль.</summary>
     public Action<string> Log { get; init; } = Console.WriteLine;
+
+    /// <summary>
+    /// Кому рассказывать о происходящем числами, а не текстом.
+    /// </summary>
+    /// <remarks>
+    /// Пусто у консоли — ей довольно строк журнала. Окно подписывается сюда
+    /// и рисует график прямо по снимкам измерения.
+    /// </remarks>
+    public Action<AgentMoment>? Watch { get; init; }
+
+    /// <summary>
+    /// Настройки агента, живущего рядом со своим исполняемым файлом.
+    /// </summary>
+    /// <remarks>
+    /// В этом и состоит портативность: папку с агентом можно скопировать на флешку
+    /// вместе с личностью и сопряжениями, и на другой машине он останется тем же
+    /// собеседником. Запись в профиль пользователя такую переносимость сломала бы.
+    /// <para>
+    /// Правило одно на всех: и консоль, и окно зовут этот метод. Два вычисления пути
+    /// однажды разошлись бы, и окно стало бы другим агентом — с другим отпечатком
+    /// и чужой книгой сопряжений.
+    /// </para>
+    /// </remarks>
+    public static AgentSettings Beside(int port) => new()
+    {
+        IdentityPath = Path.Combine(Folder, "storm-agent.identity.pfx"),
+        PeerBookPath = Path.Combine(Folder, "storm-agent.peers.json"),
+        Port = port,
+    };
+
+    private static string Folder =>
+        Path.GetDirectoryName(Environment.ProcessPath) ?? AppContext.BaseDirectory;
 }
 
 /// <summary>
@@ -84,6 +116,12 @@ public sealed class AgentHost(AgentSettings settings)
 
         _settings.Log($"Слушаю порт {_settings.Port}. Отпечаток: {Identity.ThumbprintForHumans}");
 
+        Tell(new AgentMoment
+        {
+            Kind = AgentMomentKind.Listening,
+            Text = $"Слушаю порт {_settings.Port}.",
+        });
+
         // Код выдаётся сам, когда сопрягаться больше не с кем.
         //
         // Раньше агент, запущенный без ключей, сообщал, что никого принять не сможет,
@@ -111,6 +149,12 @@ public sealed class AgentHost(AgentSettings settings)
                           + "после сопряжения по нему второй раз сопрячься нельзя. "
                           + "Истёк — перезапусти агента, он выдаст новый.");
             _settings.Log("В клиенте: Настройки → Агенты → ввести этот код и адрес этой машины.");
+
+            Tell(new AgentMoment
+            {
+                Kind = AgentMomentKind.CodeIssued,
+                Text = offer.ForHumans,
+            });
         }
         else if (Book.Thumbprints.Count == 0)
         {
@@ -200,10 +244,14 @@ public sealed class AgentHost(AgentSettings settings)
             // Отказ уже объяснён собеседнику внутри рукопожатия. Здесь — для своего
             // оператора, который смотрит в консоль агента.
             _settings.Log($"Соединение отклонено: {ex.Message}");
+
+            Tell(new AgentMoment { Kind = AgentMomentKind.Trouble, Text = $"Соединение отклонено: {ex.Message}" });
         }
         catch (Exception ex) when (ex is IOException or SocketException or OperationCanceledException)
         {
             _settings.Log($"Соединение оборвалось: {ex.Message}");
+
+            Tell(new AgentMoment { Kind = AgentMomentKind.Trouble, Text = $"Соединение оборвалось: {ex.Message}" });
         }
         finally
         {
@@ -219,6 +267,13 @@ public sealed class AgentHost(AgentSettings settings)
             _settings.Log($"Сопряжение с {session.Peer.Describe()} выполнено. "
                           + $"Его отпечаток: {PeerIdentity.Group(session.Peer.Thumbprint)}");
 
+            Tell(new AgentMoment
+            {
+                Kind = AgentMomentKind.PeerPaired,
+                Peer = session.Peer.MachineName,
+                Text = $"Сопряжение с {session.Peer.Describe()} выполнено.",
+            });
+
             // Код гасится сразу после того, как им воспользовались по назначению.
             // Оставить его годным значило бы позволить услышавшему сопрячься вторым —
             // и оператор об этом не узнал бы: у него всё прошло успешно.
@@ -231,6 +286,13 @@ public sealed class AgentHost(AgentSettings settings)
         {
             Book.Touch(session.Peer.Thumbprint);
             _settings.Log($"Подключился {session.Peer.Describe()} — сопряжение уже было, подтверждения не требуется.");
+
+            Tell(new AgentMoment
+            {
+                Kind = AgentMomentKind.PeerArrived,
+                Peer = session.Peer.MachineName,
+                Text = $"Подключился {session.Peer.Describe()}.",
+            });
         }
     }
 
@@ -244,6 +306,13 @@ public sealed class AgentHost(AgentSettings settings)
             if (message is null)
             {
                 _settings.Log($"{session.Peer.MachineName} отключился.");
+
+                Tell(new AgentMoment
+                {
+                    Kind = AgentMomentKind.PeerLeft,
+                    Peer = session.Peer.MachineName,
+                    Text = $"{session.Peer.MachineName} отключился.",
+                });
 
                 return;
             }
@@ -307,8 +376,31 @@ public sealed class AgentHost(AgentSettings settings)
         {
             _settings.Log($"Измерение {message.Request?.Kind} по просьбе {session.Peer.MachineName}…");
 
+            var kind = message.Request?.Kind;
+
+            Tell(new AgentMoment
+            {
+                Kind = AgentMomentKind.TestStarted,
+                Peer = session.Peer.MachineName,
+                Test = kind,
+                Text = $"Измерение по просьбе {session.Peer.MachineName}.",
+            });
+
+            // Промежуточные снимки шли в никуда: консоли они не нужны, а больше их
+            // некому было показать. Окну агента они и есть график — то же измерение,
+            // которое видит оператор, видно и на той стороне.
+            var progress = _settings.Watch is null
+                ? null
+                : new Progress<TestSnapshot>(sample => Tell(new AgentMoment
+                {
+                    Kind = AgentMomentKind.TestSample,
+                    Peer = session.Peer.MachineName,
+                    Test = kind,
+                    Snapshot = sample,
+                }));
+
             var snapshot = await TestConductor
-                .ServeAsync(session, message, _ => null, null, cancellationToken)
+                .ServeAsync(session, message, _ => null, progress, cancellationToken)
                 .ConfigureAwait(false);
 
             if (snapshot is null)
@@ -321,10 +413,44 @@ public sealed class AgentHost(AgentSettings settings)
             // сообщением своё представление о том, сколько дошло, а его у отправителя
             // нет и быть не может.
             _settings.Log($"Измерение закончено: {snapshot.Mbps:0.0} Мбит/с, пакетов {snapshot.Packets}.");
+
+            Tell(new AgentMoment
+            {
+                Kind = AgentMomentKind.TestFinished,
+                Peer = session.Peer.MachineName,
+                Test = kind,
+                Snapshot = snapshot,
+                Text = $"Измерение закончено: {snapshot.Mbps:0.0} Мбит/с.",
+            });
         }
         finally
         {
             Interlocked.Exchange(ref _busy, 0);
+        }
+    }
+
+    /// <summary>
+    /// Рассказывает окну о происшедшем.
+    /// </summary>
+    /// <remarks>
+    /// Беда в рисовании не должна ронять измерение: агент — это точка измерения,
+    /// а окно над ним — удобство. Поэтому исключение подписчика здесь гасится,
+    /// а не пускается в разговор с собеседником.
+    /// </remarks>
+    private void Tell(AgentMoment moment)
+    {
+        if (_settings.Watch is not { } watch)
+        {
+            return;
+        }
+
+        try
+        {
+            watch(moment);
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or ObjectDisposedException)
+        {
+            _settings.Log($"Окно не приняло событие: {ex.Message}");
         }
     }
 

@@ -19,7 +19,15 @@ public sealed class DesignTokenTests
     /// <summary>Шкала шрифтов продукта. Новая ступень — осознанное решение, не опечатка.</summary>
     private static readonly string[] FontScale = ["10", "11", "12", "13", "18", "24"];
 
-    /// <summary>Литеральный цвет допустим только в словаре токенов App.axaml.</summary>
+    /// <summary>
+    /// Литеральный цвет допустим только в словаре токенов.
+    /// </summary>
+    /// <remarks>
+    /// Словарь с И-26 — отдельный файл <c>Tokens.axaml</c>, общий для клиента
+    /// и окна агента. До этого он жил внутри App.axaml, и окно агента завело
+    /// бы себе второй: два словаря разошлись бы на первой правке, и один и тот же
+    /// продукт выглядел бы на двух машинах по-разному.
+    /// </remarks>
     [Fact]
     public void LiteralColors_LiveOnlyInAppAxaml()
     {
@@ -27,7 +35,7 @@ public sealed class DesignTokenTests
 
         foreach (var file in MarkupFiles())
         {
-            if (Path.GetFileName(file) == "App.axaml")
+            if (Path.GetFileName(file) == "Tokens.axaml")
             {
                 continue;
             }

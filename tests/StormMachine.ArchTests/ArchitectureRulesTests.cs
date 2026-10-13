@@ -225,19 +225,51 @@ public sealed class ArchitectureRulesTests
             + "это одновременно изоляция лицензии и работоспособность trimming при публикации.");
     }
 
-    [Fact(DisplayName = "Правило 5: Avalonia только в StormMachine.App")]
-    public void Avalonia_StaysInGuiProject()
+    /// <summary>
+    /// Рисование живёт только в окнах.
+    /// </summary>
+    /// <remarks>
+    /// Окон с И-26 два: клиент оператора и окно агента. Второе появилось потому,
+    /// что человек на чужой площадке участвует в измерении наравне с оператором
+    /// и видел при этом бегущие строки консоли.
+    /// <para>
+    /// Правило от этого не ослабло, а стало точнее: Avalonia разрешена проектам,
+    /// которые и есть окна, и запрещена всем остальным. Ядро, инфраструктура и сам
+    /// агент о рисовании по-прежнему не знают — агент собирается под пять платформ,
+    /// и шестьдесят мегабайт Skia в каждой сборке платили бы все за удобство одной.
+    /// </para>
+    /// </remarks>
+    [Fact(DisplayName = "Правило 5: Avalonia только в окнах")]
+    public void Avalonia_StaysInGuiProjects()
     {
+        string[] windows = ["StormMachine.App", "StormMachine.Agent.Gui"];
+
         var offenders = RepositoryLayout.SourceProjects
-            .Where(p => p.Name != "StormMachine.App")
+            .Where(p => !windows.Contains(p.Name, StringComparer.Ordinal))
             .Where(p => p.PackageReferences.Any(pkg => pkg.StartsWith("Avalonia", StringComparison.OrdinalIgnoreCase)))
             .Select(p => p.RelativePath)
             .ToList();
 
         Assert.True(
             offenders.Count == 0,
-            $"Ссылка на Avalonia вне графического клиента: {string.Join(", ", offenders)}. "
+            $"Ссылка на Avalonia вне окон: {string.Join(", ", offenders)}. "
             + "Ядро не должно знать о существовании UI.");
+
+        // Окно агента видит агента — и ничего больше. Ссылка на ядро продукта
+        // сделала бы из него второй клиент: он показывает ту точку измерения,
+        // рядом с которой запущен, а не чужие измерения и не историю оператора.
+        var window = RepositoryLayout.SourceProjects
+            .FirstOrDefault(p => p.Name == "StormMachine.Agent.Gui");
+
+        Assert.NotNull(window);
+
+        var unexpected = window!.ProjectReferences
+            .Where(r => !string.Equals(r, "StormMachine.Agent", StringComparison.Ordinal))
+            .ToList();
+
+        Assert.True(
+            unexpected.Count == 0,
+            $"Окно агента ссылается на лишнее: {string.Join(", ", unexpected)}.");
     }
 
     [Fact(DisplayName = "Правило 6: значения задержки из системных API не используются")]

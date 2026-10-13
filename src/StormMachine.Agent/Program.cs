@@ -414,23 +414,15 @@ internal static class Program
     /// можно скопировать на флешку вместе с сопряжениями, и на другой машине он останется
     /// тем же собеседником. Запись в профиль пользователя такую переносимость сломала бы.
     /// </remarks>
-    private static AgentSettings Settings(int port, PairingOffer? offer)
-    {
-        var directory = Path.GetDirectoryName(Environment.ProcessPath)
-                        ?? AppContext.BaseDirectory;
-
-        return new AgentSettings
+    private static AgentSettings Settings(int port, PairingOffer? offer) =>
+        AgentSettings.Beside(port) with
         {
-            IdentityPath = Path.Combine(directory, "storm-agent.identity.pfx"),
-            PeerBookPath = Path.Combine(directory, "storm-agent.peers.json"),
-            Port = port,
             Pairing = offer,
 
             // Запуск из консоли: человек рядом и код сопряжения ему видно.
             // У службы своя сборка настроек, и там этого признака нет.
             Interactive = true,
         };
-    }
 
 }
 
