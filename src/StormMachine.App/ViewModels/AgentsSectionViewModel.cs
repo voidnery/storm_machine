@@ -1,12 +1,33 @@
-using System.Collections.ObjectModel;
+﻿using System.Collections.ObjectModel;
 using System.Globalization;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using StormMachine.App.Controls;
+using StormMachine.App.Services;
 using StormMachine.Application.Abstractions;
+using StormMachine.Application.Agents;
 using StormMachine.Domain.Agents;
 
 namespace StormMachine.App.ViewModels;
+
+/// <summary>
+/// Платформа агента в выпадающем списке.
+/// </summary>
+/// <remarks>
+/// Пояснение не для красоты: «linux-arm64» ничего не говорит человеку, который
+/// держит в руках одноплатник, а «Raspberry Pi, облачный ARM» — говорит.
+/// </remarks>
+public sealed record AgentPlatformOption(AgentPlatform Platform) : IOption
+{
+    public override string ToString() => AgentPlatforms.Title(Platform);
+
+    string IOption.Caption => AgentPlatforms.Title(Platform);
+
+    string? IOption.About => AgentPlatforms.About(Platform);
+
+    string? IOption.Note => AgentPlatforms.Rid(Platform);
+}
 
 /// <summary>Строка списка сопряжённых агентов.</summary>
 public sealed record AgentRow(RemoteAgent Agent)
@@ -59,9 +80,18 @@ public sealed record DiscoveredAgentRow(DiscoveredAgent Agent)
 /// доверие даёт сверка отпечатка, а не то, что агент нашёлся.
 /// </para>
 /// </remarks>
-public sealed partial class AgentsSectionViewModel(IAgentDirectory directory) : ObservableObject, IDisposable
+public sealed partial class AgentsSectionViewModel(
+    IAgentDirectory directory,
+    IAgentKitBuilder kits,
+    IAgentBinaries binaries,
+    INetworkEnvironment environment,
+    IFilePicker picker) : ObservableObject, IDisposable
 {
     private readonly IAgentDirectory _directory = directory ?? throw new ArgumentNullException(nameof(directory));
+    private readonly IAgentKitBuilder _kits = kits ?? throw new ArgumentNullException(nameof(kits));
+    private readonly IAgentBinaries _binaries = binaries ?? throw new ArgumentNullException(nameof(binaries));
+    private readonly INetworkEnvironment _environment = environment ?? throw new ArgumentNullException(nameof(environment));
+    private readonly IFilePicker _picker = picker ?? throw new ArgumentNullException(nameof(picker));
 
     private CancellationTokenSource? _pairing;
 
@@ -102,6 +132,110 @@ public sealed partial class AgentsSectionViewModel(IAgentDirectory directory) : 
     public bool HasAgents => Agents.Count > 0;
 
     public int DefaultPort => _directory.DefaultPort;
+
+    // ------------------------------------------------------------ выдача агента
+
+    /// <summary>
+    /// Платформы, под которые продукт может выдать агента.
+    /// </summary>
+    /// <remarks>
+    /// Показываются только те, для которых бинарь действительно есть в поставке:
+    /// пункт, который нельзя выдать, — это обещание, которого продукт не выполнит.
+    /// </remarks>
+    public IReadOnlyList<AgentPlatformOption> Platforms { get; } =
+        [.. AgentPlatforms.All
+            .Where(binaries.Has)
+            .Select(p => new AgentPlatformOption(p))];
+
+    [ObservableProperty]
+    private AgentPlatformOption? _platform;
+
+    public bool CanIssue => Platforms.Count > 0;
+
+    /// <summary>
+    /// Собирает комплект для другого конца: бинарь, команды и юнит systemd.
+    /// </summary>
+    /// <remarks>
+    /// Кода сопряжения в комплекте нет: он живёт десять минут, а комплект едет
+    /// на площадку часами. Код называют голосом в момент сопряжения, и в написанном
+    /// на этот счёт сказано прямо.
+    /// </remarks>
+    [RelayCommand]
+    private async Task IssueKitAsync(CancellationToken cancellationToken = default)
+    {
+        var platform = Platform ?? (Platforms.Count > 0 ? Platforms[0] : null);
+
+        if (platform is null)
+        {
+            Error = "В поставке нет ни одного агента — выдавать нечего.";
+
+            return;
+        }
+
+        try
+        {
+            Error = null;
+
+            var name = AgentPlatforms.KitName(platform.Platform);
+            var extension = name[(name.IndexOf('.', StringComparison.Ordinal) + 1)..];
+
+            if (await _picker.PickSaveAsync("Куда сохранить комплект агента", name, extension)
+                    .ConfigureAwait(true) is not { Length: > 0 } path)
+            {
+                return;
+            }
+
+            var thumbprint = OwnThumbprint
+                             ?? await _directory.GetOwnThumbprintAsync(cancellationToken).ConfigureAwait(true);
+
+            var kit = await _kits.BuildAsync(
+                new AgentKitRequest
+                {
+                    Platform = platform.Platform,
+                    OutputPath = path,
+                    ClientThumbprint = thumbprint,
+                    ClientAddresses = Addresses(),
+                    Port = _directory.DefaultPort,
+
+                    // Имя машины приходит отсюда, а не из ядра: у сервера это чужая
+                    // машина в стойке, и знать её имя ядру неоткуда.
+                    ClientName = Environment.MachineName,
+                },
+                cancellationToken).ConfigureAwait(true);
+
+            Message = $"Комплект собран: {kit.Path} ({kit.Bytes / 1024 / 1024} МБ). "
+                      + "Внутри — агент, что сделать на том конце"
+                      + (AgentPlatforms.IsLinux(platform.Platform) ? " и юнит systemd." : ".");
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            Error = $"Комплект не собрался: {ex.Message}";
+        }
+    }
+
+    /// <summary>
+    /// Адреса этой машины для обратного звонка.
+    /// </summary>
+    /// <remarks>
+    /// Первым идёт адрес того адаптера, от которого продукт меряет: именно он
+    /// смотрит в ту сеть, где стоит агент. Остальные перечисляются ниже —
+    /// на площадке бывает несколько сетей, и угадывать за человека нечего.
+    /// </remarks>
+    private IReadOnlyList<string> Addresses()
+    {
+        var primary = _environment.GetPrimaryAdapter()?.IPv4Address;
+
+        return
+        [
+            .. new[] { primary }
+                .Concat(_environment.GetAdapters()
+                    .Where(a => a.IsUp)
+                    .Select(a => a.IPv4Address))
+                .Where(a => a is { Length: > 0 } && a != "127.0.0.1")
+                .Select(a => a!)
+                .Distinct(StringComparer.Ordinal),
+        ];
+    }
 
     // ------------------------------------------------------------------- список
 

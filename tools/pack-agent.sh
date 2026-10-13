@@ -1,44 +1,62 @@
 #!/bin/sh
-# Собирает storm-agent.exe в чистую папку, готовую к копированию на площадку.
+# Собирает агентов под все платформы и кладёт их в поставку клиента.
 #
-# Почему не годится папка публикации напрямую: агент хранит свою личность и список
-# сопряжений РЯДОМ С СОБОЙ — в этом и состоит его портативность. Стоит один раз
-# запустить его оттуда, и там останутся ключ и чужие сопряжения; скопировав такую
-# папку на площадку, вы увезли бы туда личность отладочного агента вместо новой.
+# Агенты едут ВНУТРИ продукта, а не скачиваются по требованию: станцию носят
+# на объекты, где интернета нет, а агент нужен именно там. Цена — размер:
+# пять платформ в сжатом виде стоят около 33 МБ вместо 80.
+#
+# Windows-агент кладётся ещё и распакованным, рядом с клиентом: им пользуются
+# прямо на этой машине, и доставать его из архива ради запуска незачем.
+#
+# Почему агент хранится сжатым: комплект для чужого конца собирает сам клиент
+# («Настройки → Агенты → Собрать комплект»), и ему всё равно, откуда брать байты.
 set -e
 
 root="$(cd "$(dirname "$0")/.." && pwd)"
-out="$root/artifacts/agent"
-pub="$root/src/StormMachine.Agent/bin/Release/net10.0-windows/win-x64/publish"
+dest="${1:-$root/artifacts/StormMachine.App}"
+platforms="${2:-win-x64 linux-x64 linux-arm64 osx-arm64 osx-x64}"
 
-echo "Собираю агента..."
-dotnet publish "$root/src/StormMachine.Agent/StormMachine.Agent.csproj" \
-    --configuration Release --nologo --verbosity quiet
+staging="$root/artifacts/agents-staging"
+agents="$dest/agents"
 
-if [ ! -f "$pub/storm-agent.exe" ]; then
-    echo "Не найден $pub/storm-agent.exe"
-    exit 1
-fi
+rm -rf "$staging"
+mkdir -p "$agents"
 
-rm -rf "$out"
-mkdir -p "$out"
+for rid in $platforms; do
+    echo "Собираю агента для $rid..."
 
-# Копируется ровно один файл. Остальное в папке публикации — отладочные символы
-# и состояние от прошлых запусков: на площадке не нужно ни то, ни другое.
-cp "$pub/storm-agent.exe" "$out/storm-agent.exe"
+    out="$staging/$rid"
+    dotnet publish "$root/src/StormMachine.Agent/StormMachine.Agent.csproj" \
+        --configuration Release --runtime "$rid" --output "$out" --nologo --verbosity quiet
 
-# Путь печатается в том виде, в каком его примут проводник и cmd: файл отсюда
-# понесут копировать руками, а bash-путь вида /d/... там не откроется.
-shown="$out/storm-agent.exe"
-if command -v cygpath >/dev/null 2>&1; then
-    shown="$(cygpath -w "$out/storm-agent.exe")"
-fi
+    binary="$out/storm-agent"
+    [ -f "$binary.exe" ] && binary="$binary.exe"
+
+    if [ ! -f "$binary" ]; then
+        echo "Для $rid не нашлось собранного агента в $out"
+        exit 1
+    fi
+
+    # Сжатие делается встроенной командой PowerShell, а не zip: на машине сборки
+    # его может не быть, а PowerShell есть везде, где есть Windows. Вызов идёт
+    # командой, а не файлом сценария: политика выполнения на рабочей машине
+    # запрещает запуск неподписанных .ps1, и скрипт-упаковщик туда не годится.
+    zip="$agents/storm-agent-$rid.zip"
+    rm -f "$zip"
+    powershell -NoProfile -Command \
+        "Compress-Archive -Path '$(cygpath -w "$binary")' -DestinationPath '$(cygpath -w "$zip")' -CompressionLevel Optimal -Force"
+
+    echo "  $(wc -c < "$binary") байт -> $(wc -c < "$zip") байт"
+
+    # Распакованный — только для своей платформы.
+    if [ "$rid" = "win-x64" ]; then
+        cp "$binary" "$dest/storm-agent.exe"
+    fi
+done
+
+rm -rf "$staging"
 
 echo
-echo "Готово: $shown"
-echo "Размер: $(wc -c < "$out/storm-agent.exe") байт"
-echo
-echo "Скопируйте этот файл на вторую машину в любую папку и запустите там:"
-echo "    storm-agent.exe listen --сопряжение"
-echo
-echo "Личность и сопряжения агент создаст сам рядом с собой при первом запуске."
+echo "Готово: $agents"
+echo "Комплект для площадки собирается из клиента: «Настройки → Агенты → Собрать комплект»."
+echo "Внутри комплекта — агент, написанные команды и (для Linux) юнит systemd."

@@ -5,28 +5,33 @@
        Правило проверяется тестом в tests/StormMachine.ArchTests. -->
 
   <PropertyGroup>
-    <ApplicationIcon>..\StormMachine.App\Assets\storm.ico</ApplicationIcon>
-  </PropertyGroup>
-
-  <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>net10.0-windows</TargetFramework>
+
+    <!-- Платформа не задана рамкой: агент идёт на тот конец, который есть у заказчика,
+         а там бывает и Ubuntu Server, и одноплатник. Windows-часть (служба) отделена
+         проверкой ОС, а не фреймворком, — иначе под Linux не собралось бы вовсе. -->
+    <TargetFramework>net10.0</TargetFramework>
     <AssemblyName>storm-agent</AssemblyName>
     <RootNamespace>StormMachine.Agent</RootNamespace>
     <Description>storm-agent: удалённая точка измерения Storm Machine.</Description>
     <PublishSingleFile>true</PublishSingleFile>
     <SelfContained>true</SelfContained>
-    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <RuntimeIdentifier Condition="'$(RuntimeIdentifier)' == ''">win-x64</RuntimeIdentifier>
     <PublishTrimmed>true</PublishTrimmed>
     <InvariantGlobalization>true</InvariantGlobalization>
 
     <!-- Нативные библиотеки — внутрь бинаря. Сегодня агенту нечего складывать
-         рядом: он ссылается только на протокол. Но tools/pack-agent.sh копирует
-         на площадку РОВНО ОДИН ФАЙЛ, и в этом весь смысл портативности агента.
-         Стоит появиться первой нативной зависимости — и без этой строки скрипт
-         молча увезёт заказчику нерабочий бинарь. Строка стоит заранее именно
-         потому, что цена её отсутствия платится не здесь и не сразу. -->
+         рядом: он ссылается только на протокол. Но комплект уезжает на площадку
+         ОДНИМ ФАЙЛОМ, и в этом весь смысл портативности агента. Стоит появиться
+         первой нативной зависимости — и без этой строки на тот конец молча уедет
+         нерабочий бинарь. Строка стоит заранее именно потому, что цена её
+         отсутствия платится не здесь и не сразу. -->
     <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+  </PropertyGroup>
+
+  <!-- Значок — свойство исполняемого файла Windows; у Linux и macOS его нет. -->
+  <PropertyGroup Condition="$(RuntimeIdentifier.StartsWith('win'))">
+    <ApplicationIcon>..\StormMachine.App\Assets\storm.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>
@@ -35,6 +40,9 @@
 
   <ItemGroup>
     <PackageReference Include="System.CommandLine" Version="2.0.11" />
+
+    <!-- Диспетчер служб Windows. На других платформах не используется: там постоянную
+         точку заводит systemd, и обращения к этому типу закрыты проверкой ОС. -->
     <PackageReference Include="System.ServiceProcess.ServiceController" Version="10.0.0" />
   </ItemGroup>
 

@@ -5,6 +5,7 @@ using CommunityToolkit.Mvvm.Input;
 using StormMachine.App.Services;
 using StormMachine.Application;
 using StormMachine.Application.Abstractions;
+using StormMachine.Application.Agents;
 using StormMachine.Application.Capabilities;
 using StormMachine.Application.Profiles;
 using StormMachine.Application.Snmp;
@@ -90,13 +91,21 @@ public sealed partial class SettingsPageViewModel : PageViewModel
         ISnmpCredentialStore credentials,
         SnmpService snmp,
         IAgentDirectory agents,
+        IAgentKitBuilder kits,
+        IAgentBinaries binaries,
+        INetworkEnvironment environment,
         SettingsTransfer transfer,
         IFilePicker picker,
         Application.Storage.RetentionSettings retention,
         FileLogProvider log)
         : base(section)
     {
-        Agents = new AgentsSectionViewModel(agents ?? throw new ArgumentNullException(nameof(agents)));
+        Agents = new AgentsSectionViewModel(
+            agents ?? throw new ArgumentNullException(nameof(agents)),
+            kits ?? throw new ArgumentNullException(nameof(kits)),
+            binaries ?? throw new ArgumentNullException(nameof(binaries)),
+            environment ?? throw new ArgumentNullException(nameof(environment)),
+            picker ?? throw new ArgumentNullException(nameof(picker)));
         Transfer = new TransferSectionViewModel(
             transfer ?? throw new ArgumentNullException(nameof(transfer)),
             picker ?? throw new ArgumentNullException(nameof(picker)))

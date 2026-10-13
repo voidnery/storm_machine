@@ -1,7 +1,4 @@
 using System.CommandLine;
-using System.Diagnostics;
-using System.Runtime.Versioning;
-using System.Security.Principal;
 using System.ServiceProcess;
 using StormMachine.Protocol;
 
@@ -24,11 +21,8 @@ namespace StormMachine.Agent;
 /// и это единственное место, где они нужны.</item>
 /// </list>
 /// </remarks>
-[SupportedOSPlatform("windows")]
 internal static class Program
 {
-    private const string ServiceName = "StormAgent";
-
     private static int Main(string[] args)
     {
         Console.OutputEncoding = System.Text.Encoding.UTF8;
@@ -36,7 +30,10 @@ internal static class Program
         // Служба запускается диспетчером без консоли и без аргументов разбора:
         // ветка отделена до System.CommandLine, потому что SCM ждёт отклика
         // в считаные секунды и разбор командной строки здесь только помешает.
-        if (args is ["--служба"] or ["--service"])
+        //
+        // Ключ существует только на Windows: на Linux постоянную точку поднимает
+        // systemd обычной командой listen, и своей ветки запуска ей не нужно.
+        if (args is ["--служба"] or ["--service"] && OperatingSystem.IsWindows())
         {
             ServiceBase.Run(new AgentService());
 
@@ -203,23 +200,22 @@ internal static class Program
         return command;
     }
 
+    /// <summary>
+    /// Постоянная точка на этой машине.
+    /// </summary>
+    /// <remarks>
+    /// Команда одна, способ разный: на Windows — диспетчер служб, на Linux — systemd.
+    /// Заставлять человека знать, на какой он машине, незачем: продукт и так знает.
+    /// На macOS постоянной точки нет, и об этом говорится прямо, а не отказом без причины.
+    /// </remarks>
     private static Command BuildService()
     {
-        var command = new Command("service", "Установка постоянной службой. Требует прав администратора.");
+        var command = new Command("service", "Постоянная точка на этой машине: служба Windows или юнит systemd.");
 
-        var install = new Command("install", "Установить и запустить службу.");
+        var install = new Command("install", "Установить и запустить.");
 
         install.SetAction((_, _) =>
         {
-            if (!IsElevated())
-            {
-                Console.Error.WriteLine(
-                    "Установка службы требует прав администратора — это единственное место, "
-                    + "где агенту они нужны. Для работы без прав используй listen или connect.");
-
-                return Task.FromResult(2);
-            }
-
             var path = Environment.ProcessPath;
 
             if (path is null)
@@ -229,33 +225,59 @@ internal static class Program
                 return Task.FromResult(1);
             }
 
-            var code = Sc($"create {ServiceName} binPath= \"\\\"{path}\\\" --служба\" start= auto "
-                          + "DisplayName= \"Storm Machine — агент измерений\"");
-
-            if (code != 0)
+            if (OperatingSystem.IsWindows())
             {
-                return Task.FromResult(code);
+                if (!Environment.IsPrivilegedProcess)
+                {
+                    Console.Error.WriteLine(
+                        "Установка службы требует прав администратора — это единственное место, "
+                        + "где агенту они нужны. Для работы без прав используй listen или connect.");
+
+                    return Task.FromResult(2);
+                }
+
+                return Task.FromResult(WindowsServiceControl.Install(path));
             }
 
-            Sc($"description {ServiceName} \"Удалённая точка измерения Storm Machine.\"");
+            if (OperatingSystem.IsLinux())
+            {
+                // Прав здесь не требуем: без root юнит ставится пользовательским,
+                // и агент работает. Разница названа внутри — она в том, переживёт ли
+                // служба выход из сеанса, а не в том, заработает ли вообще.
+                return Task.FromResult(SystemdService.Install(path));
+            }
 
-            return Task.FromResult(Sc($"start {ServiceName}"));
+            Console.Error.WriteLine(
+                "Постоянная точка на этой платформе не заводится. Агент работает "
+                + "командами listen и connect — для площадки этого достаточно.");
+
+            return Task.FromResult(2);
         });
 
-        var uninstall = new Command("uninstall", "Остановить и удалить службу.");
+        var uninstall = new Command("uninstall", "Остановить и удалить.");
 
         uninstall.SetAction((_, _) =>
         {
-            if (!IsElevated())
+            if (OperatingSystem.IsWindows())
             {
-                Console.Error.WriteLine("Удаление службы требует прав администратора.");
+                if (!Environment.IsPrivilegedProcess)
+                {
+                    Console.Error.WriteLine("Удаление службы требует прав администратора.");
 
-                return Task.FromResult(2);
+                    return Task.FromResult(2);
+                }
+
+                return Task.FromResult(WindowsServiceControl.Uninstall());
             }
 
-            Sc($"stop {ServiceName}");
+            if (OperatingSystem.IsLinux())
+            {
+                return Task.FromResult(SystemdService.Uninstall());
+            }
 
-            return Task.FromResult(Sc($"delete {ServiceName}"));
+            Console.Error.WriteLine("Постоянная точка на этой платформе не заводится — удалять нечего.");
+
+            return Task.FromResult(2);
         });
 
         command.Subcommands.Add(install);
@@ -266,8 +288,22 @@ internal static class Program
             Console.WriteLine("storm-agent service install   — установить и запустить");
             Console.WriteLine("storm-agent service uninstall — остановить и удалить");
             Console.WriteLine();
-            Console.WriteLine("Служба — единственный режим, требующий прав администратора.");
-            Console.WriteLine("Для площадки, где прав нет, годятся listen и connect.");
+
+            if (OperatingSystem.IsWindows())
+            {
+                Console.WriteLine("На Windows это служба, и это единственный режим, требующий прав администратора.");
+            }
+            else if (OperatingSystem.IsLinux())
+            {
+                Console.WriteLine("На Linux это юнит systemd. От root он системный и поднимается при загрузке;");
+                Console.WriteLine("без root — пользовательский и живёт, пока открыт сеанс.");
+            }
+            else
+            {
+                Console.WriteLine("На этой платформе постоянная точка не заводится.");
+            }
+
+            Console.WriteLine("Для площадки, где ничего ставить не дадут, годятся listen и connect.");
 
             return Task.FromResult(0);
         });
@@ -315,99 +351,5 @@ internal static class Program
         };
     }
 
-    private static int Sc(string arguments)
-    {
-        using var process = Process.Start(new ProcessStartInfo("sc.exe", arguments)
-        {
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false,
-            CreateNoWindow = true,
-        });
-
-        if (process is null)
-        {
-            Console.Error.WriteLine("Не удалось запустить sc.exe.");
-
-            return 1;
-        }
-
-        var output = process.StandardOutput.ReadToEnd() + process.StandardError.ReadToEnd();
-        process.WaitForExit(30_000);
-
-        if (output.Trim().Length > 0)
-        {
-            Console.WriteLine(output.Trim());
-        }
-
-        return process.ExitCode;
-    }
-
-    private static bool IsElevated()
-    {
-        using var identity = WindowsIdentity.GetCurrent();
-
-        return new WindowsPrincipal(identity).IsInRole(WindowsBuiltInRole.Administrator);
-    }
 }
 
-/// <summary>
-/// Оболочка службы.
-/// </summary>
-/// <remarks>
-/// Диспетчер служб ждёт отклика в считаные секунды, поэтому запуск здесь только
-/// заводит фоновую работу и сразу возвращается. Всё, что дольше, — уже в самом агенте.
-/// </remarks>
-[SupportedOSPlatform("windows")]
-internal sealed class AgentService : ServiceBase
-{
-    private readonly CancellationTokenSource _stopping = new();
-
-    private Task? _work;
-
-    public AgentService() => ServiceName = "StormAgent";
-
-    protected override void OnStart(string[] args)
-    {
-        var directory = Path.GetDirectoryName(Environment.ProcessPath) ?? AppContext.BaseDirectory;
-
-        var host = new AgentHost(new AgentSettings
-        {
-            IdentityPath = Path.Combine(directory, "storm-agent.identity.pfx"),
-            PeerBookPath = Path.Combine(directory, "storm-agent.peers.json"),
-            Port = SecureChannel.DefaultPort,
-
-            // Служба работает без человека рядом, и новых собеседников не принимает:
-            // код сопряжения некому прочитать. Сопрягать надо до установки, запустив
-            // агента в консоли.
-            Pairing = null,
-            Log = message => EventLog.WriteEntry(message),
-        });
-
-        _work = host.ListenAsync(_stopping.Token);
-    }
-
-    protected override void OnStop()
-    {
-        _stopping.Cancel();
-
-        try
-        {
-            _work?.Wait(TimeSpan.FromSeconds(10));
-        }
-        catch (AggregateException)
-        {
-            // Прерывание — штатный способ остановки, и жаловаться на него незачем.
-        }
-    }
-
-    protected override void Dispose(bool disposing)
-    {
-        if (disposing)
-        {
-            _stopping.Dispose();
-        }
-
-        base.Dispose(disposing);
-    }
-}

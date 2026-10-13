@@ -62,6 +62,41 @@ jobs:
             dotnet publish $proj.FullName --configuration Release --output "artifacts/$name"
           }
 
+      # Агенты для чужих концов едут ВНУТРИ поставки, а не скачиваются по требованию:
+      # станцию носят на объекты, где интернета нет, а агент нужен именно там.
+      # Цена — около 33 МБ в сжатом виде против 80 распакованными.
+      #
+      # Логика та же, что в tools/pack-agent.sh; повторена здесь, потому что шаг обязан
+      # работать на чистом раннере без Git Bash, а не вызывать скрипт, которого там нет.
+      - name: Агенты для чужих концов
+        if: steps.probe.outputs.found == 'true'
+        shell: pwsh
+        run: |
+          $agents = "artifacts/StormMachine.App/agents"
+          New-Item -ItemType Directory -Force -Path $agents | Out-Null
+
+          foreach ($rid in @('win-x64', 'linux-x64', 'linux-arm64', 'osx-arm64', 'osx-x64')) {
+            Write-Host "Агент для $rid"
+
+            dotnet publish src/StormMachine.Agent/StormMachine.Agent.csproj `
+              --configuration Release --runtime $rid --output "artifacts/agents/$rid" `
+              --nologo --verbosity quiet
+
+            $binary = Get-ChildItem "artifacts/agents/$rid" -File |
+              Where-Object { $_.Name -like 'storm-agent*' -and $_.Extension -ne '.pdb' } |
+              Select-Object -First 1
+
+            if (-not $binary) {
+              Write-Host "::error::Для $rid не собрался агент — комплект для этой платформы выдать будет нельзя"
+              exit 1
+            }
+
+            Compress-Archive -Path $binary.FullName `
+              -DestinationPath "$agents/storm-agent-$rid.zip" -CompressionLevel Optimal -Force
+          }
+
+          Get-ChildItem $agents | ForEach-Object { "{0,-32} {1,6:N1} МБ" -f $_.Name, ($_.Length / 1MB) } | Write-Host
+
       # ------------------------------------------------------------------ подпись
       #
       # SignPath Foundation подписывает выпуски открытых проектов бесплатно.

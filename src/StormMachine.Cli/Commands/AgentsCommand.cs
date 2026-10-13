@@ -1,6 +1,7 @@
-using System.CommandLine;
+﻿using System.CommandLine;
 using Microsoft.Extensions.DependencyInjection;
 using StormMachine.Application.Abstractions;
+using StormMachine.Application.Agents;
 using StormMachine.Cli.Rendering;
 
 namespace StormMachine.Cli.Commands;
@@ -27,6 +28,7 @@ internal static class AgentsCommand
         command.Subcommands.Add(BuildCheck(services));
         command.Subcommands.Add(BuildRename(services));
         command.Subcommands.Add(BuildForget(services));
+        command.Subcommands.Add(BuildKit(services));
 
         command.SetAction(async (_, cancellationToken) =>
         {
@@ -41,6 +43,125 @@ internal static class AgentsCommand
 
         return command;
     }
+
+    /// <summary>
+    /// Комплект агента для другого конца: <c>storm agents kit</c>.
+    /// </summary>
+    /// <remarks>
+    /// То же самое, что делает кнопка «Собрать комплект» в окне, и тем же сборщиком:
+    /// консоль и окно обязаны уметь одно и то же, иначе площадка без графики теряет
+    /// возможность, а не удобство.
+    /// </remarks>
+    private static Command BuildKit(IServiceProvider services)
+    {
+        var platformArgument = new Argument<string>("платформа")
+        {
+            Description = "Система того конца: win-x64, linux-x64, linux-arm64, osx-arm64, osx-x64.",
+        };
+
+        var outOption = new Option<string?>("--куда", "--out")
+        {
+            Description = "Куда положить комплект. По умолчанию — в текущий каталог.",
+        };
+
+        var command = new Command("kit", "Собрать комплект агента для другого конца.")
+        {
+            platformArgument,
+            outOption,
+        };
+
+        command.SetAction(async (parse, cancellationToken) =>
+        {
+            var wanted = parse.GetValue(platformArgument)!;
+
+            var platform = AgentPlatforms.All
+                .Select(p => (Platform: p, Rid: AgentPlatforms.Rid(p)))
+                .FirstOrDefault(p => string.Equals(p.Rid, wanted, StringComparison.OrdinalIgnoreCase));
+
+            if (platform.Rid is null)
+            {
+                Console.Error.WriteLine(
+                    $"Платформа «{wanted}» неизвестна. Бывают: "
+                    + string.Join(", ", AgentPlatforms.All.Select(AgentPlatforms.Rid)));
+
+                return 1;
+            }
+
+            var binaries = services.GetRequiredService<IAgentBinaries>();
+
+            if (!binaries.Has(platform.Platform))
+            {
+                Console.Error.WriteLine(
+                    $"В поставке нет агента для «{AgentPlatforms.Title(platform.Platform)}». "
+                    + "Агенты кладутся в подкаталог «agents» при сборке выпуска.");
+
+                return 1;
+            }
+
+            var directory = services.GetRequiredService<IAgentDirectory>();
+            var environment = services.GetRequiredService<INetworkEnvironment>();
+
+            var path = parse.GetValue(outOption) is { Length: > 0 } chosen
+                ? chosen
+                : Path.Combine(Directory.GetCurrentDirectory(), AgentPlatforms.KitName(platform.Platform));
+
+            try
+            {
+                var kit = await services.GetRequiredService<IAgentKitBuilder>()
+                    .BuildAsync(
+                        new AgentKitRequest
+                        {
+                            Platform = platform.Platform,
+                            OutputPath = path,
+                            ClientThumbprint = await directory
+                                .GetOwnThumbprintAsync(cancellationToken)
+                                .ConfigureAwait(false),
+                            ClientAddresses = Addresses(environment),
+                            Port = directory.DefaultPort,
+
+                            // Имя машины приходит отсюда, а не из ядра: у сервера это чужая
+                            // машина в стойке, и знать её имя ядру неоткуда.
+                            ClientName = Environment.MachineName,
+                        },
+                        cancellationToken)
+                    .ConfigureAwait(false);
+
+                Console.WriteLine($"Комплект собран: {kit.Path}");
+                Console.WriteLine($"Размер: {kit.Bytes / 1024 / 1024} МБ");
+                Console.WriteLine();
+                Console.WriteLine("Внутри:");
+
+                foreach (var item in kit.Contents)
+                {
+                    Console.WriteLine($"  {item}");
+                }
+
+                Console.WriteLine();
+                Console.WriteLine("Увезите файл на тот конец и распакуйте. Что делать дальше —");
+                Console.WriteLine($"написано внутри, в {IAgentKitBuilder.ReadmeName}.");
+
+                return 0;
+            }
+            catch (InvalidOperationException ex)
+            {
+                Console.Error.WriteLine(ex.Message);
+
+                return 1;
+            }
+        });
+
+        return command;
+    }
+
+    /// <summary>Адреса этой машины: по ним агент дозванивается обратно.</summary>
+    private static IReadOnlyList<string> Addresses(INetworkEnvironment environment) =>
+    [
+        .. new[] { environment.GetPrimaryAdapter()?.IPv4Address }
+            .Concat(environment.GetAdapters().Where(a => a.IsUp).Select(a => a.IPv4Address))
+            .Where(a => a is { Length: > 0 } && a != "127.0.0.1")
+            .Select(a => a!)
+            .Distinct(StringComparer.Ordinal),
+    ];
 
     private static Command BuildBrowse(IServiceProvider services)
     {

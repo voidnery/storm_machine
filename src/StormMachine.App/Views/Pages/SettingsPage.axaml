@@ -116,6 +116,25 @@
                   <forms:CopyChip Text="{Binding OwnThumbprint}" />
                 </StackPanel>
 
+                <!-- Выдача агента на тот конец. До этого человеку на площадке надо было
+                     откуда-то взять бинарь под свою систему и догадаться, что с ним делать;
+                     агент при этом ехал только под Windows. -->
+                <StackPanel Spacing="6" IsVisible="{Binding CanIssue}">
+                  <TextBlock Text="Выдать агента на другой конец" Classes="caption" />
+
+                  <WrapPanel>
+                    <forms:Picker Width="320" Margin="0,0,8,4"
+                                  ItemsSource="{Binding Platforms}"
+                                  SelectedItem="{Binding Platform, Mode=TwoWay}"
+                                  Placeholder="выберите систему того конца" />
+                    <Button Content="Собрать комплект" Command="{Binding IssueKitCommand}"
+                            Padding="14,6" Margin="0,0,0,4" />
+                  </WrapPanel>
+
+                  <forms:MethodCard Thesis="Внутри — агент, что сделать на том конце и юнит systemd для Linux."
+                                    Detail="Кода сопряжения в комплекте нет намеренно: код живёт десять минут, а комплект едет на площадку часами — вшитый приехал бы мёртвым. Код называют голосом в момент сопряжения, и в написанном это сказано прямо. Отпечаток этой машины в комплект кладётся: по нему на том конце сверяют, с кем сопряглись." />
+                </StackPanel>
+
                 <TextBlock Text="Сопряжённых агентов нет." Classes="label"
                            IsVisible="{Binding !HasAgents}" />
 

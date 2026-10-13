@@ -5,6 +5,8 @@ using StormMachine.Agents;
 using StormMachine.Alerting;
 using StormMachine.Application.Abstractions;
 using StormMachine.Application.Adapters;
+using StormMachine.Agents.Kits;
+using StormMachine.Application.Agents;
 using StormMachine.Application.Baselines;
 using StormMachine.Application.Capabilities;
 using StormMachine.Application.Probes;
@@ -180,6 +182,16 @@ public static class StormMachineServiceCollectionExtensions
         // Снятие эталона — общее для окна и консоли: раньше сборка лежала
         // в команде консоли, и мышью эталон было не снять.
         services.AddSingleton<BaselineCapture>();
+
+        // Агенты для чужих концов. Бинари едут внутри поставки — рядом с клиентом
+        // и в подкаталоге «agents»; каталог знает корень композиции, а не сам сборщик
+        // комплекта: ядру положение исполняемого файла знать неоткуда и незачем.
+        services.AddSingleton(_ => new AgentBinaryStore(
+            Path.GetDirectoryName(Environment.ProcessPath) is { Length: > 0 } beside
+                ? beside
+                : AppContext.BaseDirectory));
+        services.AddSingleton<IAgentBinaries>(p => p.GetRequiredService<AgentBinaryStore>());
+        services.AddSingleton<IAgentKitBuilder, AgentKitWriter>();
 
         // Отчёты. Движок PDF спрятан за IReportRenderer — замена стоит день, а не месяц.
         services.AddSingleton<IReportRenderer, PdfReportRenderer>();
