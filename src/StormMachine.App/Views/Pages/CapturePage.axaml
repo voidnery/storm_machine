@@ -28,7 +28,9 @@
                   Command="{Binding AskForRightsCommand}" />
         </StackPanel>
 
-        <Grid ColumnDefinitions="Auto,240,Auto,80,Auto,Auto,*" IsVisible="{Binding IsAvailable}">
+        <!-- Ширина поля секунд 140, а не 80: у NumericUpDown стрелки съедают место,
+             и трёхзначное число в узком поле режется (урок со страницы задержки). -->
+        <Grid ColumnDefinitions="Auto,240,Auto,140,Auto,Auto,*" IsVisible="{Binding IsAvailable}">
           <TextBlock Grid.Column="0" Text="Слушать на:" Classes="body"
                      Foreground="{StaticResource TextSecondaryBrush}"
                      VerticalAlignment="Center" Margin="0,0,10,0" />
