@@ -56,8 +56,8 @@
 Работает **всё** без admin:
 
 ```
-ttl= 2  TtlExpired    31.28.6.1          1.092 мс
-ttl= 3  TtlExpired    10.10.13.181       0.953 мс
+ttl= 2  TtlExpired    <узел провайдера>  1.092 мс
+ttl= 3  TtlExpired    <узел провайдера>  0.953 мс
 ttl= 6  Success       1.1.1.1           39.419 мс     ← traceroute отработал
 Максимальный payload с DF: 1472 байт → PMTU ≈ 1500    ← PMTU отработал
 ```

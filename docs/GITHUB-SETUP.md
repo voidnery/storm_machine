@@ -133,7 +133,7 @@ tools\setup-repo.cmd
 ### 5.1 Добавь репозиторий в GitHub Desktop
 
 1. **File → Add local repository…**
-2. Укажи `D:\Temp_Danya\Projects\storm_machine`
+2. Укажи папку, куда склонирован репозиторий, например `D:\Projects\storm_machine`
 3. GitHub Desktop увидит репозиторий, созданный скриптом из §4
 
 ### 5.2 Первый коммит
