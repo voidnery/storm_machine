@@ -2,6 +2,12 @@
 
 # Срабатывает на подписанный тег vX.Y.Z, который создаёт локальный хук
 # .githooks/pre-push при переливке beta -> master.
+#
+# Выпуск — только переносимый архив (решение штаба D-0005): установщика и ленты
+# обновлений нет. Переносимую копию везут с собой на объект в папке, и ставить
+# её поверх себя же на ходу нельзя; о новой версии клиент говорит сам — по кнопке
+# и ссылкой на страницу выпуска. Раскладка архива та же, что у tools/pack-portable.sh:
+# сборка здесь и на машине разработки обязана давать одно и то же.
 on:
   push:
     tags: [ 'v*' ]
@@ -33,8 +39,31 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
-      - name: Восстановление локальных инструментов
-        run: dotnet tool restore
+      # Номер выпуска — из тега, номер продукта — из Directory.Build.props. Тег ставит
+      # хук из того же файла, так что разойтись им трудно, но можно: запуском вручную
+      # с ветки или тегом, поставленным руками. Выпуск под чужим номером — это архив,
+      # окно «О продукте» которого называет другую версию, чем страница, откуда его скачали.
+      - name: Номер выпуска совпадает с проектом
+        id: version
+        shell: pwsh
+        run: |
+          $tag = "${{ github.ref_name }}"
+          if ($tag -notmatch '^v\d') {
+            Write-Host "::error::Выпуск собирается только по тегу vX.Y.Z, а запущен на «$tag»."
+            exit 1
+          }
+
+          $version = $tag.Substring(1)
+          $props = Get-Content Directory.Build.props -Raw -Encoding utf8
+          $project = [regex]::Match($props, '<Version>(.*?)</Version>').Groups[1].Value.Trim()
+
+          if ($version -ne $project) {
+            Write-Host "::error::Тег $tag, а в Directory.Build.props — $project. Номера обязаны совпадать."
+            exit 1
+          }
+
+          "version=$version" >> $env:GITHUB_OUTPUT
+          "name=StormMachine-$version-win-x64-portable" >> $env:GITHUB_OUTPUT
 
       - name: Есть ли что публиковать
         id: probe
@@ -48,41 +77,45 @@ jobs:
             Write-Host "::notice::Публикуемых проектов ещё нет — релиз будет только с исходниками"
           }
 
-      - name: Publish (self-contained, single-file)
+      # Клиент и консоль — в одну папку: продукт один, и собирать его из трёх
+      # архивов руками значило бы переложить сборку на человека.
+      - name: Клиент и консоль (self-contained, single-file)
         if: steps.probe.outputs.found == 'true'
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force -Path artifacts | Out-Null
+          $dest = "artifacts/${{ steps.version.outputs.name }}"
+          New-Item -ItemType Directory -Force -Path $dest | Out-Null
+
           # Параметры публикации (single-file, trimmed, win-x64) заданы в самих .csproj,
           # чтобы локальная сборка и сборка здесь давали идентичный артефакт.
-          foreach ($name in @('StormMachine.App', 'StormMachine.Cli', 'StormMachine.Agent')) {
-            $proj = Get-ChildItem -Path src -Filter "$name.csproj" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
-            if (-not $proj) { continue }
+          foreach ($name in @('StormMachine.App', 'StormMachine.Cli')) {
             Write-Host "Публикую $name"
-            dotnet publish $proj.FullName --configuration Release --output "artifacts/$name"
+            dotnet publish "src/$name/$name.csproj" --configuration Release --output $dest --nologo
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           }
 
       # Агенты для чужих концов едут ВНУТРИ поставки, а не скачиваются по требованию:
       # станцию носят на объекты, где интернета нет, а агент нужен именно там.
       # Цена — около 33 МБ в сжатом виде против 80 распакованными.
       #
-      # Логика та же, что в tools/pack-agent.sh; повторена здесь, потому что шаг обязан
-      # работать на чистом раннере без Git Bash, а не вызывать скрипт, которого там нет.
+      # Логика та же, что в tools/pack-agent.sh; повторена здесь, потому что подпись
+      # встаёт между публикацией и упаковкой, а скрипт делает их за один проход.
       - name: Агенты для чужих концов
         if: steps.probe.outputs.found == 'true'
         shell: pwsh
         run: |
-          $agents = "artifacts/StormMachine.App/agents"
+          $dest = "artifacts/${{ steps.version.outputs.name }}"
+          $agents = "$dest/agents"
           New-Item -ItemType Directory -Force -Path $agents | Out-Null
 
           foreach ($rid in @('win-x64', 'linux-x64', 'linux-arm64', 'osx-arm64', 'osx-x64')) {
             Write-Host "Агент для $rid"
 
             dotnet publish src/StormMachine.Agent/StormMachine.Agent.csproj `
-              --configuration Release --runtime $rid --output "artifacts/agents/$rid" `
+              --configuration Release --runtime $rid --output "artifacts/agents-staging/$rid" `
               --nologo --verbosity quiet
 
-            $binary = Get-ChildItem "artifacts/agents/$rid" -File |
+            $binary = Get-ChildItem "artifacts/agents-staging/$rid" -File |
               Where-Object { $_.Name -like 'storm-agent*' -and $_.Extension -ne '.pdb' } |
               Select-Object -First 1
 
@@ -93,6 +126,9 @@ jobs:
 
             Compress-Archive -Path $binary.FullName `
               -DestinationPath "$agents/storm-agent-$rid.zip" -CompressionLevel Optimal -Force
+
+            # Распакованный — только для своей платформы: им пользуются прямо здесь.
+            if ($rid -eq 'win-x64') { Copy-Item $binary.FullName "$dest/storm-agent.exe" -Force }
           }
 
           Get-ChildItem $agents | ForEach-Object { "{0,-32} {1,6:N1} МБ" -f $_.Name, ($_.Length / 1MB) } | Write-Host
@@ -114,8 +150,24 @@ jobs:
             exit 1
           }
 
-          Copy-Item $window "artifacts/StormMachine.App/storm-agent-ui.exe" -Force
+          Copy-Item $window "artifacts/${{ steps.version.outputs.name }}/storm-agent-ui.exe" -Force
           "{0,6:N1} МБ  storm-agent-ui.exe" -f ((Get-Item $window).Length / 1MB) | Write-Host
+
+      # Маркер и есть вся портативность: по нему продукт держит базу, настройки
+      # и журнал рядом с собой, а не в профиле пользователя. Текст маркера — один файл
+      # на обе сборки, tools/portable-marker.txt.
+      #
+      # Отладочные символы в архив не идут: одни только libSkiaSharp.pdb
+      # и libHarfBuzzSharp.pdb весят 105 МБ и человеку на объекте не нужны.
+      # Символы восстанавливаются из той же сборки, когда понадобятся.
+      - name: Маркер переносимости
+        if: steps.probe.outputs.found == 'true'
+        shell: pwsh
+        run: |
+          $dest = "artifacts/${{ steps.version.outputs.name }}"
+          Get-ChildItem $dest -Recurse -Filter '*.pdb' | Remove-Item -Force
+          Copy-Item tools/portable-marker.txt "$dest/storm.portable" -Force
+          Get-ChildItem $dest | ForEach-Object { "{0,-28} {1,8:N1} МБ" -f $_.Name, ($_.Length / 1MB) } | Write-Host
 
       # ------------------------------------------------------------------ подпись
       #
@@ -124,18 +176,16 @@ jobs:
       # выполнены: лицензия MIT, воспроизводимая сборка (Deterministic +
       # ContinuousIntegrationBuild), выпуск собирается только из CI по подписанному тегу.
       #
-      # Подпись идёт в два приёма, и порядок здесь существенный. Сначала бинарники,
-      # потом установщик: Velopack считает контрольные суммы содержимого при упаковке,
-      # и подпись внутренних файлов после неё их бы сломала. Подписать только установщик
-      # тоже мало — SmartScreen успокоится, а Defender будет ругаться на неподписанный
-      # StormMachine.exe при каждом запуске.
+      # Подписываются исполняемые файлы в папке до упаковки: подпись внутри архива
+      # и есть то, что увидят SmartScreen и Defender при каждом запуске. Установщика,
+      # которому нужна была бы вторая подпись поверх, больше нет.
       - name: Бинарники на подпись
         id: unsigned-app
         if: steps.probe.outputs.found == 'true' && env.HAS_SIGNING == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: unsigned-app
-          path: artifacts/StormMachine.App
+          path: artifacts/${{ steps.version.outputs.name }}
 
       - name: Подпись бинарников
         if: steps.probe.outputs.found == 'true' && env.HAS_SIGNING == 'true'
@@ -148,91 +198,41 @@ jobs:
           artifact-configuration-slug: app-files
           github-artifact-id: ${{ steps.unsigned-app.outputs.artifact-id }}
           wait-for-completion: true
-          output-artifact-directory: artifacts/StormMachine.App
+          output-artifact-directory: artifacts/${{ steps.version.outputs.name }}
 
-      # Установщик и лента обновлений. Velopack проверен спайком-07 на совместимость
-      # с обрезкой — разбор ленты и разностные пакеты её переживают, в отличие от Quartz.
-      - name: Установщик Velopack
+      # Что уходит человеку: переносимый архив целиком и, отдельно, агенты по платформам.
+      # Отдельные агенты — для того, кто ставит вторую точку на Linux или macOS и качает
+      # её прямо там: тянуть ради этого сотню мегабайт клиента для Windows незачем.
+      # Это те же архивы, что лежат в agents/ внутри переносимого, — после подписи.
+      #
+      # Суммы — с переводом строки LF и строчными буквами, как у sha256sum: агентов
+      # проверяют и на Linux, а «sha256sum -c» спотыкается о CRLF в имени файла.
+      - name: Архивы и контрольные суммы
         if: steps.probe.outputs.found == 'true'
         shell: pwsh
         run: |
-          $version = "${{ github.ref_name }}" -replace '^v', ''
+          $version = "${{ steps.version.outputs.version }}"
+          $name = "${{ steps.version.outputs.name }}"
+          New-Item -ItemType Directory -Force -Path out | Out-Null
 
-          # Консоль и агент кладутся рядом с клиентом: продукт один, и ставить его
-          # тремя установщиками значило бы заставить оператора собирать его руками.
-          Copy-Item artifacts/StormMachine.Cli/* artifacts/StormMachine.App/ -Force -ErrorAction SilentlyContinue
-          Copy-Item artifacts/StormMachine.Agent/* artifacts/StormMachine.App/ -Force -ErrorAction SilentlyContinue
+          Compress-Archive -Path "artifacts/$name/*" -DestinationPath "out/$name.zip" -CompressionLevel Optimal -Force
 
-          # Отладочные символы в установщик не идут: одни только libSkiaSharp.pdb
-          # и libHarfBuzzSharp.pdb весят 105 МБ и человеку, который ставит продукт,
-          # не нужны. Символы восстанавливаются из той же сборки, когда понадобятся.
-          Remove-Item artifacts/StormMachine.App/*.pdb -Force -ErrorAction SilentlyContinue
-
-          # Лента прошлых выпусков нужна для разностных пакетов: без неё каждое
-          # обновление весило бы как полная установка.
-          New-Item -ItemType Directory -Force -Path releases | Out-Null
-          dotnet vpk download github --repoUrl "https://github.com/${{ github.repository }}" --outputDir releases 2>&1 | Out-Host
-          if ($LASTEXITCODE -ne 0) { Write-Host "::notice::Прошлых выпусков нет — собираю первый" }
-
-          # packId — это и каталог установки (%LocalAppData%\<packId>), и опознание
-          # продукта в ленте обновлений. Он намеренно не совпадает с каталогом данных
-          # (%LocalAppData%\StormMachine): там лежит storm.db с историей измерений,
-          # и ставить продукт поверх неё значит сложить свои файлы в чужой каталог,
-          # а при удалении унести историю с собой.
-          dotnet vpk pack `
-            --packId StormMachine.App `
-            --packVersion $version `
-            --packTitle "Storm Machine" `
-            --packAuthors "Eterix Tech - by voidnery" `
-            --packDir artifacts/StormMachine.App `
-            --mainExe StormMachine.exe `
-            --icon src/StormMachine.App/Assets/storm.ico `
-            --outputDir releases
-
-
-      - name: Установщик на подпись
-        id: unsigned-setup
-        if: steps.probe.outputs.found == 'true' && env.HAS_SIGNING == 'true'
-        uses: actions/upload-artifact@v4
-        with:
-          name: unsigned-installer
-          path: releases/StormMachine.App-win-Setup.exe
-
-      - name: Подпись установщика
-        if: steps.probe.outputs.found == 'true' && env.HAS_SIGNING == 'true'
-        uses: signpath/github-action-submit-signing-request@v2
-        with:
-          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
-          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
-          project-slug: storm-machine
-          signing-policy-slug: release-signing
-          artifact-configuration-slug: installer
-          github-artifact-id: ${{ steps.unsigned-setup.outputs.artifact-id }}
-          wait-for-completion: true
-          output-artifact-directory: releases
-
-      - name: Упаковка и контрольные суммы
-        if: steps.probe.outputs.found == 'true'
-        shell: pwsh
-        run: |
-          $tag = "${{ github.ref_name }}"
-          Compress-Archive -Path artifacts/* -DestinationPath "storm-machine-$tag-win-x64.zip" -Force
-
-          # Суммы считаются по всему, что уходит человеку: и по архиву, и по установщику.
-          # Неподписанный установщик — единственный способ убедиться, что скачано то самое.
-          $files = @("storm-machine-$tag-win-x64.zip") + (Get-ChildItem releases -Filter '*.exe' | ForEach-Object { $_.FullName })
-          $lines = foreach ($f in $files) {
-            $h = (Get-FileHash $f -Algorithm SHA256).Hash
-            "$h  $(Split-Path $f -Leaf)"
+          foreach ($zip in Get-ChildItem "artifacts/$name/agents" -Filter 'storm-agent-*.zip') {
+            $rid = $zip.BaseName -replace '^storm-agent-', ''
+            Copy-Item $zip.FullName "out/storm-agent-$version-$rid.zip"
           }
-          $lines | Set-Content "SHA256SUMS.txt" -Encoding ascii
+
+          $lines = Get-ChildItem out -Filter '*.zip' | Sort-Object Name | ForEach-Object {
+            "{0}  {1}" -f (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant(), $_.Name
+          }
+          [IO.File]::WriteAllText("$PWD/out/SHA256SUMS.txt", (($lines -join "`n") + "`n"))
           $lines | Write-Host
 
       - name: Предупреждение о неподписанном выпуске
         if: steps.probe.outputs.found == 'true' && env.HAS_SIGNING != 'true'
         shell: pwsh
         run: |
-          Write-Host "::warning::Выпуск не подписан: токен SignPath не задан. SmartScreen покажет предупреждение при установке. Проверять скачанное — по SHA256SUMS.txt."
+          Write-Host "::warning::Выпуск не подписан: токен SignPath не задан. SmartScreen покажет предупреждение при первом запуске StormMachine.exe. Проверять скачанное — по SHA256SUMS.txt."
 
       # Описание выпуска берётся из docs/RELEASES.md — раздел этой версии целиком.
       # До этого шапка RELEASES.md обещала «из этого файла берётся описание выпуска»,
@@ -241,11 +241,11 @@ jobs:
       #
       # Записи нет — выпуск не собирается. Мягкий вариант («соберём без описания»)
       # кончается черновиком, который публикуют не глядя: у пользователя на руках
-      # установщик без единого слова о том, что в нём и чего от него не ждать.
+      # архив без единого слова о том, что в нём и чего от него не ждать.
       - name: Описание выпуска из RELEASES.md
         shell: pwsh
         run: |
-          $version = "${{ github.ref_name }}" -replace '^v', ''
+          $version = "${{ steps.version.outputs.version }}"
           $text = Get-Content docs/RELEASES.md -Raw -Encoding utf8
 
           # Пробел после номера обязателен: иначе «0.2.0» совпало бы с «0.2.0-alpha.3».
@@ -254,6 +254,14 @@ jobs:
 
           if (-not $found.Success) {
             Write-Host "::error::В docs/RELEASES.md нет раздела «## $version» — выпуск без описания не собирается."
+            exit 1
+          }
+
+          # Места, оставленные под итог, который знает только оператор (боевые тесты),
+          # помечены [[ВПИСАТЬ: …]]. Черновик с такой пометкой опубликовали бы не глядя —
+          # тем же путём, что и черновик без описания.
+          if ($found.Value -match '\[\[ВПИСАТЬ') {
+            Write-Host "::error::В разделе «## $version» docs/RELEASES.md остались места [[ВПИСАТЬ: …]] — заполните их перед выпуском."
             exit 1
           }
 
@@ -270,9 +278,5 @@ jobs:
           draft: true          # черновик: оператор проверяет и публикует вручную
           prerelease: ${{ contains(github.ref_name, '-') }}
           files: |
-            storm-machine-*.zip
-            SHA256SUMS.txt
-            releases/*.exe
-            releases/*.nupkg
-            releases/*.json
-            releases/RELEASES
+            out/*.zip
+            out/SHA256SUMS.txt
