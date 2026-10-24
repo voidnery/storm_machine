@@ -1,5 +1,4 @@
 using Avalonia;
-using Velopack;
 
 namespace StormMachine.App;
 
@@ -14,11 +13,6 @@ internal static class Program
     {
         try
         {
-            // Первой строкой и до Avalonia. Установщик запускает продукт с ключами
-            // вроде --veloapp-install, чтобы тот создал ярлыки и завершился; окно
-            // при этом появляться не должно, а появится, если сначала поднять Avalonia.
-            VelopackApp.Build().Run();
-
             return BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
         }
         catch (Exception ex)

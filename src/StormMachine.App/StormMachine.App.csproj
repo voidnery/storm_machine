@@ -60,9 +60,9 @@
     <PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.11" />
     <PackageReference Include="ScottPlot.Avalonia" Version="5.1.59" />
 
-    <!-- Обновление продукта. Работоспособность под обрезкой проверена спайком-07:
-         в отличие от Quartz, разбор ленты и разностные пакеты переживают ILLink. -->
-    <PackageReference Include="Velopack" Version="1.2.0" />
+    <!-- Velopack здесь больше нет: продукт поставляется только переносимым архивом
+         (D-0005), а лента обновлений работает лишь для копии, поставленной установщиком.
+         О новой версии говорит UpdateService — по кнопке и ссылкой на выпуск. -->
 
   </ItemGroup>
 

@@ -508,26 +508,22 @@
               <forms:CopyChip Text="{x:Static vm:SettingsPageViewModel.Version}" />
             </StackPanel>
 
-            <!-- Обновления показываются только там, где они возможны. В портативном
-                 режиме раздела нет вовсе: три серые кнопки и объяснение, почему они
-                 серые, — это рассказ о невозможном на месте, где человек ищет нужное
-                 (замечание оператора). Как получить новую версию, сказано в «Хранилище»,
-                 рядом с режимом. -->
-            <StackPanel Spacing="6" IsVisible="{Binding !Updates.IsPortable}">
-              <TextBlock Text="Обновление" Classes="caption" />
+            <!-- Новая версия. Установщика у продукта нет (только переносимый архив),
+                 поэтому и кнопок установки нет: проверка по нажатию и ссылка на выпуск.
+                 Адрес показан и текстом — на машине без браузера или без выхода наружу
+                 его копируют и открывают там, где выход есть. -->
+            <StackPanel Spacing="6">
+              <TextBlock Text="Новая версия" Classes="caption" />
               <TextBlock Text="{Binding Updates.StateText}" Classes="label" TextWrapping="Wrap" LineHeight="16" />
 
-              <forms:Caveat Text="{Binding Updates.Hold}" />
-
-              <Grid ColumnDefinitions="Auto,Auto,Auto">
+              <Grid ColumnDefinitions="Auto,Auto">
                 <Button Grid.Column="0" Content="Проверить" Padding="12,5" Margin="0,0,6,0"
                         Command="{Binding CheckUpdateCommand}" IsEnabled="{Binding Updates.CanCheck}" />
-                <Button Grid.Column="1" Content="Скачать" Padding="12,5" Margin="0,0,6,0"
-                        Command="{Binding DownloadUpdateCommand}" IsEnabled="{Binding Updates.CanDownload}" />
-                <Button Grid.Column="2" Content="Установить и перезапустить" Padding="12,5"
-                        Command="{Binding ApplyUpdateCommand}" IsEnabled="{Binding Updates.CanApply}"
-                        Background="{StaticResource AccentBrush}" Foreground="White" />
+                <Button Grid.Column="1" Content="Открыть страницу выпуска" Padding="12,5"
+                        Command="{Binding OpenReleasePageCommand}" />
               </Grid>
+
+              <forms:CopyChip Text="{Binding Updates.ReleasePage}" />
 
               <forms:MethodCard Thesis="{x:Static vm:SettingsPageViewModel.UpdateNote}"
                                    Detail="{x:Static vm:SettingsPageViewModel.UpdateNoteWhy}" />

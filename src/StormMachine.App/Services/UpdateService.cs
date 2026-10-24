@@ -1,12 +1,13 @@
+using System.ComponentModel;
+using System.Diagnostics;
+using System.Net.Http.Headers;
+using System.Text.Json;
 using CommunityToolkit.Mvvm.ComponentModel;
 using StormMachine.Application;
-using StormMachine.Application.Abstractions;
-using Velopack;
-using Velopack.Sources;
 
 namespace StormMachine.App.Services;
 
-/// <summary>Что сейчас известно про обновление.</summary>
+/// <summary>Что сейчас известно про новую версию.</summary>
 public enum UpdateState
 {
     /// <summary>Ещё не спрашивали.</summary>
@@ -18,33 +19,27 @@ public enum UpdateState
 
     Available,
 
-    Downloading,
-
-    /// <summary>Скачано и готово к установке. Установка — по команде оператора.</summary>
-    Ready,
-
-    /// <summary>Продукт запущен не из установленной копии: обновлять нечего.</summary>
-    NotInstalled,
-
     Failed,
 }
 
 /// <summary>
-/// Обновление продукта.
+/// Новая версия продукта: узнать — по кнопке, поставить — руками.
 /// </summary>
 /// <remarks>
-/// Проверка идёт сама, установка — только по команде человека. Причина не в осторожности
-/// вообще, а в том, чем продукт занимается: подменить версию посреди суточного мониторинга
-/// значит разорвать ряд измерений надвое и не сказать об этом. Условия измерения хранятся
-/// вместе с каждым прогоном именно затем, чтобы такие разрывы были видны, — устраивать их
-/// самому было бы прямым противоречием.
+/// Продукт поставляется только переносимым архивом (решение штаба D-0005), и ставить
+/// себя он не умеет и не должен. Переносимую копию везут с собой в папке, и подменять
+/// её на ходу нельзя; к тому же замена версии посреди суточного мониторинга разорвала бы
+/// ряд измерений надвое, не сказав об этом. Поэтому служба делает одно: спрашивает
+/// страницу выпусков и говорит, есть ли новее. Скачивают и распаковывают поверх руками.
 /// <para>
-/// То же правило, что у профилей окружения: узнать можно молча, поменять — нет.
+/// Спрашивает только по нажатию. Станцию приносят на чужие площадки, часто без выхода
+/// наружу, и обращение к GitHub, которого никто не просил, легло бы в тот самый трафик,
+/// который здесь измеряют.
 /// </para>
 /// <para>
-/// Работоспособность под обрезкой проверена спайком-07: лента, поиск, сверка контрольной
-/// суммы и разностный пакет работают на опубликованном бинарнике. Проверять это было
-/// обязательно — Quartz на том же вопросе провалился (спайк-06).
+/// До этого здесь жил Velopack с лентой обновлений и установкой по команде. Лента
+/// работает только для копии, поставленной установщиком, а установщика больше нет:
+/// у переносимой копии та же кнопка навсегда осталась бы серой.
 /// </para>
 /// </remarks>
 public sealed partial class UpdateService : ObservableObject
@@ -52,55 +47,13 @@ public sealed partial class UpdateService : ObservableObject
     /// <summary>Откуда берутся выпуски. Тот же репозиторий, что в README.</summary>
     public const string ReleasesUrl = "https://github.com/voidnery/storm_machine";
 
-    private readonly RunnerService _runner;
-    private UpdateManager? _manager;
-    private UpdateInfo? _pending;
-
     /// <summary>
-    /// Копия портативная — об этом говорится отдельными словами.
+    /// Список выпусков, а не «последний»: последним GitHub считает только стабильный,
+    /// а пока продукт выходит альфами и бетами, такой запрос не находил бы ничего.
     /// </summary>
-    /// <remarks>
-    /// Для Velopack портативная копия и запуск из каталога сборки — одно и то же:
-    /// «не установлено». Для человека — разные вещи: во втором случае он собирает
-    /// продукт и всё понимает сам, в первом он работает на площадке и ему важно
-    /// знать, как получить новую версию, не потеряв данные.
-    /// </remarks>
-    public bool IsPortable { get; }
+    private const string ReleasesApi = "https://api.github.com/repos/voidnery/storm_machine/releases?per_page=30";
 
-    public UpdateService(RunnerService runner, IStorageLocation location)
-    {
-        _runner = runner ?? throw new ArgumentNullException(nameof(runner));
-        IsPortable = (location ?? throw new ArgumentNullException(nameof(location))).IsPortable;
-
-        // Оговорка про идущие измерения зависит от списка операций, а не от состояния
-        // обновления: без этой подписки она застывала — измерение закончилось,
-        // а «дождитесь окончания» продолжало висеть, и наоборот.
-        _runner.ActiveChanged += (_, _) =>
-        {
-            OnPropertyChanged(nameof(Hold));
-            OnPropertyChanged(nameof(CanApply));
-        };
-
-        try
-        {
-            _manager = new UpdateManager(new GithubSource(ReleasesUrl, accessToken: null, prerelease: false));
-
-            if (!_manager.IsInstalled)
-            {
-                // Запуск из каталога сборки или из распакованного архива. Это не ошибка,
-                // и делать вид, что обновление возможно, нельзя: кнопка, которая ничего
-                // не сделает, хуже её отсутствия.
-                _manager = null;
-                State = UpdateState.NotInstalled;
-            }
-        }
-        catch (Exception ex) when (ex is IOException or InvalidOperationException or UnauthorizedAccessException)
-        {
-            _manager = null;
-            State = UpdateState.NotInstalled;
-            Detail = ex.Message;
-        }
-    }
+    private static readonly HttpClient Http = CreateClient();
 
     [ObservableProperty]
     private UpdateState _state;
@@ -111,58 +64,34 @@ public sealed partial class UpdateService : ObservableObject
     [ObservableProperty]
     private string? _detail;
 
-    [ObservableProperty]
-    private int _percent;
-
     public static string CurrentVersion => ProductInfo.Version;
 
-    public bool CanCheck => _manager is not null && State is not (UpdateState.Checking or UpdateState.Downloading);
-
-    public bool CanDownload => State == UpdateState.Available;
+    public bool CanCheck => State != UpdateState.Checking;
 
     /// <summary>
-    /// Установка предлагается, только когда она возможна.
+    /// Куда идти за архивом: к найденному выпуску, а пока его нет — к списку выпусков.
     /// </summary>
     /// <remarks>
-    /// Раньше кнопка оставалась включённой во время измерений, а сама установка
-    /// молча выходила по <see cref="Hold"/>: нажатие не давало ни результата,
-    /// ни объяснения. Кнопка обязана быть выключенной там, где действие не сработает.
+    /// Адрес собирается из разобранного номера, а не берётся из ответа сервера:
+    /// открывать в браузере то, что пришло по сети, продукт не станет.
     /// </remarks>
-    public bool CanApply => State == UpdateState.Ready && Hold is null;
+    public string ReleasePage => AvailableVersion is { } version
+        ? $"{ReleasesUrl}/releases/tag/v{version}"
+        : $"{ReleasesUrl}/releases";
 
     public string StateText => State switch
     {
-        UpdateState.Unknown => "Наличие обновлений ещё не проверялось.",
+        UpdateState.Unknown => "Новая версия ещё не искалась. Проверка спросит страницу выпусков на GitHub.",
         UpdateState.Checking => "Проверяю…",
-        UpdateState.UpToDate => "Установлена последняя версия.",
-        UpdateState.Available => $"Доступна версия {AvailableVersion}.",
-        UpdateState.Downloading => $"Скачиваю: {Percent}%",
-        UpdateState.Ready => $"Версия {AvailableVersion} скачана и готова к установке.",
-        UpdateState.NotInstalled when IsPortable =>
-            "Портативная копия не обновляется: обновление заменяет установленную копию, "
-            + "а эта живёт в своей папке и переносится целиком. Новую версию скачивают "
-            + "и распаковывают поверх — данные останутся, они лежат рядом.",
-        UpdateState.NotInstalled =>
-            "Продукт запущен не из установленной копии — обновлять нечего. "
-            + "Так бывает при работе из каталога сборки или из распакованного архива.",
-        _ => Detail ?? "Проверить не удалось.",
+        UpdateState.UpToDate => $"Новее {CurrentVersion} на GitHub нет.",
+        UpdateState.Available => $"Вышла версия {AvailableVersion}. Архив — на странице выпуска; "
+                                 + "ставится распаковкой поверх этой папки.",
+        _ => Detail is { Length: > 0 } detail ? $"Проверить не удалось: {detail}" : "Проверить не удалось.",
     };
-
-    /// <summary>
-    /// Почему установка сейчас не предлагается, даже если обновление скачано.
-    /// </summary>
-    /// <remarks>
-    /// Перезапуск посреди прогона обрывает измерение. Прогон, оборванный так,
-    /// сохранит измеренное — это обеспечено записью по ходу, — но ряд всё равно
-    /// разорвётся, а причина разрыва в журнале не будет видна.
-    /// </remarks>
-    public string? Hold => _runner.Active.Count > 0
-        ? "Идут измерения. Установка перезапустит продукт и оборвёт их — дождитесь окончания."
-        : null;
 
     public async Task CheckAsync(CancellationToken cancellationToken = default)
     {
-        if (_manager is not { } manager)
+        if (!CanCheck)
         {
             return;
         }
@@ -171,65 +100,109 @@ public sealed partial class UpdateService : ObservableObject
 
         try
         {
-            _pending = await manager.CheckForUpdatesAsync().ConfigureAwait(true);
+            using var response = await Http.GetAsync(new Uri(ReleasesApi), cancellationToken).ConfigureAwait(true);
+            response.EnsureSuccessStatusCode();
 
-            if (_pending is null)
-            {
-                Update(UpdateState.UpToDate);
+            await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(true);
+            using var document = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken)
+                .ConfigureAwait(true);
 
-                return;
-            }
-
-            AvailableVersion = _pending.TargetFullRelease.Version.ToString();
-            Update(UpdateState.Available);
+            AvailableVersion = Newer(Published(document.RootElement), CurrentVersion);
+            Update(AvailableVersion is null ? UpdateState.UpToDate : UpdateState.Available);
         }
-        catch (Exception ex) when (ex is HttpRequestException or IOException or InvalidOperationException
-                                       or TaskCanceledException)
+        catch (Exception ex) when (ex is HttpRequestException or IOException or JsonException
+                                       or TaskCanceledException or InvalidOperationException)
         {
             Detail = ex.Message;
             Update(UpdateState.Failed);
         }
     }
 
-    public async Task DownloadAsync(CancellationToken cancellationToken = default)
+    /// <summary>Открывает страницу выпуска в браузере.</summary>
+    public void OpenReleasePage()
     {
-        if (_manager is not { } manager || _pending is not { } update)
-        {
-            return;
-        }
-
-        Update(UpdateState.Downloading);
-
         try
         {
-            await manager.DownloadUpdatesAsync(
-                update,
-                percent =>
-                {
-                    Percent = percent;
-                    OnPropertyChanged(nameof(StateText));
-                },
-                cancelToken: cancellationToken).ConfigureAwait(true);
-
-            Update(UpdateState.Ready);
+            Process.Start(new ProcessStartInfo(ReleasePage) { UseShellExecute = true });
         }
-        catch (Exception ex) when (ex is HttpRequestException or IOException or InvalidOperationException
-                                       or TaskCanceledException)
+        catch (Win32Exception ex)
         {
-            Detail = ex.Message;
+            // Браузера может не быть — на служебной машине это обычное дело. Адрес
+            // на экране остаётся: его копируют и открывают там, где выход наружу есть.
+            Detail = $"браузер не открылся ({ex.Message}). Адрес можно скопировать ниже.";
             Update(UpdateState.Failed);
         }
     }
 
-    /// <summary>Ставит скачанное и перезапускает продукт. Только по команде человека.</summary>
-    public void Apply()
+    /// <summary>
+    /// Самый новый выпуск старше текущей версии, либо <see langword="null"/>.
+    /// </summary>
+    /// <remarks>
+    /// Стабильной версии предлагаются только стабильные выпуски, предварительной — любые
+    /// новее неё. Кто сидит на альфе, ждёт следующую альфу; кто на стабильной — не ждёт.
+    /// </remarks>
+    internal static string? Newer(IEnumerable<(string Tag, bool Prerelease)> releases, string current)
     {
-        if (_manager is not { } manager || _pending is not { } update || Hold is not null)
+        if (!ReleaseVersion.TryParse(current, out var installed))
         {
-            return;
+            return null;
         }
 
-        manager.ApplyUpdatesAndRestart(update.TargetFullRelease);
+        ReleaseVersion? newest = null;
+
+        foreach (var (tag, prerelease) in releases)
+        {
+            if (!ReleaseVersion.TryParse(tag, out var candidate)
+                || ((prerelease || candidate.IsPrerelease) && !installed.IsPrerelease)
+                || candidate <= installed
+                || (newest is { } best && candidate <= best))
+            {
+                continue;
+            }
+
+            newest = candidate;
+        }
+
+        return newest?.ToString();
+    }
+
+    /// <summary>Опубликованные выпуски из ответа GitHub: черновики пропускаются.</summary>
+    private static List<(string Tag, bool Prerelease)> Published(JsonElement root)
+    {
+        var found = new List<(string Tag, bool Prerelease)>();
+
+        if (root.ValueKind != JsonValueKind.Array)
+        {
+            return found;
+        }
+
+        foreach (var release in root.EnumerateArray())
+        {
+            if (release.ValueKind != JsonValueKind.Object
+                || (release.TryGetProperty("draft", out var draft) && draft.ValueKind == JsonValueKind.True)
+                || !release.TryGetProperty("tag_name", out var tag)
+                || tag.ValueKind != JsonValueKind.String
+                || tag.GetString() is not { Length: > 0 } name)
+            {
+                continue;
+            }
+
+            var prerelease = release.TryGetProperty("prerelease", out var flag) && flag.ValueKind == JsonValueKind.True;
+            found.Add((name, prerelease));
+        }
+
+        return found;
+    }
+
+    private static HttpClient CreateClient()
+    {
+        var client = new HttpClient { Timeout = TimeSpan.FromSeconds(20) };
+
+        // Без User-Agent GitHub отвечает 403: таково правило его API.
+        client.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("StormMachine", CurrentVersion));
+        client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/vnd.github+json"));
+
+        return client;
     }
 
     private void Update(UpdateState state)
@@ -238,8 +211,6 @@ public sealed partial class UpdateService : ObservableObject
 
         OnPropertyChanged(nameof(StateText));
         OnPropertyChanged(nameof(CanCheck));
-        OnPropertyChanged(nameof(CanDownload));
-        OnPropertyChanged(nameof(CanApply));
-        OnPropertyChanged(nameof(Hold));
+        OnPropertyChanged(nameof(ReleasePage));
     }
 }

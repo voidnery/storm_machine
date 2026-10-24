@@ -162,9 +162,9 @@ public sealed partial class SettingsPageViewModel : PageViewModel
     /// Обновление продукта.
     /// </summary>
     /// <remarks>
-    /// Живёт в настройках, а не всплывает само: проверка идёт молча, установка —
-    /// по команде человека. Подменить версию посреди мониторинга значит разорвать
-    /// ряд измерений и не сказать об этом.
+    /// Живёт в настройках, а не всплывает само: новую версию ищут по кнопке, ставят
+    /// руками — распаковкой архива поверх. Подменить версию посреди мониторинга значит
+    /// разорвать ряд измерений и не сказать об этом.
     /// </remarks>
     public UpdateService Updates { get; }
 
@@ -210,7 +210,8 @@ public sealed partial class SettingsPageViewModel : PageViewModel
           + "они рядом, а не внутри."
         : "Данные лежат в профиле пользователя этой машины. Положите рядом с программой файл "
           + StorageEnvironment.PortableMarker
-          + " — и она станет портативной.";
+          + " — и она станет портативной. Архив выпуска приносит этот файл с собой: распаковав "
+          + "новую версию поверх, удалите его снова, иначе продукт начнёт искать данные рядом с собой.";
 
     /// <summary>
     /// Где искать журнал клиента.
@@ -332,16 +333,15 @@ public sealed partial class SettingsPageViewModel : PageViewModel
     private Task CheckUpdateAsync(CancellationToken cancellationToken) => Updates.CheckAsync(cancellationToken);
 
     [RelayCommand]
-    private Task DownloadUpdateAsync(CancellationToken cancellationToken) => Updates.DownloadAsync(cancellationToken);
+    private void OpenReleasePage() => Updates.OpenReleasePage();
 
-    [RelayCommand]
-    private void ApplyUpdate() => Updates.Apply();
-
-    public static string UpdateNote => "Проверка идёт сама, установка — по команде.";
+    public static string UpdateNote => "Проверка — по кнопке, установка — руками.";
 
     public static string UpdateNoteWhy =>
-        "Продукт измеряет, и подменить свою версию посреди суточного мониторинга "
-        + "значило бы разорвать ряд измерений надвое, не сказав об этом.";
+        "Без нажатия продукт к GitHub не обращается: станцию приносят на чужие площадки, "
+        + "и непрошеный запрос наружу лёг бы в измеряемый трафик. Новую версию скачивают "
+        + "архивом и распаковывают поверх: подменять себя посреди суточного мониторинга "
+        + "продукт не станет — это разорвало бы ряд измерений.";
 
     public static string LicenceNote => "Продукт распространяется по лицензии MIT.";
 
